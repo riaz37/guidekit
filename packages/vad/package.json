@@ -16,7 +16,7 @@
   "files": [
     "dist",
     "models",
-    "../../LICENSE",
+    "LICENSE",
     "README.md"
   ],
   "scripts": {
