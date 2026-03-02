@@ -1,6 +1,6 @@
 {
   "name": "@guidekit/core",
-  "version": "0.1.0-beta.2",
+  "version": "0.1.0-beta.3",
   "description": "Core engine for GuideKit SDK — DOM intelligence, LLM orchestration, context management",
   "type": "module",
   "main": "./dist/index.cjs",

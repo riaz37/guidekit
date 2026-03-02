@@ -1,6 +1,6 @@
 {
   "name": "@guidekit/react",
-  "version": "0.1.0-beta.2",
+  "version": "0.1.0-beta.3",
   "description": "React bindings for GuideKit SDK — Provider, hooks, and Widget",
   "type": "module",
   "main": "./dist/index.cjs",

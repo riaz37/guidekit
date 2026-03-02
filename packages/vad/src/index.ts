@@ -126,8 +126,7 @@ export class SileroVAD {
 
   // ONNX Runtime state
   private _session: ort.InferenceSession | null = null;
-  private _h: ort.Tensor | null = null;
-  private _c: ort.Tensor | null = null;
+  private _state: ort.Tensor | null = null;
 
   // Audio pipeline
   private _audioContext: AudioContext | null = null;
@@ -262,15 +261,13 @@ export class SileroVAD {
     const feeds: Record<string, ort.Tensor> = {
       input: inputTensor,
       sr: srTensor,
-      h: this._h!,
-      c: this._c!,
+      state: this._state!,
     };
 
     const results = await this._session.run(feeds);
 
-    // Update LSTM hidden/cell states for the next frame.
-    this._h = results['hn'] as ort.Tensor;
-    this._c = results['cn'] as ort.Tensor;
+    // Update LSTM state for the next frame.
+    this._state = results['stateN'] as ort.Tensor;
 
     const probability = (results['output'] as ort.Tensor).data[0] as number;
     return probability;
@@ -390,10 +387,8 @@ export class SileroVAD {
     }
 
     // Dispose tensors.
-    this._h?.dispose();
-    this._c?.dispose();
-    this._h = null;
-    this._c = null;
+    this._state?.dispose();
+    this._state = null;
 
     this._isReady = false;
     this._isDestroyed = true;
@@ -662,15 +657,13 @@ export class SileroVAD {
   // Private: ONNX state helpers
   // -------------------------------------------------------------------------
 
-  /** Reset the LSTM hidden and cell states to zeros. */
+  /** Reset the LSTM state to zeros. */
   private _resetStates(): void {
-    // Dispose any existing tensors to free memory.
-    this._h?.dispose();
-    this._c?.dispose();
+    // Dispose any existing tensor to free memory.
+    this._state?.dispose();
 
     const zeros = new Float32Array(2 * STATE_SIZE).fill(0);
-    this._h = new ort.Tensor('float32', zeros.slice(0, STATE_SIZE), [2, 1, 64]);
-    this._c = new ort.Tensor('float32', zeros.slice(STATE_SIZE), [2, 1, 64]);
+    this._state = new ort.Tensor('float32', zeros, [2, 1, STATE_SIZE]);
   }
 
   // -------------------------------------------------------------------------
