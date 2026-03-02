@@ -1,6 +1,6 @@
 {
   "name": "@guidekit/server",
-  "version": "0.1.0",
+  "version": "0.1.0-beta.1",
   "description": "Server-side utilities for GuideKit SDK — token generation, auth middleware",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -13,7 +13,11 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist", "../../LICENSE", "README.md"],
+  "files": [
+    "dist",
+    "../../LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",

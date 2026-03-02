@@ -1,6 +1,6 @@
 {
   "name": "@guidekit/vanilla",
-  "version": "0.1.0",
+  "version": "0.1.0-beta.1",
   "description": "Vanilla JS bundle for GuideKit SDK — script-tag integration",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -17,7 +17,11 @@
       "default": "./dist/index.global.js"
     }
   },
-  "files": ["dist", "../../LICENSE", "README.md"],
+  "files": [
+    "dist",
+    "../../LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
