@@ -1,0 +1,162 @@
+# Vanilla (Non-React)
+
+`@guidekit/vanilla` provides an IIFE bundle for using GuideKit without React, via a `<script>` tag.
+
+## CDN Usage
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/@guidekit/vanilla/dist/index.global.js"></script>
+<script>
+  GuideKit.init({
+    tokenEndpoint: '/api/guidekit/token',
+    agent: { name: 'Guide', greeting: 'Hello!' },
+  });
+</script>
+```
+
+## NPM Usage
+
+```bash
+npm install @guidekit/vanilla
+```
+
+```javascript
+import { init, sendText, highlight, destroy } from '@guidekit/vanilla';
+
+await init({
+  tokenEndpoint: '/api/guidekit/token',
+  agent: { name: 'Guide' },
+});
+
+const response = await sendText('What is this page about?');
+```
+
+## API
+
+### init(options)
+
+Initialize GuideKit. Must be called before any other methods. Idempotent.
+
+```typescript
+await init({
+  tokenEndpoint: '/api/guidekit/token',
+  llm: { provider: 'gemini', apiKey: '...' },  // Or use tokenEndpoint
+  agent: { name: 'Guide', greeting: 'Hi!' },
+  options: { mode: 'text', debug: true },
+  headless: false,  // Set true to hide built-in widget UI
+  onError: (err) => console.error(err),
+  onEvent: (event) => analytics.track(event),
+  onReady: () => console.log('Ready!'),
+});
+```
+
+### sendText(message)
+
+Send a text message and get a response.
+
+```typescript
+const response = await sendText('Show me pricing');
+```
+
+### highlight(params)
+
+Spotlight an element on the page.
+
+```typescript
+highlight({
+  sectionId: 'pricing',
+  tooltip: 'Check out our plans!',
+  position: 'top',
+});
+```
+
+### dismissHighlight()
+
+Remove the current spotlight.
+
+### scrollToSection(sectionId, offset?)
+
+Smooth scroll to a section. Optional pixel offset for sticky headers.
+
+```typescript
+scrollToSection('features', 80);
+```
+
+### startTour(sectionIds, mode?)
+
+Start a guided tour through sections.
+
+```typescript
+startTour(['hero', 'features', 'pricing', 'cta'], 'manual');
+```
+
+### stopTour()
+
+Stop the current tour.
+
+### navigate(href)
+
+Navigate to a URL (same-origin only).
+
+```typescript
+await navigate('/pricing');
+```
+
+### setPageContext(context)
+
+Set developer context for the LLM.
+
+```typescript
+setPageContext({ currentUser: 'John', plan: 'pro' });
+```
+
+### registerAction(actionId, action)
+
+Register a custom action the LLM can invoke.
+
+```typescript
+registerAction('addToCart', {
+  description: 'Add product to cart',
+  parameters: { productId: 'string', quantity: 'number' },
+  handler: async ({ productId, quantity }) => {
+    await cart.add(productId, quantity);
+    return { success: true };
+  },
+});
+```
+
+### Voice Methods
+
+```typescript
+await startListening();  // Start voice input
+stopListening();         // Stop voice input
+```
+
+### State Queries
+
+```typescript
+const state = getAgentState();     // Current agent state
+const model = getPageModel();      // Current page model
+const ready = isReady();           // Whether SDK is ready
+const quiet = getQuietMode();      // Quiet mode status
+setQuietMode(true);                // Enable quiet mode
+```
+
+### Health & Cleanup
+
+```typescript
+const health = await checkHealth();  // Service health check
+await destroy();                     // Clean up everything
+const core = getCore();              // Access underlying GuideKitCore
+```
+
+## Built-in Widget
+
+By default, `init()` creates a floating chat widget with:
+- FAB button (bottom-right)
+- Chat panel with text input
+- Mobile-responsive bottom sheet
+- Shadow DOM style isolation
+- Accessibility (keyboard nav, ARIA attributes)
+
+Set `headless: true` to disable the widget and build your own UI.

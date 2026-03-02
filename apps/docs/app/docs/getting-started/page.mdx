@@ -1,0 +1,122 @@
+# Getting Started
+
+## Installation
+
+```bash
+npm install @guidekit/core @guidekit/react @guidekit/server
+```
+
+For voice support, also install the VAD package:
+
+```bash
+npm install @guidekit/vad
+```
+
+## Setup with CLI
+
+The fastest way to get started:
+
+```bash
+npx guidekit init
+```
+
+This scaffolds the token endpoint, provider component, and environment variables for your framework (Next.js App Router, Pages Router, or generic React).
+
+Then generate a signing secret:
+
+```bash
+npx guidekit generate-secret
+```
+
+Add the secret and your API keys to `.env.local`:
+
+```env
+GUIDEKIT_SECRET=your-generated-secret
+GEMINI_KEY=your-gemini-api-key
+DEEPGRAM_KEY=your-deepgram-key      # Optional, for voice
+ELEVENLABS_KEY=your-elevenlabs-key  # Optional, for voice
+```
+
+## Manual Setup
+
+### 1. Create Token Endpoint
+
+```typescript
+// app/api/guidekit/token/route.ts (Next.js App Router)
+import { createSessionToken } from '@guidekit/server';
+
+export async function POST() {
+  const token = await createSessionToken({
+    signingSecret: process.env.GUIDEKIT_SECRET!,
+    geminiKey: process.env.GEMINI_KEY!,
+    deepgramKey: process.env.DEEPGRAM_KEY,
+    elevenlabsKey: process.env.ELEVENLABS_KEY,
+    expiresIn: '15m',
+  });
+  return Response.json(token);
+}
+```
+
+### 2. Add the Provider
+
+```tsx
+// app/layout.tsx
+import { GuideKitProvider } from '@guidekit/react';
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <GuideKitProvider
+      tokenEndpoint="/api/guidekit/token"
+      agent={{
+        name: 'Guide',
+        greeting: 'Hi! How can I help you today?',
+      }}
+      options={{
+        mode: 'text',
+        debug: process.env.NODE_ENV === 'development',
+      }}
+    >
+      {children}
+    </GuideKitProvider>
+  );
+}
+```
+
+### 3. Verify Setup
+
+```bash
+npx guidekit doctor
+```
+
+This checks your environment variables, package installations, and provider connectivity.
+
+## Quick Prototyping (Dev Only)
+
+For quick prototyping without a token endpoint, pass API keys directly:
+
+```tsx
+<GuideKitProvider
+  llm={{ provider: 'gemini', apiKey: 'your-key' }}
+  agent={{ name: 'Guide' }}
+>
+  {children}
+</GuideKitProvider>
+```
+
+**Warning:** This exposes keys in the browser. Only use for local development.
+
+## Framework Support
+
+| Framework | Support |
+|-----------|---------|
+| Next.js App Router | Full (recommended) |
+| Next.js Pages Router | Full |
+| Vite + React | Full |
+| Create React App | Full |
+| Non-React (vanilla JS) | Via `@guidekit/vanilla` |
+
+## Next Steps
+
+- [Provider Setup](/docs/provider) — Configuration options in depth
+- [Hooks API](/docs/hooks) — Using hooks in your components
+- [Architecture](/docs/architecture) — How GuideKit works under the hood

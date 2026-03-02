@@ -1,0 +1,54 @@
+{
+  "name": "@guidekit/react",
+  "version": "0.1.0",
+  "description": "React bindings for GuideKit SDK — Provider, hooks, and Widget",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./devtools": {
+      "types": "./dist/devtools.d.ts",
+      "import": "./dist/devtools.js",
+      "require": "./dist/devtools.cjs"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js",
+      "require": "./dist/testing.cjs"
+    }
+  },
+  "files": ["dist", "../../LICENSE", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@guidekit/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "tsup": "^8.4.0",
+    "vitest": "^3.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  },
+  "sideEffects": false,
+  "license": "MIT"
+}

@@ -1,0 +1,55 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: '0 6 * * *' # 6am UTC daily
+  workflow_dispatch: # allow manual trigger
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+jobs:
+  full-test-suite:
+    name: Full Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm build
+
+      - name: Unit tests
+        run: pnpm test:unit
+
+      - name: Bundle size check
+        run: pnpm size:check
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: E2E tests (all browsers)
+        run: npx playwright test --project=chromium
+        # When Firefox/Safari projects are added to playwright.config.ts,
+        # remove the --project flag to run all browsers.
+
+      - name: Dependency audit
+        run: pnpm audit --prod || true
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-playwright-report
+          path: playwright-report/
+          retention-days: 14

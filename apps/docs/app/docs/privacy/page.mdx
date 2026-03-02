@@ -1,0 +1,69 @@
+# Privacy & Security
+
+GuideKit provides multiple mechanisms to protect user privacy and control what data reaches external LLM providers.
+
+## `onBeforeLLMCall` Hook
+
+Intercept and modify every payload before it is sent to the LLM. Use this to redact PII, filter content, or block requests entirely.
+
+```tsx
+<GuideKitProvider
+  tokenEndpoint="/api/guidekit/token"
+  agent={{ name: 'Guide' }}
+  options={{
+    privacy: {
+      onBeforeLLMCall: (payload) => {
+        // Redact email addresses
+        payload.messages = payload.messages.map((msg) => ({
+          ...msg,
+          content: msg.content.replace(
+            /[\w.-]+@[\w.-]+\.\w+/g,
+            '[REDACTED_EMAIL]'
+          ),
+        }));
+
+        // Return null to block the request entirely
+        // return null;
+
+        return payload;
+      },
+    },
+  }}
+>
+  {children}
+</GuideKitProvider>
+```
+
+If `onBeforeLLMCall` returns `null`, the request is cancelled and the SDK emits a `PRIVACY_HOOK_CANCELLED` error.
+
+## `data-guidekit-ignore`
+
+Add this attribute to any DOM element to exclude it from the page model sent to the LLM. The DOM Scanner skips these elements entirely.
+
+```html
+<div data-guidekit-ignore>
+  <p>This content will not be included in LLM context.</p>
+  <input type="password" />
+</div>
+```
+
+Use this for:
+- Password fields and sensitive forms
+- Internal admin controls
+- Content that should not influence AI responses
+
+## Token-based Authentication
+
+API keys never reach the browser. The `@guidekit/server` package generates short-lived JWTs that the client SDK uses to authenticate. Keys are encrypted within the token payload and decrypted server-side by the provider adapters.
+
+## Security Deny-list
+
+The `clickElement` tool action maintains a deny-list of selectors that cannot be programmatically clicked:
+
+- `button[type="submit"]` on payment forms
+- Elements with `data-guidekit-deny-click`
+- Links to external domains (configurable)
+
+## Data Retention
+
+GuideKit stores conversation history in memory only. Session data in `sessionStorage` is cleared when the browser tab closes. No data is persisted to disk or sent to GuideKit servers.

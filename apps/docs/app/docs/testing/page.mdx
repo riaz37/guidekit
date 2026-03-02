@@ -1,0 +1,188 @@
+# Testing Utilities
+
+`@guidekit/react/testing` provides mock providers and simulation helpers for testing components that use GuideKit hooks.
+
+## Installation
+
+Testing utilities are included in `@guidekit/react` — no extra installation needed.
+
+```typescript
+import {
+  MockGuideKitProvider,
+  simulateAgentResponse,
+  simulateVoiceInput,
+  simulateError,
+  simulateReady,
+  resetAgentState,
+  getGuideKitTestState,
+  cleanupTestStore,
+} from '@guidekit/react/testing';
+```
+
+## MockGuideKitProvider
+
+A lightweight mock provider that satisfies the context contract used by all GuideKit hooks, without requiring real API keys or browser APIs.
+
+```tsx
+import { render } from '@testing-library/react';
+import { MockGuideKitProvider } from '@guidekit/react/testing';
+
+render(
+  <MockGuideKitProvider
+    initialState={{ isReady: true, agentState: { status: 'idle' } }}
+    actions={{ sendText: vi.fn() }}
+  >
+    <ComponentUnderTest />
+  </MockGuideKitProvider>
+);
+```
+
+### Props
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `initialState` | `MockInitialState` | Initial store state |
+| `actions` | `MockActions` | Mock implementations for actions |
+| `children` | `ReactNode` | Components to render |
+
+### MockInitialState
+
+```typescript
+interface MockInitialState {
+  isReady?: boolean;           // Default: false
+  agentState?: AgentState;     // Default: { status: 'idle' }
+  error?: GuideKitErrorType;   // Default: null
+}
+```
+
+### MockActions
+
+All actions default to noops. Override with `vi.fn()` for assertions:
+
+```typescript
+interface MockActions {
+  sendText?: (text: string) => Promise<string>;
+  highlight?: (params: HighlightParams) => void;
+  dismissHighlight?: () => void;
+  scrollToSection?: (sectionId: string, offset?: number) => void;
+  startTour?: (sectionIds: string[], mode?: 'auto' | 'manual') => void;
+  navigate?: (href: string) => Promise<boolean>;
+  setPageContext?: (context: Record<string, unknown>) => void;
+  registerAction?: (actionId: string, action: ActionDef) => void;
+  startListening?: () => Promise<void>;
+  stopListening?: () => void;
+}
+```
+
+## Simulation Helpers
+
+These functions update the global mock store, triggering re-renders in any mounted components.
+
+### simulateAgentResponse(text)
+
+Sets agent state to `{ status: 'speaking', utterance: text }`.
+
+```typescript
+simulateAgentResponse('Hello! This is the pricing page.');
+
+const state = getGuideKitTestState();
+expect(state.status.agentState.status).toBe('speaking');
+```
+
+### simulateVoiceInput(text)
+
+Sets agent state to `{ status: 'processing', transcript: text }` and `isListening: false`.
+
+```typescript
+simulateVoiceInput('Show me the pricing');
+```
+
+### simulateError(error)
+
+Sets agent state to error and populates the store-level error field.
+
+```typescript
+const error = new AuthenticationError({
+  code: 'AUTH_INVALID_KEY',
+  message: 'Invalid API key',
+  recoverable: false,
+  suggestion: 'Check your key',
+  docsUrl: 'https://guidekit.dev/errors/AUTH_INVALID_KEY',
+});
+simulateError(error);
+```
+
+### simulateReady(isReady?)
+
+Sets the `isReady` flag. Defaults to `true`.
+
+```typescript
+simulateReady(true);
+```
+
+### resetAgentState()
+
+Resets to idle state and clears errors.
+
+```typescript
+resetAgentState();
+// agentState: { status: 'idle' }, error: null
+```
+
+### getGuideKitTestState()
+
+Returns the current mock store state for assertions.
+
+```typescript
+const state = getGuideKitTestState();
+expect(state.status.isReady).toBe(true);
+expect(state.voice.isListening).toBe(false);
+```
+
+### cleanupTestStore()
+
+Clears the global store reference. Call in `afterEach` to prevent state leaking.
+
+```typescript
+afterEach(() => {
+  cleanupTestStore();
+});
+```
+
+## Full Example
+
+```tsx
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import {
+  MockGuideKitProvider,
+  simulateAgentResponse,
+  getGuideKitTestState,
+  cleanupTestStore,
+} from '@guidekit/react/testing';
+import { MyChat } from './MyChat';
+
+describe('MyChat', () => {
+  afterEach(() => cleanupTestStore());
+
+  it('displays agent response', async () => {
+    const sendText = vi.fn().mockResolvedValue('Hello!');
+
+    render(
+      <MockGuideKitProvider
+        initialState={{ isReady: true }}
+        actions={{ sendText }}
+      >
+        <MyChat />
+      </MockGuideKitProvider>
+    );
+
+    // Simulate user typing
+    await userEvent.type(screen.getByRole('textbox'), 'Hi');
+    await userEvent.click(screen.getByRole('button', { name: /send/i }));
+
+    expect(sendText).toHaveBeenCalledWith('Hi');
+  });
+});
+```

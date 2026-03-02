@@ -1,0 +1,95 @@
+# Server SDK
+
+The `@guidekit/server` package provides server-side utilities for secure token generation and validation.
+
+## Installation
+
+```bash
+npm install @guidekit/server
+```
+
+## `createSessionToken`
+
+Generates a signed JWT containing encrypted API keys. The client SDK sends this token with every request.
+
+```typescript
+import { createSessionToken } from '@guidekit/server';
+
+export async function POST() {
+  const token = await createSessionToken({
+    signingSecret: process.env.GUIDEKIT_SECRET!,
+    geminiKey: process.env.GEMINI_KEY!,
+    deepgramKey: process.env.DEEPGRAM_KEY,
+    elevenlabsKey: process.env.ELEVENLABS_KEY,
+    expiresIn: '15m',
+  });
+
+  return Response.json(token);
+}
+```
+
+### Options
+
+| Option | Type | Required | Description |
+|--------|------|----------|-------------|
+| `signingSecret` | `string` | Yes | Secret used to sign the JWT |
+| `geminiKey` | `string` | Yes | Google Gemini API key |
+| `deepgramKey` | `string` | No | Deepgram API key (for STT) |
+| `elevenlabsKey` | `string` | No | ElevenLabs API key (for TTS) |
+| `expiresIn` | `string` | No | Token lifetime (default: `'15m'`) |
+| `metadata` | `object` | No | Custom claims to include in the token |
+
+## `validateSessionToken`
+
+Verifies and decodes a token. Useful for custom middleware or edge functions.
+
+```typescript
+import { validateSessionToken } from '@guidekit/server';
+
+const payload = await validateSessionToken({
+  token: request.headers.get('Authorization')?.replace('Bearer ', '')!,
+  signingSecret: process.env.GUIDEKIT_SECRET!,
+});
+
+if (!payload) {
+  return new Response('Unauthorized', { status: 401 });
+}
+```
+
+## Secret Rotation
+
+To rotate your signing secret without downtime:
+
+1. Generate a new secret: `npx guidekit generate-secret`
+2. Set `GUIDEKIT_SECRET_NEW` in your environment
+3. Update your token endpoint to sign with the new secret
+4. Wait for all existing tokens to expire (default 15 minutes)
+5. Remove the old secret and rename `GUIDEKIT_SECRET_NEW` to `GUIDEKIT_SECRET`
+
+## Framework Examples
+
+### Next.js App Router
+
+```typescript
+// app/api/guidekit/token/route.ts
+import { createSessionToken } from '@guidekit/server';
+
+export async function POST() {
+  const token = await createSessionToken({ /* ... */ });
+  return Response.json(token);
+}
+```
+
+### Express
+
+```typescript
+import express from 'express';
+import { createSessionToken } from '@guidekit/server';
+
+const app = express();
+
+app.post('/api/guidekit/token', async (req, res) => {
+  const token = await createSessionToken({ /* ... */ });
+  res.json(token);
+});
+```

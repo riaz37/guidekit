@@ -1,0 +1,75 @@
+# DevTools
+
+`@guidekit/react/devtools` provides a developer panel for debugging GuideKit in development.
+
+## Usage
+
+```tsx
+import { GuideKitDevTools } from '@guidekit/react/devtools';
+
+function App() {
+  return (
+    <>
+      <GuideKitProvider tokenEndpoint="/api/guidekit/token">
+        {children}
+      </GuideKitProvider>
+      {process.env.NODE_ENV === 'development' && <GuideKitDevTools />}
+    </>
+  );
+}
+```
+
+## Features
+
+The DevTools panel has four tabs:
+
+### State Tab
+
+Shows the current SDK state:
+- **isReady** — Whether the SDK has initialized
+- **Agent State** — Current status (idle, listening, processing, speaking, error)
+- **Voice** — isListening, isSpeaking
+- **Error** — Current error (if any) with code, message, suggestion
+
+### Events Tab
+
+Live stream of all EventBus events:
+- DOM events (`dom:scan-complete`, `dom:mutation-detected`, `dom:route-change`)
+- LLM events (`llm:response-start`, `llm:response-chunk`, `llm:tool-call`)
+- Voice events (`voice:state-change`, `voice:transcript`)
+- Auth events (`auth:token-refreshed`, `auth:token-expired`)
+- Error events
+
+Each event shows its type, timestamp, and data payload.
+
+### Sections Tab
+
+Displays the current PageModel:
+- All discovered page sections with IDs
+- Section scores (visibility-based priority)
+- Interactive elements found
+- Forms detected
+- Scan metadata (nodes scanned, budget status)
+
+### Rate Limits Tab
+
+Shows current rate limiter state:
+- LLM calls: current / limit per minute
+- STT minutes: current / limit per session
+- TTS characters: current / limit per session
+- Visual meters showing usage
+
+## Appearance
+
+The DevTools panel:
+- Fixed position, top-right corner
+- Dark theme with monospace font
+- Collapsible (click the GuideKit DevTools header)
+- z-index 2147483646 (one below widget)
+- SSR safe (renders nothing server-side)
+
+## Props
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `core` | `GuideKitCore` | Optional — reads from context if not provided |

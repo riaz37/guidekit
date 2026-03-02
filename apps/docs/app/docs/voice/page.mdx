@@ -1,0 +1,72 @@
+# Voice
+
+GuideKit supports half-duplex voice interactions powered by VAD (Voice Activity Detection), STT (Speech-to-Text), and TTS (Text-to-Speech).
+
+## Setup
+
+Install the VAD package alongside the core SDK:
+
+```bash
+npm install @guidekit/vad
+```
+
+Enable voice mode in the provider:
+
+```tsx
+<GuideKitProvider
+  tokenEndpoint="/api/guidekit/token"
+  agent={{ name: 'Guide' }}
+  options={{ mode: 'voice' }}
+>
+  {children}
+</GuideKitProvider>
+```
+
+## How It Works
+
+1. **VAD** (`@guidekit/vad`) — Silero ONNX model detects when the user starts and stops speaking
+2. **STT** (Deepgram) — Streams audio via WebSocket for real-time transcription
+3. **LLM** (Gemini) — Processes the transcribed text and generates a response
+4. **TTS** (ElevenLabs) — Converts the response to speech and plays it back
+
+## Voice Events
+
+Subscribe to voice lifecycle events via the `useGuideKitVoice` hook or the EventBus:
+
+```tsx
+const { isListening, startVoice, stopVoice } = useGuideKitVoice();
+```
+
+| Event | Description |
+|-------|-------------|
+| `voice:vad_start` | User started speaking |
+| `voice:vad_end` | User stopped speaking |
+| `voice:stt_result` | Transcription received |
+| `voice:tts_start` | TTS playback started |
+| `voice:tts_end` | TTS playback finished |
+
+## Barge-in
+
+When the user speaks while TTS is playing, the SDK detects barge-in and:
+
+1. Stops the current TTS playback
+2. Captures the new speech via STT
+3. Sends the new input to the LLM
+
+## Degradation
+
+If any voice component fails (microphone denied, WebSocket dropped, etc.), the SDK automatically falls back to text-only mode and emits the relevant error code. Users can continue interacting via text without interruption.
+
+## Provider Keys
+
+Voice requires additional API keys in your token endpoint:
+
+```typescript
+const token = await createSessionToken({
+  signingSecret: process.env.GUIDEKIT_SECRET!,
+  geminiKey: process.env.GEMINI_KEY!,
+  deepgramKey: process.env.DEEPGRAM_KEY!,
+  elevenlabsKey: process.env.ELEVENLABS_KEY!,
+  expiresIn: '15m',
+});
+```

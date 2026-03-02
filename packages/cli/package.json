@@ -1,0 +1,40 @@
+{
+  "name": "@guidekit/cli",
+  "version": "0.1.0",
+  "description": "CLI tools for GuideKit SDK — init, doctor, generate-secret",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "guidekit": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist", "../../LICENSE", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run --config ../../vitest.config.ts",
+    "test:unit": "vitest run --config ../../vitest.config.ts",
+    "test:watch": "vitest --config ../../vitest.config.ts",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@guidekit/server": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "tsup": "^8.4.0",
+    "vitest": "^3.0.0",
+    "@types/node": "^22.0.0"
+  },
+  "sideEffects": false,
+  "license": "MIT"
+}

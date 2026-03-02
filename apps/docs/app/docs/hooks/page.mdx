@@ -1,0 +1,193 @@
+# Hooks API
+
+GuideKit provides focused hooks that subscribe to specific store slices, minimizing re-renders.
+
+## useGuideKitStatus
+
+Tracks SDK readiness, agent state, and errors.
+
+```tsx
+const { isReady, agentState, error } = useGuideKitStatus();
+```
+
+**Re-renders:** Only when status, agentState, or error changes.
+
+### Agent State
+
+`agentState` is a discriminated union:
+
+```typescript
+type AgentState =
+  | { status: 'idle' }
+  | { status: 'listening'; durationMs: number }
+  | { status: 'processing'; transcript: string }
+  | { status: 'speaking'; utterance: string }
+  | { status: 'error'; error: GuideKitError };
+```
+
+### Example
+
+```tsx
+function StatusIndicator() {
+  const { isReady, agentState } = useGuideKitStatus();
+
+  if (!isReady) return <div>Loading...</div>;
+
+  switch (agentState.status) {
+    case 'listening':
+      return <div>Listening...</div>;
+    case 'processing':
+      return <div>Thinking about: {agentState.transcript}</div>;
+    case 'speaking':
+      return <div>Speaking: {agentState.utterance}</div>;
+    case 'error':
+      return <div>Error: {agentState.error.message}</div>;
+    default:
+      return <div>Ready</div>;
+  }
+}
+```
+
+## useGuideKitVoice
+
+Controls voice input and text messaging.
+
+```tsx
+const {
+  isListening,
+  isSpeaking,
+  startListening,
+  stopListening,
+  sendText,
+} = useGuideKitVoice();
+```
+
+**Re-renders:** Only when voice state (isListening, isSpeaking) changes.
+
+### Example
+
+```tsx
+function ChatInput() {
+  const { sendText, isListening, startListening, stopListening } = useGuideKitVoice();
+  const [text, setText] = useState('');
+
+  const handleSend = async () => {
+    if (!text.trim()) return;
+    const response = await sendText(text);
+    setText('');
+  };
+
+  return (
+    <div>
+      <input value={text} onChange={(e) => setText(e.target.value)} />
+      <button onClick={handleSend}>Send</button>
+      <button onClick={isListening ? stopListening : startListening}>
+        {isListening ? 'Stop' : 'Mic'}
+      </button>
+    </div>
+  );
+}
+```
+
+## useGuideKitActions
+
+Provides visual guidance functions. **Never re-renders** (stable function references).
+
+```tsx
+const {
+  highlight,
+  dismissHighlight,
+  scrollToSection,
+  startTour,
+  navigate,
+} = useGuideKitActions();
+```
+
+### Example
+
+```tsx
+function TourButton() {
+  const { startTour } = useGuideKitActions();
+
+  return (
+    <button onClick={() => startTour(['hero', 'features', 'pricing'], 'manual')}>
+      Start Tour
+    </button>
+  );
+}
+```
+
+### highlight()
+
+```tsx
+highlight({
+  sectionId: 'pricing',     // Target by section ID
+  selector: '#pricing-card', // Or by CSS selector
+  tooltip: 'Check out our plans!',
+  position: 'top',          // 'top' | 'bottom' | 'left' | 'right' | 'auto'
+});
+```
+
+### scrollToSection()
+
+```tsx
+scrollToSection('features', 80); // offset for sticky header
+```
+
+## useGuideKitContext
+
+Sets page context and registers custom actions. **Never re-renders**.
+
+```tsx
+const { setPageContext, registerAction } = useGuideKitContext();
+```
+
+### Custom Actions
+
+```tsx
+useEffect(() => {
+  registerAction('addToCart', {
+    description: 'Add a product to the shopping cart',
+    parameters: { productId: 'string', quantity: 'number' },
+    handler: async ({ productId, quantity }) => {
+      await cart.add(productId, quantity);
+      return { success: true };
+    },
+  });
+}, [registerAction]);
+```
+
+### Page Context
+
+```tsx
+useEffect(() => {
+  setPageContext({
+    currentUser: user.name,
+    subscription: user.plan,
+    cartItems: cart.items.length,
+  });
+}, [user, cart, setPageContext]);
+```
+
+## useGuideKit (Combined)
+
+Subscribes to all store slices. Use only for prototyping — prefer focused hooks in production.
+
+```tsx
+const {
+  isReady, agentState, error,
+  isListening, isSpeaking, startListening, stopListening, sendText,
+  highlight, dismissHighlight, scrollToSection, startTour, navigate,
+  setPageContext, registerAction,
+} = useGuideKit();
+```
+
+## Hook Re-render Behavior
+
+| Hook | Re-renders when |
+|------|----------------|
+| `useGuideKitStatus` | Status, agentState, or error changes |
+| `useGuideKitVoice` | Voice state (isListening, isSpeaking) changes |
+| `useGuideKitActions` | Never (stable refs) |
+| `useGuideKitContext` | Never (stable refs) |
+| `useGuideKit` | Any slice changes |

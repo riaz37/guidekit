@@ -1,0 +1,189 @@
+# Architecture
+
+GuideKit is built as a modular monorepo with clear separation of concerns. This page covers the internal architecture.
+
+## Package Structure
+
+```
+guidekit/
+  packages/
+    core/           # @guidekit/core — all runtime logic
+      src/
+        dom/        # DOM Intelligence Engine
+        awareness/  # User Awareness System
+        voice/      # Voice Pipeline (STT + TTS)
+        visual/     # Visual Guidance (spotlight, tooltips)
+        navigation/ # Navigation Controller
+        context/    # Context Manager (LLM prompt assembly)
+        llm/        # LLM Orchestrator (streaming, tool calls)
+        bus/        # Typed EventBus
+        errors/     # Error hierarchy
+        resources/  # Resource lifecycle manager
+        connectivity/ # ConnectionManager
+        i18n/       # Internationalization
+        types/      # Shared TypeScript types
+    vad/            # @guidekit/vad — Silero ONNX VAD model
+    react/          # @guidekit/react — Provider + hooks + widget
+    server/         # @guidekit/server — JWT tokens, middleware
+    vanilla/        # @guidekit/vanilla — IIFE script-tag bundle
+    cli/            # @guidekit/cli — CLI tools
+  apps/
+    docs/           # Documentation site (Nextra)
+    example-nextjs/ # Reference Next.js integration
+```
+
+## Core Subsystems
+
+### DOM Intelligence Engine
+
+Builds a compact `PageModel` (~5KB) using TreeWalker traversal:
+
+- **Section scoring**: Viewport-visible sections scored highest
+- **`data-guidekit-target`**: Developer-provided stable selectors
+- **`data-guidekit-ignore`**: Skip sensitive DOM subtrees
+- **Budget**: 5000-node limit, yields every 5ms via `requestIdleCallback`
+- **MutationObserver**: Debounced (500ms), circuit breaker at 100 mutations/sec
+
+### LLM Orchestrator
+
+Streaming multi-turn conversation with tool calling:
+
+- **Provider adapters**: Gemini (default), OpenAI format
+- **Tool execution**: Multi-turn loop with parallel tool calls
+- **Context window**: Sliding window, summarize oldest turns at 80% capacity
+- **Content filter**: Retry with simplified prompt, graceful user message
+
+### Voice Pipeline
+
+Half-duplex voice with echo cancellation:
+
+```
+Mic → VAD (Silero) → STT (Deepgram) → LLM (Gemini) → TTS (ElevenLabs) → Speaker
+```
+
+- **State machine**: IDLE → LISTENING → PROCESSING → SPEAKING → IDLE
+- **Barge-in**: Detect speech during TTS, abort stream, switch to LISTENING
+- **Echo detection**: 60% word overlap within 3-second window
+- **Degradation**: Voice failure → text-only mode (not Web Speech API)
+
+### Visual Guidance
+
+Spotlight overlay and tooltip system:
+
+- **Spotlight**: Box-shadow cutout on `document.body` (outside Shadow DOM)
+- **Tracking**: ResizeObserver + scroll listeners (not rAF polling)
+- **Scrollable containers**: Detect ancestor overflow, clip to intersection
+- **Tours**: Sequential guided tour with auto/manual modes
+- **Accessibility**: `aria-live="assertive"` announcements for screen readers
+
+### User Awareness
+
+Passive signals for proactive behavior:
+
+| Signal | Method | Throttle |
+|--------|--------|----------|
+| Viewport/scroll | `scroll` (passive) | per-frame |
+| Visible sections | `IntersectionObserver` | on change |
+| Mouse region | `elementFromPoint` | 200ms |
+| Dwell detection | 8s on same section | 8s |
+| Idle detection | 60s no interaction | 60s |
+| Rage clicks | 3+ clicks in 2s | per-event |
+
+## Security Model
+
+### Token-Based Auth
+
+```
+Client → POST /api/guidekit/token → JWT (sessionId, permissions, exp)
+Client → JWT to server middleware → Server looks up provider keys → Proxy to provider
+```
+
+- JWT tokens do **NOT** contain API keys (base64-decodable)
+- Provider keys stay server-side in an in-memory session store
+- Tokens refresh at 80% of TTL, multi-tab coordination via BroadcastChannel
+- Signing secret rotation: accepts array `[newSecret, oldSecret]`
+
+### Privacy
+
+| Data | Leaves Browser? | Storage |
+|------|----------------|---------|
+| Audio chunks | Yes → STT (ephemeral) | Not stored |
+| Transcripts | Yes → LLM (ephemeral) | Not stored |
+| PageModel | Yes → LLM (ephemeral) | Not stored |
+| Full DOM | No | Browser only |
+| Mouse/scroll | No | Browser only |
+| Form values | Never | Stripped |
+
+### Protections
+
+- `data-guidekit-ignore`: Skip sensitive subtrees
+- `onBeforeLLMCall`: Developer privacy hook for custom scrubbing
+- Tooltip `textContent` only (never `innerHTML` — prevents XSS)
+- Client-side rate limits (cost protection, not security)
+- Password/email/phone inputs: values never included in PageModel
+
+## Error Handling
+
+All errors extend `GuideKitError` with actionable guidance:
+
+```typescript
+class GuideKitError extends Error {
+  code: string;
+  provider?: string;
+  recoverable: boolean;
+  suggestion: string;
+  docsUrl: string;
+}
+```
+
+Error types: `AuthenticationError`, `ConfigurationError`, `NetworkError`, `TimeoutError`, `RateLimitError`, `PermissionError`, `BrowserSupportError`, `ContentFilterError`, `ResourceExhaustedError`, `InitializationError`.
+
+## EventBus
+
+Typed pub/sub with namespace support:
+
+```typescript
+bus.on('dom:scan-complete', handler);
+bus.on('llm:*', handler);     // Namespace wildcard
+bus.onAny(handler);            // All events
+const unsub = bus.on('error', handler);
+unsub();                       // Cleanup
+```
+
+Error isolation: one handler throwing does not prevent others from executing.
+
+## Resource Management
+
+All allocated resources tracked via ResourceManager:
+
+- `AbortController` signal pattern for event listeners
+- Ref-counted singleton (StrictMode safe)
+- Per-resource 2s cleanup timeout on teardown
+- Instance isolation via `instanceId`
+
+## LLM Tools
+
+| Tool | Description |
+|------|-------------|
+| `highlight` | Spotlight an element |
+| `dismissHighlight` | Remove spotlight |
+| `scrollToSection` | Smooth scroll |
+| `navigate` | SPA navigation (same-origin) |
+| `startTour` | Sequential guided tour |
+| `readPageContent` | Read visible text |
+| `getVisibleSections` | What's in viewport |
+| `clickElement` | Programmatic click (whitelisted) |
+| `executeCustomAction` | Developer-defined actions |
+
+## Technology Stack
+
+| Layer | Choice |
+|-------|--------|
+| Build | tsup (esbuild), pnpm + Turborepo |
+| LLM | Gemini 2.5 Flash (default) |
+| STT | Deepgram Nova-3 (WebSocket) |
+| TTS | ElevenLabs Flash v2.5 (WebSocket) |
+| VAD | Silero via ONNX Runtime |
+| UI | Shadow DOM |
+| Auth | JWT (HS256 via jose) |
+| Testing | Vitest + Playwright |

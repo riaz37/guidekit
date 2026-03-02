@@ -1,0 +1,77 @@
+# Proactive Triggers
+
+GuideKit can proactively reach out to users based on behavioral signals, helping them before they ask.
+
+## Overview
+
+The Proactive Trigger Engine observes user behavior through the User Awareness System and fires triggers when conditions are met. Each trigger has a cooldown to prevent overwhelming the user.
+
+## Awareness Signals
+
+| Signal | Description |
+|--------|-------------|
+| `viewport` | Visible area and scroll position |
+| `scroll` | Scroll depth and direction |
+| `dwell` | Time spent on a specific element |
+| `idle` | User has been inactive for a threshold |
+| `rage_click` | Rapid repeated clicks on the same area |
+
+## Configuring Triggers
+
+```tsx
+<GuideKitProvider
+  tokenEndpoint="/api/guidekit/token"
+  agent={{ name: 'Guide' }}
+  options={{
+    proactive: {
+      enabled: true,
+      triggers: [
+        {
+          signal: 'idle',
+          threshold: 30000, // 30 seconds
+          message: 'Need help finding something?',
+          cooldown: 300000, // 5 minutes
+        },
+        {
+          signal: 'rage_click',
+          threshold: 3,
+          message: 'It looks like something is not working. Can I help?',
+          cooldown: 60000, // 1 minute
+        },
+        {
+          signal: 'dwell',
+          selector: '#pricing-table',
+          threshold: 10000, // 10 seconds
+          message: 'Have questions about our pricing plans?',
+          cooldown: 600000, // 10 minutes
+        },
+      ],
+    },
+  }}
+>
+  {children}
+</GuideKitProvider>
+```
+
+## Cooldowns
+
+Each trigger tracks its own cooldown timer. After a trigger fires, it will not fire again until the cooldown period elapses. Cooldowns persist in `sessionStorage` so they survive page navigations within the same session.
+
+## Quiet Mode
+
+Disable all proactive triggers temporarily:
+
+```tsx
+const { setQuietMode } = useGuideKitActions();
+
+// Suppress proactive messages for 10 minutes
+setQuietMode(600000);
+```
+
+## Events
+
+| Event | Description |
+|-------|-------------|
+| `proactive:triggered` | A trigger condition was met |
+| `proactive:dismissed` | User dismissed a proactive message |
+| `proactive:accepted` | User engaged with a proactive message |

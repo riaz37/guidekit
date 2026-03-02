@@ -1,0 +1,36 @@
+{
+  "name": "@guidekit/vanilla",
+  "version": "0.1.0",
+  "description": "Vanilla JS bundle for GuideKit SDK — script-tag integration",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./iife": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.global.js"
+    }
+  },
+  "files": ["dist", "../../LICENSE", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@guidekit/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "tsup": "^8.4.0"
+  },
+  "sideEffects": false,
+  "license": "MIT"
+}

@@ -1,0 +1,122 @@
+# Provider Setup
+
+The `GuideKitProvider` is the root component that initializes the SDK and provides context to all hooks.
+
+## Basic Usage
+
+```tsx
+import { GuideKitProvider } from '@guidekit/react';
+
+<GuideKitProvider
+  tokenEndpoint="/api/guidekit/token"
+  agent={{ name: 'Aria', greeting: 'Welcome!' }}
+>
+  {children}
+</GuideKitProvider>
+```
+
+## Props
+
+### Authentication
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `tokenEndpoint` | `string` | URL of your token endpoint (recommended) |
+| `stt` | `STTConfig` | Direct STT config (dev only) |
+| `tts` | `TTSConfig` | Direct TTS config (dev only) |
+| `llm` | `LLMConfig` | Direct LLM config (dev only) |
+
+### Agent Configuration
+
+```tsx
+agent={{
+  name: 'Guide',                              // Agent's display name
+  greeting: 'Hi! Want me to show you around?' // First-visit greeting
+}}
+```
+
+### Content Map
+
+Prevents hallucination by providing factual content the LLM can reference:
+
+```tsx
+// Static content map
+<GuideKitProvider
+  contentMap={{
+    'section-pricing': {
+      description: 'Pricing starts at $29/mo',
+      facts: ['14-day free trial', 'No credit card required'],
+    },
+  }}
+>
+
+// Dynamic content map (supports async)
+<GuideKitProvider
+  contentMap={(sectionId) => {
+    if (sectionId === 'section-inventory') {
+      return { description: `${inventory.count} items in stock`, facts: [] };
+    }
+    return null;
+  }}
+>
+```
+
+### Options
+
+```tsx
+options={{
+  locale: 'auto',             // Auto-detect from <html lang>
+  mode: 'voice',              // 'voice' | 'text' | 'auto'
+  greetOnFirstVisit: true,    // Visual greeting for new visitors
+  spotlightColor: '#4a9eed',  // Spotlight highlight color
+  debug: false,               // Enable debug logging
+}}
+```
+
+### Callbacks
+
+```tsx
+<GuideKitProvider
+  onError={(err) => console.error(err)}
+  onEvent={(event) => analytics.track(event.type, event.data)}
+  onReady={() => console.log('GuideKit ready!')}
+  onBeforeLLMCall={(ctx) => {
+    // Privacy hook — modify or cancel LLM calls
+    // ctx.systemPrompt, ctx.userMessage, ctx.conversationHistory
+  }}
+>
+```
+
+### Advanced
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `instanceId` | `string` | `'default'` | For multi-instance setups |
+| `rootElement` | `HTMLElement` | `document.body` | DOM scan scope |
+| `locale` | `string \| object` | `'auto'` | i18n locale or custom strings |
+
+## Provider Types
+
+Authentication configs use discriminated unions for type safety:
+
+```typescript
+type LLMConfig =
+  | { provider: 'gemini'; apiKey: string; model?: string }
+  | { provider: 'openai'; apiKey: string; model?: string };
+
+type STTConfig =
+  | { provider: 'deepgram'; apiKey: string; model?: string }
+  | { provider: 'assemblyai'; apiKey: string };
+
+type TTSConfig =
+  | { provider: 'elevenlabs'; apiKey: string; voiceId?: string }
+  | { provider: 'cartesia'; apiKey: string; voiceId?: string };
+```
+
+## SSR Safety
+
+The provider is fully SSR-safe:
+- No browser APIs are called during server-side rendering
+- Hooks return safe defaults (`isReady: false`, `agentState: { status: 'idle' }`)
+- All initialization is deferred to client-side mounting
+- Compatible with Next.js App Router and Pages Router

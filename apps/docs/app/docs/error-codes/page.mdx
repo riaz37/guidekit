@@ -1,0 +1,118 @@
+# Error Codes
+
+Every error emitted by the GuideKit SDK carries a structured error code, a human-readable message, and an actionable suggestion. All errors extend `GuideKitError`.
+
+## Handling Errors
+
+```typescript
+import { isGuideKitError } from '@guidekit/core';
+
+try {
+  await core.sendText('Hello');
+} catch (err) {
+  if (isGuideKitError(err)) {
+    console.log(err.code);        // e.g. 'AUTH_EXPIRED_TOKEN'
+    console.log(err.suggestion);   // Actionable fix
+    console.log(err.recoverable);  // Can the SDK continue?
+  }
+}
+```
+
+## Error Code Reference
+
+### Authentication
+
+| Code | Recoverable | Description |
+|------|-------------|-------------|
+| `AUTH_INVALID_KEY` | No | The API key or token is invalid |
+| `AUTH_EXPIRED_TOKEN` | No | The session token has expired |
+| `AUTH_TOKEN_REFRESH_FAILED` | No | Failed to refresh the session token |
+| `AUTH_ENDPOINT_FAILED` | No | The token endpoint returned an error |
+
+### Configuration
+
+| Code | Recoverable | Description |
+|------|-------------|-------------|
+| `CONFIG_INVALID_PROVIDER` | No | An unsupported LLM provider was specified |
+| `CONFIG_MISSING_REQUIRED` | No | A required configuration option is missing |
+
+### Initialization
+
+| Code | Recoverable | Description |
+|------|-------------|-------------|
+| `INIT_SHADOW_DOM_FAILED` | No | Failed to create the Shadow DOM container |
+| `INIT_BROWSER_UNSUPPORTED` | No | The browser does not meet minimum requirements |
+
+### Rate Limiting
+
+| Code | Recoverable | Description |
+|------|-------------|-------------|
+| `RATE_LIMIT_PROVIDER` | Yes | The LLM provider rate limit was hit |
+| `RATE_LIMIT_CLIENT` | Yes | Client-side rate limit exceeded |
+
+### Resource Exhaustion
+
+| Code | Recoverable | Description |
+|------|-------------|-------------|
+| `RESOURCE_EXHAUSTED_LLM` | No | LLM usage quota exhausted |
+| `RESOURCE_EXHAUSTED_STT` | No | STT usage quota exhausted |
+| `RESOURCE_EXHAUSTED_TTS` | No | TTS usage quota exhausted |
+
+### Permissions
+
+| Code | Recoverable | Description |
+|------|-------------|-------------|
+| `PERMISSION_MIC_DENIED` | No | Microphone permission was denied by the user |
+| `PERMISSION_MIC_UNAVAILABLE` | No | No microphone device is available |
+
+### Network
+
+| Code | Recoverable | Description |
+|------|-------------|-------------|
+| `NETWORK_WEBSOCKET_FAILED` | Yes | WebSocket connection failed |
+| `NETWORK_CONNECTION_LOST` | Yes | Network connection was lost |
+| `NETWORK_TIMEOUT` | Yes | A network request timed out |
+
+### Timeouts
+
+| Code | Recoverable | Description |
+|------|-------------|-------------|
+| `TIMEOUT_STT_CONNECT` | Yes | STT WebSocket connection timed out |
+| `TIMEOUT_LLM_RESPONSE` | Yes | LLM response timed out |
+| `TIMEOUT_TTS_CONNECT` | Yes | TTS WebSocket connection timed out |
+| `TIMEOUT_TTS_FIRST_AUDIO` | Yes | TTS first audio chunk timed out |
+
+### Browser Support
+
+| Code | Recoverable | Description |
+|------|-------------|-------------|
+| `BROWSER_NO_WEB_AUDIO` | No | Web Audio API is not available |
+| `BROWSER_NO_WASM` | No | WebAssembly is not supported |
+| `VAD_PACKAGE_MISSING` | No | `@guidekit/vad` is not installed |
+
+### Content
+
+| Code | Recoverable | Description |
+|------|-------------|-------------|
+| `CONTENT_FILTER_TRIGGERED` | No | LLM safety or content filter was triggered |
+
+### Privacy
+
+| Code | Recoverable | Description |
+|------|-------------|-------------|
+| `PRIVACY_HOOK_CANCELLED` | No | The `onBeforeLLMCall` hook cancelled the request |
+
+## Error Classes
+
+| Class | Codes | Default Recoverable |
+|-------|-------|-------------------|
+| `AuthenticationError` | `AUTH_*` | No |
+| `ConfigurationError` | `CONFIG_*` | No |
+| `InitializationError` | `INIT_*` | No |
+| `RateLimitError` | `RATE_LIMIT_*` | Yes |
+| `ResourceExhaustedError` | `RESOURCE_EXHAUSTED_*` | No |
+| `PermissionError` | `PERMISSION_*` | No |
+| `NetworkError` | `NETWORK_*` | Yes |
+| `TimeoutError` | `TIMEOUT_*` | Yes |
+| `BrowserSupportError` | `BROWSER_*`, `VAD_*` | No |
+| `ContentFilterError` | `CONTENT_*` | No |

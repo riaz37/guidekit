@@ -1,0 +1,64 @@
+# GuideKit
+
+## Embed an AI guide that truly *understands* your website
+
+GuideKit is an embeddable React/Next.js SDK that gives your app an AI assistant capable of:
+
+- **Understanding** your site's structure, content, and navigation automatically
+- **Conversing** via voice or text — answers questions, explains sections, guides users
+- **Visually guiding** — spotlights elements, scrolls to sections, shows tooltips
+- **Navigating** — routes users to different pages within your SPA
+- **Custom actions** — add-to-cart, submit forms, or any developer-defined operation
+
+## Quick Start
+
+```bash
+npm install @guidekit/core @guidekit/react @guidekit/server
+```
+
+```tsx
+// app/layout.tsx
+import { GuideKitProvider } from '@guidekit/react';
+
+export default function Layout({ children }) {
+  return (
+    <GuideKitProvider
+      tokenEndpoint="/api/guidekit/token"
+      agent={{ name: 'Guide', greeting: 'Hi! How can I help?' }}
+    >
+      {children}
+    </GuideKitProvider>
+  );
+}
+```
+
+That's it. GuideKit auto-discovers your site, builds a page model, and provides an AI assistant ready to help users.
+
+## Packages
+
+| Package | Size (gzip) | Description |
+|---------|------------|-------------|
+| `@guidekit/core` | 60 KB | DOM scanner, LLM orchestrator, voice pipeline, visual guidance |
+| `@guidekit/react` | 7 KB | Provider, hooks, Shadow DOM widget |
+| `@guidekit/server` | 2 KB | JWT token generation, session management |
+| `@guidekit/vanilla` | 88 KB | IIFE bundle for non-React apps |
+| `@guidekit/cli` | 5 KB | CLI tools (init, doctor, generate-secret) |
+| `@guidekit/vad` | 800 KB | Silero VAD model (optional, voice only) |
+
+## Key Features
+
+### Text-First, Voice-Enhanced
+
+The SDK works in text-only mode out of the box. Voice is an enhancement layer — no microphone required for core functionality.
+
+### Token-Based Security
+
+API keys never reach the browser. The `@guidekit/server` package generates short-lived JWT tokens, and provider keys stay server-side.
+
+### DOM Intelligence
+
+GuideKit's TreeWalker-based scanner builds a compact `PageModel` that the LLM uses to understand page structure, sections, forms, and navigation — all without manual configuration.
+
+### Developer Extensibility
+
+Register custom actions, provide content maps to prevent hallucination, set page context, and hook into every event via the typed EventBus.

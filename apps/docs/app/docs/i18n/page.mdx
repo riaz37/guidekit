@@ -1,0 +1,75 @@
+# Internationalization
+
+GuideKit ships with 8 built-in locales and supports custom string overrides for full localization control.
+
+## Built-in Locales
+
+| Code | Language |
+|------|----------|
+| `en` | English (default) |
+| `es` | Spanish |
+| `fr` | French |
+| `de` | German |
+| `pt` | Portuguese |
+| `ja` | Japanese |
+| `ko` | Korean |
+| `zh` | Chinese (Simplified) |
+
+## Setting the Locale
+
+```tsx
+<GuideKitProvider
+  tokenEndpoint="/api/guidekit/token"
+  agent={{ name: 'Guide' }}
+  options={{ locale: 'es' }}
+>
+  {children}
+</GuideKitProvider>
+```
+
+## Custom Strings
+
+Override any built-in string by passing a `strings` object:
+
+```tsx
+<GuideKitProvider
+  tokenEndpoint="/api/guidekit/token"
+  agent={{ name: 'Guide' }}
+  options={{
+    locale: 'en',
+    strings: {
+      'widget.placeholder': 'Ask me anything...',
+      'widget.greeting': 'Welcome! How can I assist?',
+      'widget.send': 'Send',
+      'widget.close': 'Close assistant',
+      'voice.listening': 'Listening...',
+      'voice.processing': 'Processing...',
+      'error.generic': 'Something went wrong. Please try again.',
+    },
+  }}
+>
+  {children}
+</GuideKitProvider>
+```
+
+## Adding a New Locale
+
+To add a locale that is not built in, provide a complete strings object:
+
+```tsx
+options={{
+  locale: 'custom',
+  strings: {
+    'widget.placeholder': 'Your custom placeholder...',
+    // ... all string keys
+  },
+}}
+```
+
+## RTL Support
+
+The Shadow DOM widget respects the `dir` attribute on the host document. Set `dir="rtl"` on your `<html>` element for right-to-left layouts.
+
+## Dynamic Locale Switching
+
+The locale can be changed at runtime by updating the provider props. The widget re-renders with the new strings immediately.

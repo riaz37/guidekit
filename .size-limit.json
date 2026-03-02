@@ -1,0 +1,44 @@
+[
+  {
+    "name": "@guidekit/core (ESM)",
+    "path": "packages/core/dist/index.js",
+    "limit": "80 KB",
+    "gzip": true
+  },
+  {
+    "name": "@guidekit/react (ESM)",
+    "path": "packages/react/dist/index.js",
+    "limit": "10 KB",
+    "gzip": true
+  },
+  {
+    "name": "@guidekit/react/devtools",
+    "path": "packages/react/dist/devtools.js",
+    "limit": "8 KB",
+    "gzip": true
+  },
+  {
+    "name": "@guidekit/react/testing",
+    "path": "packages/react/dist/testing.js",
+    "limit": "3 KB",
+    "gzip": true
+  },
+  {
+    "name": "@guidekit/server",
+    "path": "packages/server/dist/index.js",
+    "limit": "5 KB",
+    "gzip": true
+  },
+  {
+    "name": "@guidekit/vanilla (IIFE)",
+    "path": "packages/vanilla/dist/index.global.js",
+    "limit": "120 KB",
+    "gzip": true
+  },
+  {
+    "name": "@guidekit/cli",
+    "path": "packages/cli/dist/index.js",
+    "limit": "8 KB",
+    "gzip": true
+  }
+]

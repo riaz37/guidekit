@@ -1,0 +1,108 @@
+# CLI Tools
+
+The `@guidekit/cli` package provides command-line tools for project setup and diagnostics.
+
+## Installation
+
+The CLI is available via npx (no installation needed):
+
+```bash
+npx guidekit <command>
+```
+
+Or install globally:
+
+```bash
+npm install -g @guidekit/cli
+```
+
+## Commands
+
+### `guidekit init`
+
+Interactive setup wizard that scaffolds GuideKit configuration for your project.
+
+```bash
+npx guidekit init
+```
+
+**What it does:**
+1. Detects your framework (Next.js App Router, Pages Router, React)
+2. Checks for missing packages
+3. Creates `.env.local` with GuideKit variables
+4. Creates a token endpoint (for token-based auth)
+5. Creates a provider wrapper component (Next.js App Router)
+
+### `guidekit doctor`
+
+Validates your setup — checks environment variables, packages, and provider connectivity.
+
+```bash
+npx guidekit doctor
+```
+
+**Checks performed:**
+- `.env` / `.env.local` file exists
+- `.gitignore` includes `.env` files
+- `GUIDEKIT_SECRET` is set and valid length
+- `GEMINI_KEY` is present
+- `DEEPGRAM_KEY` and `ELEVENLABS_KEY` (optional, for voice)
+- `@guidekit/core`, `@guidekit/react`, `@guidekit/server` are installed
+- Connectivity to Google AI, Deepgram, and ElevenLabs APIs
+
+**Example output:**
+```
+GuideKit Doctor — Checking your setup
+
+ℹ Project root: /Users/you/myapp
+
+Environment
+✓ .env file: Found .env.local
+✓ .gitignore: .env files are ignored
+✓ GUIDEKIT_SECRET: Set and valid length
+✓ Gemini API Key: Found
+○ Deepgram API Key: Not set (optional)
+○ ElevenLabs API Key: Not set (optional)
+
+Packages
+✓ @guidekit/core: Installed (^0.1.0)
+✓ @guidekit/react: Installed (^0.1.0)
+✓ @guidekit/server: Installed (^0.1.0)
+
+Connectivity
+✓ Google AI connectivity: Reachable
+✓ Deepgram connectivity: Reachable
+✓ ElevenLabs connectivity: Reachable
+
+✓ All checks passed! Your GuideKit setup looks good.
+```
+
+### `guidekit generate-secret`
+
+Generates a cryptographically random 256-bit signing secret for JWT token authentication.
+
+```bash
+npx guidekit generate-secret
+```
+
+**Output:**
+```
+GuideKit — Generate Signing Secret
+
+✓ Generated a cryptographically random 256-bit signing secret:
+
+  SIIwq8fzeBsh1s5WTTMBZEiXcxU5BH51A0ScD5ORVvQ
+
+Add this to your .env file:
+
+  GUIDEKIT_SECRET=SIIwq8fzeBsh1s5WTTMBZEiXcxU5BH51A0ScD5ORVvQ
+
+Warning: Keep this secret safe. Never commit it to version control.
+```
+
+## Help
+
+```bash
+npx guidekit --help
+npx guidekit --version
+```
