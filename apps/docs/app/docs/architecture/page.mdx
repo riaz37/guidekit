@@ -41,14 +41,14 @@ Builds a compact `PageModel` (~5KB) using TreeWalker traversal:
 - **Section scoring**: Viewport-visible sections scored highest
 - **`data-guidekit-target`**: Developer-provided stable selectors
 - **`data-guidekit-ignore`**: Skip sensitive DOM subtrees
-- **Budget**: 5000-node limit, yields every 5ms via `requestIdleCallback`
+- **Budget**: 5000-node limit, yields via `requestIdleCallback` with adaptive time budget
 - **MutationObserver**: Debounced (500ms), circuit breaker at 100 mutations/sec
 
 ### LLM Orchestrator
 
 Streaming multi-turn conversation with tool calling:
 
-- **Provider adapters**: Gemini (default), OpenAI format
+- **Provider adapters**: Gemini (default), custom adapters via `LLMProviderAdapter`
 - **Tool execution**: Multi-turn loop with parallel tool calls
 - **Context window**: Sliding window, summarize oldest turns at 80% capacity
 - **Content filter**: Retry with simplified prompt, graceful user message
@@ -58,7 +58,7 @@ Streaming multi-turn conversation with tool calling:
 Half-duplex voice with echo cancellation:
 
 ```
-Mic → VAD (Silero) → STT (Deepgram) → LLM (Gemini) → TTS (ElevenLabs) → Speaker
+Mic → VAD (Silero) → STT (Deepgram / Web Speech API) → LLM (Gemini) → TTS (ElevenLabs / Web Speech API) → Speaker
 ```
 
 - **State machine**: IDLE → LISTENING → PROCESSING → SPEAKING → IDLE
@@ -181,8 +181,8 @@ All allocated resources tracked via ResourceManager:
 |-------|--------|
 | Build | tsup (esbuild), pnpm + Turborepo |
 | LLM | Gemini 2.5 Flash (default) |
-| STT | Deepgram Nova-3 (WebSocket) |
-| TTS | ElevenLabs Flash v2.5 (WebSocket) |
+| STT | Deepgram Nova-3 (WebSocket), Web Speech API |
+| TTS | ElevenLabs Flash v2.5 (WebSocket), Web Speech API |
 | VAD | Silero via ONNX Runtime |
 | UI | Shadow DOM |
 | Auth | JWT (HS256 via jose) |

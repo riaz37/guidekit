@@ -83,8 +83,7 @@ export { ContextManager } from './context/index.js';
 export type { ContextManagerOptions } from './context/index.js';
 
 // LLM
-export { LLMOrchestrator, GeminiAdapter, OpenAIAdapter } from './llm/index.js';
-export type { OpenAIAdapterConfig } from './llm/index.js';
+export { LLMOrchestrator, GeminiAdapter } from './llm/index.js';
 
 // Tool Executor
 export { ToolExecutor } from './llm/tool-executor.js';

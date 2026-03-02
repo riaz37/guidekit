@@ -29,9 +29,9 @@ DOM_RULE_5=DOMScanner produces PageModel (ground truth sent to LLM each turn) â€
 # ============================================================================
 LLM_RULE_0=You are the Senior AI Engineer. You own LLM orchestration: provider adapters, tool system, rate limiting, streaming, conversation management
 LLM_RULE_1=Read your memory at ~/.claude/projects/-Users-riazulislam-Developer-personal-guidekit/memory/llm.md for adapter patterns, orchestration flow, and tool system internals
-LLM_RULE_2=You own: packages/core/src/llm/ (index.ts, openai-adapter.ts, tool-executor.ts, rate-limiter.ts). Stay within these boundaries
+LLM_RULE_2=You own: packages/core/src/llm/ (index.ts, tool-executor.ts, rate-limiter.ts). Stay within these boundaries
 LLM_RULE_3=Key types: LLMConfig, ToolDefinition, ToolParameterSchema, ToolCall, TextChunk, LLMProviderAdapter. formatTools() MUST wrap parameters as JSON Schema object with properties + required
-LLM_RULE_4=Use `sdk-builder` for adapter design. Use `agent-sdk-dev` for Claude Agent SDK patterns. Use `code-simplifier` for clean code. Use `context7` for OpenAI/Gemini API docs
+LLM_RULE_4=Use `sdk-builder` for adapter design. Use `agent-sdk-dev` for Claude Agent SDK patterns. Use `code-simplifier` for clean code. Use `context7` for Gemini API docs
 LLM_RULE_5=Streaming responses yield TextChunk | ToolCall â€” consumers must handle interleaved text and tool calls. Test streaming edge cases
 
 # ============================================================================

@@ -35,7 +35,7 @@ Existing solutions fall short:
 ## Features
 
 - **DOM Intelligence** — Auto-discovers site structure, content, navigation, forms, and overlays
-- **Text + Voice** — Full conversation via text or voice (Deepgram STT + ElevenLabs TTS)
+- **Text + Voice** — Full conversation via text or voice (Deepgram, ElevenLabs, or Web Speech API)
 - **Visual Guidance** — Spotlight overlay, tooltips, smooth scrolling, guided tours
 - **LLM Tool Calling** — highlight, scroll, navigate, click, and custom developer actions
 - **User Awareness** — Viewport tracking, dwell/idle detection, rage click detection

@@ -63,7 +63,7 @@ All errors extend `GuideKitError` with structured metadata:
 
 - **DOM Scanner** — TreeWalker-based page model with `data-guidekit-ignore` support
 - **Context Manager** — Token budgeting and truncation for LLM context windows
-- **LLM Orchestrator** — Streaming responses with tool calling (Gemini adapter)
+- **LLM Orchestrator** — Streaming responses with tool calling (Gemini (default), custom adapters via `LLMProviderAdapter`)
 - **Resource Manager** — AbortController pattern and lifecycle tracking
 
 ## Documentation

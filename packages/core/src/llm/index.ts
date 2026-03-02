@@ -20,9 +20,6 @@ import {
   ErrorCodes,
 } from '../errors/index.js';
 
-export { OpenAIAdapter } from './openai-adapter.js';
-export type { OpenAIAdapterConfig } from './openai-adapter.js';
-
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -765,7 +762,7 @@ export class LLMOrchestrator {
    *
    * Custom adapters:
    * - Pass `{ adapter: myAdapter }` to use any `LLMProviderAdapter`.
-   *   Example: `llm: { adapter: new OpenAIAdapter({ ... }) }`
+   *   Example: `llm: { adapter: myCustomAdapter }`
    */
   private createAdapter(config: LLMConfig): LLMProviderAdapter {
     // Custom adapter — pass-through.

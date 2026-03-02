@@ -33,7 +33,7 @@ export async function POST() {
 | Option | Type | Required | Description |
 |--------|------|----------|-------------|
 | `signingSecret` | `string` | Yes | Secret used to sign the JWT |
-| `llmApiKey` | `string` | Yes | LLM provider API key |
+| `llmApiKey` | `string` | No | LLM provider API key |
 | `sttApiKey` | `string` | No | STT provider API key (for speech-to-text) |
 | `ttsApiKey` | `string` | No | TTS provider API key (for text-to-speech) |
 | `expiresIn` | `string` | No | Token lifetime (default: `'15m'`) |

@@ -1,7 +1,7 @@
 # @guidekit/server
 
-## 0.1.0
+## 0.1.0-beta.2
 
-### Patch Changes
+### Breaking Changes
 
-- Fix LLM tool formatting (Gemini/OpenAI), add ElevenLabs STT support, fix workspace:\* publish issue, add tokenEndpoint warning, and expand built-in tool required[] arrays.
+- **Key renames**: `geminiKey` → `llmApiKey`, `deepgramKey` → `sttApiKey`, `elevenlabsKey` → `ttsApiKey`

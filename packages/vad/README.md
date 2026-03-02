@@ -12,7 +12,7 @@ This package is an optional peer dependency of `@guidekit/core`. It is automatic
 
 ## How It Works
 
-`@guidekit/vad` loads the Silero VAD model via ONNX Runtime Web and runs inference on audio frames from the microphone. It emits `speech_start` and `speech_end` events that the core engine uses to trigger STT (Deepgram) and manage barge-in.
+`@guidekit/vad` loads the Silero VAD model via ONNX Runtime Web and runs inference on audio frames from the microphone. It emits `speech_start` and `speech_end` events that the core engine uses to trigger STT and manage barge-in.
 
 ## Usage with GuideKit
 

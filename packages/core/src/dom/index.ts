@@ -979,7 +979,7 @@ export class DOMScanner {
 
       if (
         (position === 'fixed' || position === 'absolute') &&
-        !isNaN(zIndex) &&
+        !Number.isNaN(zIndex) &&
         zIndex >= 1000
       ) {
         const visible = isElementVisible(el);
@@ -1030,8 +1030,8 @@ export class DOMScanner {
     const height = parseFloat(style.height);
     if (
       typeof window !== 'undefined' &&
-      !isNaN(width) &&
-      !isNaN(height) &&
+      !Number.isNaN(width) &&
+      !Number.isNaN(height) &&
       width > window.innerWidth * 0.5 &&
       height > window.innerHeight * 0.5
     ) {
@@ -1039,7 +1039,7 @@ export class DOMScanner {
     }
 
     // Small positioned element is likely a popover
-    if (!isNaN(width) && width < 400) return 'popover';
+    if (!Number.isNaN(width) && width < 400) return 'popover';
 
     return null;
   }

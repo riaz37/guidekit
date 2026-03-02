@@ -8,6 +8,9 @@ export async function POST() {
 
   const token = await createSessionToken({
     signingSecret: secret,
+    llmApiKey: process.env.LLM_API_KEY!,
+    sttApiKey: process.env.STT_API_KEY,
+    ttsApiKey: process.env.TTS_API_KEY,
     expiresIn: '15m',
   });
 
