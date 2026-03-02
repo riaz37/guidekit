@@ -1,7 +1,7 @@
 {
   "name": "@guidekit/react",
   "version": "0.1.0-beta.1",
-  "description": "React bindings for GuideKit SDK — Provider, hooks, and Widget",
+  "description": "React bindings for GuideKit SDK \u2014 Provider, hooks, and Widget",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -54,5 +54,14 @@
     "@types/react-dom": "^19.0.0"
   },
   "sideEffects": false,
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/riaz37/guidekit.git",
+    "directory": "packages/react"
+  },
+  "homepage": "https://github.com/riaz37/guidekit#readme",
+  "bugs": {
+    "url": "https://github.com/riaz37/guidekit/issues"
+  }
 }

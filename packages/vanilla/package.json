@@ -1,7 +1,7 @@
 {
   "name": "@guidekit/vanilla",
   "version": "0.1.0-beta.1",
-  "description": "Vanilla JS bundle for GuideKit SDK — script-tag integration",
+  "description": "Vanilla JS bundle for GuideKit SDK \u2014 script-tag integration",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -36,5 +36,14 @@
     "tsup": "^8.4.0"
   },
   "sideEffects": false,
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/riaz37/guidekit.git",
+    "directory": "packages/vanilla"
+  },
+  "homepage": "https://github.com/riaz37/guidekit#readme",
+  "bugs": {
+    "url": "https://github.com/riaz37/guidekit/issues"
+  }
 }

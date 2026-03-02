@@ -1,7 +1,7 @@
 {
   "name": "@guidekit/cli",
   "version": "0.1.0-beta.1",
-  "description": "CLI tools for GuideKit SDK — init, doctor, generate-secret",
+  "description": "CLI tools for GuideKit SDK \u2014 init, doctor, generate-secret",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -40,5 +40,14 @@
     "@types/node": "^22.0.0"
   },
   "sideEffects": false,
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/riaz37/guidekit.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/riaz37/guidekit#readme",
+  "bugs": {
+    "url": "https://github.com/riaz37/guidekit/issues"
+  }
 }
