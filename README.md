@@ -3,7 +3,7 @@
   <img src="https://img.shields.io/npm/v/@guidekit/react?label=react&color=6366f1&style=flat-square" alt="react version" />
   <img src="https://img.shields.io/npm/v/@guidekit/server?label=server&color=6366f1&style=flat-square" alt="server version" />
   <img src="https://img.shields.io/github/license/riaz37/guidekit?style=flat-square" alt="license" />
-  <img src="https://img.shields.io/badge/tests-949%20passing-brightgreen?style=flat-square" alt="tests" />
+  <img src="https://img.shields.io/badge/tests-980%20passing-brightgreen?style=flat-square" alt="tests" />
   <img src="https://img.shields.io/badge/TypeScript-strict-blue?style=flat-square" alt="typescript" />
 </p>
 
@@ -74,7 +74,7 @@ Add it to `.env.local`:
 
 ```env
 GUIDEKIT_SECRET=your-generated-secret
-GEMINI_KEY=your-gemini-api-key
+LLM_API_KEY=your-llm-api-key
 ```
 
 ### 2. Create a token endpoint (Next.js App Router)
@@ -86,7 +86,7 @@ import { createSessionToken } from '@guidekit/server';
 export async function POST() {
   const token = await createSessionToken({
     signingSecret: process.env.GUIDEKIT_SECRET!,
-    geminiKey: process.env.GEMINI_KEY!,
+    llmApiKey: process.env.LLM_API_KEY!,
     expiresIn: '15m',
     allowedOrigins: ['https://yourapp.com'],
   });
@@ -250,9 +250,9 @@ Server-side, add provider keys:
 ```typescript
 const token = await createSessionToken({
   signingSecret: process.env.GUIDEKIT_SECRET!,
-  geminiKey: process.env.GEMINI_KEY!,
-  deepgramKey: process.env.DEEPGRAM_KEY!,
-  elevenlabsKey: process.env.ELEVENLABS_KEY!,
+  llmApiKey: process.env.LLM_API_KEY!,
+  sttApiKey: process.env.STT_API_KEY!,
+  ttsApiKey: process.env.TTS_API_KEY!,
   expiresIn: '15m',
 });
 ```
@@ -342,7 +342,7 @@ pnpm install        # Install dependencies
 pnpm build          # Build all 8 packages
 pnpm typecheck      # TypeScript strict mode
 pnpm lint           # ESLint
-pnpm test:unit      # 949 unit tests
+pnpm test:unit      # 980 unit tests
 pnpm test:e2e       # Playwright E2E tests
 pnpm size:check     # Bundle size limits
 ```

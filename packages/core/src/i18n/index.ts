@@ -449,8 +449,8 @@ export class I18n {
       if (this.debug) {
         console.warn(`${LOG_PREFIX} Missing translation key "${key}"`);
       }
-      // Fallback to English for missing keys in custom string maps
-      return en[key] ?? key;
+      // Fallback to English; in non-production show a debug marker
+      return en[key] ?? (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production' ? key : `[MISSING: ${key}]`);
     }
     return value;
   }

@@ -32,9 +32,9 @@ Add the secret and your API keys to `.env.local`:
 
 ```env
 GUIDEKIT_SECRET=your-generated-secret
-GEMINI_KEY=your-gemini-api-key
-DEEPGRAM_KEY=your-deepgram-key      # Optional, for voice
-ELEVENLABS_KEY=your-elevenlabs-key  # Optional, for voice
+LLM_API_KEY=your-llm-api-key
+STT_API_KEY=your-stt-api-key        # Optional, for voice
+TTS_API_KEY=your-tts-api-key        # Optional, for voice
 ```
 
 ## Manual Setup
@@ -48,9 +48,9 @@ import { createSessionToken } from '@guidekit/server';
 export async function POST() {
   const token = await createSessionToken({
     signingSecret: process.env.GUIDEKIT_SECRET!,
-    geminiKey: process.env.GEMINI_KEY!,
-    deepgramKey: process.env.DEEPGRAM_KEY,
-    elevenlabsKey: process.env.ELEVENLABS_KEY,
+    llmApiKey: process.env.LLM_API_KEY!,
+    sttApiKey: process.env.STT_API_KEY,
+    ttsApiKey: process.env.TTS_API_KEY,
     expiresIn: '15m',
   });
   return Response.json(token);

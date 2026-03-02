@@ -101,16 +101,17 @@ Authentication configs use discriminated unions for type safety:
 
 ```typescript
 type LLMConfig =
-  | { provider: 'gemini'; apiKey: string; model?: string }
-  | { provider: 'openai'; apiKey: string; model?: string };
+  | { provider: 'gemini'; apiKey: string; model?: 'gemini-2.5-flash' | 'gemini-2.5-pro' }
+  | { adapter: LLMProviderAdapter };
 
 type STTConfig =
-  | { provider: 'deepgram'; apiKey: string; model?: string }
-  | { provider: 'assemblyai'; apiKey: string };
+  | { provider: 'deepgram'; apiKey: string; model?: 'nova-2' | 'nova-3' }
+  | { provider: 'elevenlabs'; apiKey: string; language?: string }
+  | { provider: 'web-speech'; language?: string; continuous?: boolean; interimResults?: boolean };
 
 type TTSConfig =
   | { provider: 'elevenlabs'; apiKey: string; voiceId?: string }
-  | { provider: 'cartesia'; apiKey: string; voiceId?: string };
+  | { provider: 'web-speech'; voice?: string; rate?: number; pitch?: number; language?: string };
 ```
 
 ## SSR Safety

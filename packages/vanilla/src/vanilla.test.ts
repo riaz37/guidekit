@@ -103,7 +103,7 @@ describe('@guidekit/vanilla', () => {
 
   describe('VERSION', () => {
     it('exports the correct version string', () => {
-      expect(VERSION).toBe('0.1.0');
+      expect(VERSION).toBe('0.1.0-beta.2');
     });
 
     it('is of type string', () => {
@@ -111,7 +111,7 @@ describe('@guidekit/vanilla', () => {
     });
 
     it('follows semver format', () => {
-      expect(VERSION).toMatch(/^\d+\.\d+\.\d+$/);
+      expect(VERSION).toMatch(/^\d+\.\d+\.\d+(-[\w.]+)?$/);
     });
   });
 

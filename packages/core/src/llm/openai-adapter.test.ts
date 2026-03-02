@@ -3,7 +3,7 @@
  *
  * @module @guidekit/core/llm
  */
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OpenAIAdapter } from './openai-adapter.js';
 import {
   AuthenticationError,
@@ -177,20 +177,18 @@ const mockTools: ToolDefinition[] = [
     name: 'highlight',
     description: 'Highlight an element',
     parameters: {
-      type: 'object',
-      properties: { selector: { type: 'string' } },
-      required: ['selector'],
+      selector: { type: 'string', description: 'CSS selector' },
     },
+    required: ['selector'],
     schemaVersion: 1,
   },
   {
     name: 'scrollToSection',
     description: 'Scroll to a section',
     parameters: {
-      type: 'object',
-      properties: { sectionId: { type: 'string' } },
-      required: ['sectionId'],
+      sectionId: { type: 'string', description: 'Section ID' },
     },
+    required: ['sectionId'],
     schemaVersion: 1,
   },
 ];
@@ -214,7 +212,7 @@ describe('OpenAIAdapter', () => {
   });
 
   beforeEach(() => {
-    adapter = new OpenAIAdapter({ provider: 'openai', apiKey: 'test-key' });
+    adapter = new OpenAIAdapter({ apiKey: 'test-key' });
   });
 
   // -----------------------------------------------------------------------
@@ -258,7 +256,7 @@ describe('OpenAIAdapter', () => {
   // -----------------------------------------------------------------------
 
   describe('formatTools()', () => {
-    it('converts ToolDefinition[] to OpenAI function tools format', () => {
+    it('converts ToolDefinition[] to OpenAI function tools format with schema wrapper', () => {
       const result = adapter.formatTools(mockTools) as Array<{
         type: string;
         function: {
@@ -275,18 +273,76 @@ describe('OpenAIAdapter', () => {
       expect(result[0]!.function.description).toBe('Highlight an element');
       expect(result[0]!.function.parameters).toEqual({
         type: 'object',
-        properties: { selector: { type: 'string' } },
+        properties: { selector: { type: 'string', description: 'CSS selector' } },
         required: ['selector'],
       });
 
       expect(result[1]!.type).toBe('function');
       expect(result[1]!.function.name).toBe('scrollToSection');
       expect(result[1]!.function.description).toBe('Scroll to a section');
+      expect(result[1]!.function.parameters).toEqual({
+        type: 'object',
+        properties: { sectionId: { type: 'string', description: 'Section ID' } },
+        required: ['sectionId'],
+      });
     });
 
     it('returns undefined for empty tools array', () => {
       const result = adapter.formatTools([]);
       expect(result).toBeUndefined();
+    });
+
+    it('no-parameter tool produces empty properties and required[]', () => {
+      const noParamTool: ToolDefinition[] = [
+        {
+          name: 'dismissHighlight',
+          description: 'Remove the spotlight',
+          parameters: {},
+          required: [],
+          schemaVersion: 1,
+        },
+      ];
+      const result = adapter.formatTools(noParamTool) as Array<{
+        function: { parameters: Record<string, unknown> };
+      }>;
+      expect(result[0]!.function.parameters).toEqual({
+        type: 'object',
+        properties: {},
+        required: [],
+      });
+    });
+
+    it('uses empty array for required when tool.required is omitted', () => {
+      const toolWithoutRequired: ToolDefinition[] = [
+        {
+          name: 'getVisibleSections',
+          description: 'Get visible sections',
+          parameters: {},
+          schemaVersion: 1,
+        },
+      ];
+      const result = adapter.formatTools(toolWithoutRequired) as Array<{
+        function: { parameters: Record<string, unknown> };
+      }>;
+      expect(result[0]!.function.parameters).toEqual({
+        type: 'object',
+        properties: {},
+        required: [],
+      });
+    });
+
+    it('does not mutate original tool.parameters', () => {
+      const tool: ToolDefinition = {
+        name: 'highlight',
+        description: 'Highlight',
+        parameters: { selector: { type: 'string' } },
+        required: [],
+        schemaVersion: 1,
+      };
+      const originalParamKeys = Object.keys(tool.parameters);
+      adapter.formatTools([tool]);
+      // Original parameters object should be unchanged
+      expect(Object.keys(tool.parameters)).toEqual(originalParamKeys);
     });
   });
 
@@ -584,7 +640,6 @@ describe('OpenAIAdapter', () => {
 
     it('uses custom model when specified', async () => {
       const customAdapter = new OpenAIAdapter({
-        provider: 'openai',
         apiKey: 'test-key',
         model: 'gpt-4o-mini',
       });

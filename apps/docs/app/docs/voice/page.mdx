@@ -25,9 +25,11 @@ Enable voice mode in the provider:
 ## How It Works
 
 1. **VAD** (`@guidekit/vad`) — Silero ONNX model detects when the user starts and stops speaking
-2. **STT** (Deepgram) — Streams audio via WebSocket for real-time transcription
-3. **LLM** (Gemini) — Processes the transcribed text and generates a response
-4. **TTS** (ElevenLabs) — Converts the response to speech and plays it back
+2. **STT** (Deepgram, ElevenLabs, or Web Speech API) — Transcribes audio in real-time
+3. **LLM** (Gemini or custom adapter) — Processes the transcribed text and generates a response
+4. **TTS** (ElevenLabs or Web Speech API) — Converts the response to speech and plays it back
+
+> By default, GuideKit uses the browser-native Web Speech API for STT and TTS, requiring no API keys. For production quality, configure Deepgram/ElevenLabs providers with API keys.
 
 ## Voice Events
 
@@ -64,9 +66,9 @@ Voice requires additional API keys in your token endpoint:
 ```typescript
 const token = await createSessionToken({
   signingSecret: process.env.GUIDEKIT_SECRET!,
-  geminiKey: process.env.GEMINI_KEY!,
-  deepgramKey: process.env.DEEPGRAM_KEY!,
-  elevenlabsKey: process.env.ELEVENLABS_KEY!,
+  llmApiKey: process.env.LLM_API_KEY!,
+  sttApiKey: process.env.STT_API_KEY!,
+  ttsApiKey: process.env.TTS_API_KEY!,
   expiresIn: '15m',
 });
 ```

@@ -84,6 +84,7 @@ export type { ContextManagerOptions } from './context/index.js';
 
 // LLM
 export { LLMOrchestrator, GeminiAdapter, OpenAIAdapter } from './llm/index.js';
+export type { OpenAIAdapterConfig } from './llm/index.js';
 
 // Tool Executor
 export { ToolExecutor } from './llm/tool-executor.js';
@@ -143,3 +144,13 @@ export type {
   LocaleInput,
   I18nOptions,
 } from './i18n/index.js';
+
+// Voice — Web Speech API adapters (browser-native, zero-config defaults)
+export { WebSpeechSTT } from './voice/web-speech-stt.js';
+export type { WebSpeechSTTOptions } from './voice/web-speech-stt.js';
+export { WebSpeechTTS } from './voice/web-speech-tts.js';
+export type { WebSpeechTTSOptions, WebSpeechTTSAudioEvent } from './voice/web-speech-tts.js';
+
+// Voice — VoicePipeline
+export { VoicePipeline } from './voice/index.js';
+export type { VoicePipelineOptions, VoiceState } from './voice/index.js';

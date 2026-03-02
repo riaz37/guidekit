@@ -1,7 +1,7 @@
 {
   "name": "@guidekit/cli",
-  "version": "0.1.0-beta.1",
-  "description": "CLI tools for GuideKit SDK \u2014 init, doctor, generate-secret",
+  "version": "0.1.0-beta.2",
+  "description": "CLI tools for GuideKit SDK — init, doctor, generate-secret",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -31,7 +31,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@guidekit/server": "workspace:*"
+    "@guidekit/server": "workspace:^"
   },
   "devDependencies": {
     "typescript": "^5.7.0",
@@ -41,6 +41,18 @@
   },
   "sideEffects": false,
   "license": "MIT",
+  "author": "Riazul Islam",
+  "keywords": [
+    "guidekit",
+    "cli",
+    "sdk",
+    "ai",
+    "scaffolding",
+    "developer-tools"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/riaz37/guidekit.git",

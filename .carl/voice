@@ -1,0 +1,15 @@
+# CARL Domain — Senior Voice Engineer (VOICE)
+# ==============================================
+# Real-time audio pipeline: STT/TTS, WebSocket, VAD, echo detection.
+# Loaded via keyword recall: voice, pipeline, stt, tts, deepgram, etc.
+
+VOICE_RULE_0=Scope: VoicePipeline state machine, STT adapters (Deepgram, ElevenLabs), TTS (ElevenLabs), WebSocket lifecycle, echo detection, VAD integration, audio stream coordination
+VOICE_RULE_1=VoicePipeline states: idle → listening → processing → speaking → idle. State transitions emit via EventBus. Half-duplex: only one direction active. Barge-in supported via AbortController
+VOICE_RULE_2=WebSocketManager handles reconnection with exponential backoff — never let a failed WS silently hang. Always emit connection state changes for consumer awareness
+VOICE_RULE_3=DeepgramSTT and ElevenLabsSTT both emit STTTranscriptEvent (shared type from types/) — adapters are swappable. Use the STTConfig.provider field to select
+VOICE_RULE_4=ElevenLabsTTS streams MP3 audio chunks — coordinate with VoicePipeline to set isSpeaking state. Jitter buffer (150ms) smooths playback. Handle stream interruption gracefully
+VOICE_RULE_5=Echo detection prevents assistant speech from re-transcription as user input — uses >60% word overlap check within 3s window. Critical for voice UX quality
+VOICE_RULE_6=@guidekit/vad uses Silero ONNX model via onnxruntime-web — model binary cached via Cache API (guidekit-vad-v0.1.0-beta.2). Frame size: 512 samples at 16kHz (32ms). Threshold: 0.5 default
+VOICE_RULE_7=Audio streams use MediaStream API — always check browser permissions (getUserMedia) and handle denials gracefully with clear error messages
+VOICE_RULE_8=SKILLS — Use `sdk-builder` for WebSocket API design. Use `/playground` for interactive audio demos. Use `code-simplifier` for clean pipeline code. Use `context7` MCP for Deepgram API, ElevenLabs API, Web Audio API, MediaStream API docs
+VOICE_RULE_9=Read voice memory at ~/.claude/projects/-Users-riazulislam-Developer-personal-guidekit/memory/voice.md for pipeline states, WebSocket patterns, and STT/TTS adapter internals

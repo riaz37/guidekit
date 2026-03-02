@@ -14,7 +14,7 @@ import { runDoctor } from './commands/doctor.js';
 import { runGenerateSecret } from './commands/generate-secret.js';
 import { c, log, error as logError } from './utils.js';
 
-const VERSION = '0.1.0';
+const VERSION = '0.1.0-beta.2';
 
 const HELP = `
 ${c.bold}guidekit${c.reset} — CLI tools for GuideKit SDK

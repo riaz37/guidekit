@@ -90,20 +90,18 @@ const mockTools: ToolDefinition[] = [
     name: 'highlight',
     description: 'Highlight an element',
     parameters: {
-      type: 'object',
-      properties: { selector: { type: 'string' } },
-      required: ['selector'],
+      selector: { type: 'string', description: 'CSS selector' },
     },
+    required: ['selector'],
     schemaVersion: 1,
   },
   {
     name: 'scrollToSection',
     description: 'Scroll to a section',
     parameters: {
-      type: 'object',
-      properties: { sectionId: { type: 'string' } },
-      required: ['sectionId'],
+      sectionId: { type: 'string', description: 'Section ID' },
     },
+    required: ['sectionId'],
     schemaVersion: 1,
   },
 ];
@@ -157,7 +155,7 @@ describe('GeminiAdapter', () => {
   });
 
   describe('formatTools()', () => {
-    it('converts ToolDefinition[] to Gemini function declarations', () => {
+    it('converts ToolDefinition[] to Gemini function declarations with schema wrapper', () => {
       const result = adapter.formatTools(mockTools) as Array<{
         functionDeclarations: Array<{
           name: string;
@@ -174,17 +172,52 @@ describe('GeminiAdapter', () => {
       expect(decl0.description).toBe('Highlight an element');
       expect(decl0.parameters).toEqual({
         type: 'object',
-        properties: { selector: { type: 'string' } },
+        properties: { selector: { type: 'string', description: 'CSS selector' } },
         required: ['selector'],
       });
 
       const decl1 = result[0]!.functionDeclarations[1]!;
       expect(decl1.name).toBe('scrollToSection');
+      expect(decl1.parameters).toEqual({
+        type: 'object',
+        properties: { sectionId: { type: 'string', description: 'Section ID' } },
+        required: ['sectionId'],
+      });
     });
 
     it('returns undefined for empty tools array', () => {
       const result = adapter.formatTools([]);
       expect(result).toBeUndefined();
+    });
+
+    it('produces required:[] when tool.required is omitted', () => {
+      const tool: ToolDefinition = {
+        name: 'getVisibleSections',
+        description: 'Get visible sections',
+        parameters: {},
+        schemaVersion: 1,
+      };
+      const result = adapter.formatTools([tool]) as Array<{
+        functionDeclarations: Array<{ parameters: Record<string, unknown> }>;
+      }>;
+      expect(result[0]!.functionDeclarations[0]!.parameters).toEqual({
+        type: 'object',
+        properties: {},
+        required: [],
+      });
+    });
+
+    it('does not mutate original tool.parameters', () => {
+      const tool: ToolDefinition = {
+        name: 'highlight',
+        description: 'Highlight',
+        parameters: { selector: { type: 'string' } },
+        required: [],
+        schemaVersion: 1,
+      };
+      const originalParamKeys = Object.keys(tool.parameters);
+      adapter.formatTools([tool]);
+      expect(Object.keys(tool.parameters)).toEqual(originalParamKeys);
     });
   });
 
@@ -354,6 +387,14 @@ describe('LLMOrchestrator', () => {
             config: { provider: 'anthropic', apiKey: 'test-key' },
           }),
       ).toThrow('not yet supported');
+    });
+
+    it('accepts a custom adapter via { adapter } config', () => {
+      const mockAdapter = new GeminiAdapter({ provider: 'gemini', apiKey: 'test-key' });
+      const orchestrator = new LLMOrchestrator({
+        config: { adapter: mockAdapter },
+      });
+      expect(orchestrator.adapter).toBe(mockAdapter);
     });
   });
 

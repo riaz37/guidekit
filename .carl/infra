@@ -1,0 +1,17 @@
+# CARL Domain — Principal Infrastructure Engineer (INFRA)
+# =========================================================
+# Server auth, CLI, CI/CD, builds, releases, performance, benchmarks.
+# Loaded via keyword recall: server, jwt, token, cli, build, turbo, bundle, etc.
+
+INFRA_RULE_0=Scope: Server-side token management (jose JWT), CLI tooling, CI/CD pipeline, build system (turbo + tsup), bundle analysis, release process (changesets), dependency management, runtime performance profiling, memory leak detection, bundle tree-shaking, benchmarks
+INFRA_RULE_1=createSessionToken() uses jose SignJWT — provider API keys stay server-side in sessionKeyStore, NEVER in JWT payload. In-memory store, no keys persisted to disk or transmitted to client
+INFRA_RULE_2=CLI commands: `guidekit init` (scaffold config), `guidekit doctor` (validate API keys, packages, provider connectivity), `guidekit generate-secret` (create JWT signing key). Bin: guidekit
+INFRA_RULE_3=CI pipeline (.github/workflows/publish.yml): triggers on tags (v*.*.*) → checkout → install → build → typecheck → test:unit → validate no workspace:* → publish with npm provenance (OIDC token)
+INFRA_RULE_4=Changesets for versioning: `pnpm changeset` to create, `pnpm changeset version` to bump. Internal deps MUST use `workspace:^`. Changesets auto-resolved before publish
+INFRA_RULE_5=Bundle limits in .size-limit.json are HARD limits: core ≤80KB, react ≤10KB, server ≤5KB, vanilla ≤120KB, cli ≤8KB (gzip). Verify with `pnpm size:check`
+INFRA_RULE_6=Every package built with tsup — dual ESM/CJS, sideEffects: false, TypeScript declarations, ES2022 target. Never commit `workspace:*` — CI validates this
+INFRA_RULE_7=Performance targets: DOM scanner <50ms for <500 elements. Voice pipeline mouth-to-ear latency <500ms. LLM time-to-first-token tracking. Measure with performance.now()
+INFRA_RULE_8=destroy() must release ALL resources — WebSocket connections, audio streams, DOM observers, timers. Profile with memory leak detection tools. No dangling listeners
+INFRA_RULE_9=Tree-shaking: verify unused code eliminated with `pnpm size:check`. React hooks must not cause unnecessary re-renders. Track bundle size changes in PRs
+INFRA_RULE_10=SKILLS — Use `commit-commands` for git workflow (commit, push, PR). Use `security-guidance` for server code review. Use `hookify` to create CI enforcement hooks. Use `code-simplifier` for clean code. Use `context7` MCP for jose, pnpm, Performance API, Web Vitals docs
+INFRA_RULE_11=Read infra memory at ~/.claude/projects/-Users-riazulislam-Developer-personal-guidekit/memory/infra.md for JWT patterns, CI/CD pipeline, release process, perf benchmarks, and latency targets

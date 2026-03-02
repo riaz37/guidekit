@@ -1,0 +1,15 @@
+# CARL Domain — Principal DOM Engineer (DOM)
+# =============================================
+# Browser intelligence: scanning, page model, awareness, navigation, connectivity.
+# Loaded via keyword recall: dom, scanner, page model, awareness, viewport, etc.
+
+DOM_RULE_0=Scope: DOM scanning, context management, awareness signals (viewport, dwell, rage clicks, idle), proactive triggers, navigation observation, connectivity monitoring
+DOM_RULE_1=DOMScanner produces PageModel (the ground truth sent to LLM each turn) — any change to scanning logic directly affects LLM response quality. Test with diverse page structures
+DOM_RULE_2=PageSection.score determines section relevance ranking — scoring algorithm changes ripple through LLM grounding. Document scoring rationale
+DOM_RULE_3=AwarenessSystem tracks viewport position, element dwell time, rage clicks, idle detection — emits events via EventBus. Keep observers lightweight (<50ms scan time)
+DOM_RULE_4=ProactiveTriggerEngine fires based on awareness signals — test trigger conditions thoroughly. Prevent trigger storms with debouncing and cooldown periods
+DOM_RULE_5=ContextManager merges DOM context + ContentMap + conversation state into unified context for LLM — keep merge logic deterministic and predictable
+DOM_RULE_6=NavigationController observes URL changes (pushState, popstate, hashchange) — trigger DOM re-scan on navigation. Handle SPAs and hash routing
+DOM_RULE_7=ConnectionManager detects online/degraded/offline states — all subsystems must degrade gracefully. Queue messages during offline, replay on reconnect
+DOM_RULE_8=SKILLS — Use `code-simplifier` for complex DOM traversal logic. Use `/playground` to create interactive demos of scanning behavior. Use `/feature-dev` (code-explorer) to understand existing patterns. Use `context7` MCP for Web API documentation (MutationObserver, IntersectionObserver, ResizeObserver)
+DOM_RULE_9=Read dom memory at ~/.claude/projects/-Users-riazulislam-Developer-personal-guidekit/memory/dom.md for scanner internals, PageModel schema, and awareness patterns

@@ -1,0 +1,17 @@
+# CARL Domain — Principal Quality Engineer (QUALITY)
+# =====================================================
+# Tests, coverage, E2E, security, threat modeling, OWASP.
+# Loaded via keyword recall: test, vitest, playwright, coverage, security, etc.
+
+QUALITY_RULE_0=Scope: Test strategy, unit/E2E coverage, security testing, threat modeling, auth hardening, input validation, XSS/injection prevention, dependency audits, quality gates, regression prevention, OWASP compliance
+QUALITY_RULE_1=Vitest config: globals true, jsdom environment, test pattern packages/*/src/**/*.test.ts(x). Coverage: v8 provider, html reporter
+QUALITY_RULE_2=Coverage thresholds: 80% statements, 70% branches — CI blocks merges below this. Track coverage trends. Flag files dropping below threshold
+QUALITY_RULE_3=Mock ALL external dependencies — never real API calls, WebSocket connections, or network requests in unit tests. Use vi.mock() for module mocking, vi.fn() for functions
+QUALITY_RULE_4=Playwright E2E: Chromium only, port 3099 (example-nextjs app), tests in e2e/. Test user-visible behavior, not implementation details. Screenshot on failure
+QUALITY_RULE_5=Provider API keys MUST stay in server-side sessionKeyStore — NEVER in JWT payload, client bundle, logs, or error messages. Validate this in security reviews
+QUALITY_RULE_6=ToolExecutor — validate ALL tool call arguments against schema. clickElement respects DEFAULT_CLICK_DENY list (sensitive selectors). maxMessageLength enforced on user input
+QUALITY_RULE_7=WebSocket connections — validate origin, use WSS (never WS in production), handle reconnection without leaking auth state. Visual guidance — sanitize all user-provided content against XSS
+QUALITY_RULE_8=Dependency audit: run `pnpm audit` regularly. Track CVEs in jose, onnxruntime-web, and all direct deps. Pin vulnerable transitive deps if needed
+QUALITY_RULE_9=Known failures: 2 vanilla VERSION tests expect '0.1.0' but get '0.1.0-beta.1' — track but don't block. Update when version stabilizes
+QUALITY_RULE_10=SKILLS — Use `/code-review` + `/pr-review-toolkit` (pr-test-analyzer, silent-failure-hunter, type-design-analyzer) for PR review. Use `security-guidance` for vulnerability detection. Use `playwright` MCP for E2E automation. Use `code-simplifier` for clean tests. Use `context7` MCP for Vitest, Playwright, OWASP docs
+QUALITY_RULE_11=Read quality memory at ~/.claude/projects/-Users-riazulislam-Developer-personal-guidekit/memory/quality.md for test patterns, coverage, E2E, threat model, security decisions, OWASP checklist

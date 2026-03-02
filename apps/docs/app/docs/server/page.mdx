@@ -18,9 +18,9 @@ import { createSessionToken } from '@guidekit/server';
 export async function POST() {
   const token = await createSessionToken({
     signingSecret: process.env.GUIDEKIT_SECRET!,
-    geminiKey: process.env.GEMINI_KEY!,
-    deepgramKey: process.env.DEEPGRAM_KEY,
-    elevenlabsKey: process.env.ELEVENLABS_KEY,
+    llmApiKey: process.env.LLM_API_KEY!,
+    sttApiKey: process.env.STT_API_KEY,
+    ttsApiKey: process.env.TTS_API_KEY,
     expiresIn: '15m',
   });
 
@@ -33,9 +33,9 @@ export async function POST() {
 | Option | Type | Required | Description |
 |--------|------|----------|-------------|
 | `signingSecret` | `string` | Yes | Secret used to sign the JWT |
-| `geminiKey` | `string` | Yes | Google Gemini API key |
-| `deepgramKey` | `string` | No | Deepgram API key (for STT) |
-| `elevenlabsKey` | `string` | No | ElevenLabs API key (for TTS) |
+| `llmApiKey` | `string` | Yes | LLM provider API key |
+| `sttApiKey` | `string` | No | STT provider API key (for speech-to-text) |
+| `ttsApiKey` | `string` | No | TTS provider API key (for text-to-speech) |
 | `expiresIn` | `string` | No | Token lifetime (default: `'15m'`) |
 | `metadata` | `object` | No | Custom claims to include in the token |
 
@@ -46,12 +46,12 @@ Verifies and decodes a token. Useful for custom middleware or edge functions.
 ```typescript
 import { validateSessionToken } from '@guidekit/server';
 
-const payload = await validateSessionToken({
-  token: request.headers.get('Authorization')?.replace('Bearer ', '')!,
-  signingSecret: process.env.GUIDEKIT_SECRET!,
-});
+const result = await validateSessionToken(
+  request.headers.get('Authorization')?.replace('Bearer ', '')!,
+  process.env.GUIDEKIT_SECRET!,
+);
 
-if (!payload) {
+if (!result.valid) {
   return new Response('Unauthorized', { status: 401 });
 }
 ```

@@ -21,10 +21,14 @@
 import { EventBus, createEventBus } from '../bus/index.js';
 import { BrowserSupportError, ErrorCodes, PermissionError } from '../errors/index.js';
 import { DeepgramSTT } from './deepgram-stt.js';
+import { ElevenLabsSTT } from './elevenlabs-stt.js';
 import { ElevenLabsTTS } from './elevenlabs-tts.js';
+import { WebSpeechSTT } from './web-speech-stt.js';
+import { WebSpeechTTS } from './web-speech-tts.js';
 
-import type { TranscriptEvent } from './deepgram-stt.js';
+import type { STTTranscriptEvent } from '../types/index.js';
 import type { TTSAudioEvent } from './elevenlabs-tts.js';
+import type { WebSpeechTTSAudioEvent } from './web-speech-tts.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -48,8 +52,13 @@ const ECHO_OVERLAP_THRESHOLD = 0.6;
 export type VoiceState = 'idle' | 'listening' | 'processing' | 'speaking' | 'error';
 
 export interface VoicePipelineOptions {
-  sttConfig: { provider: 'deepgram'; apiKey: string; model?: 'nova-2' | 'nova-3' };
-  ttsConfig: { provider: 'elevenlabs'; apiKey: string; voiceId?: string; modelId?: string };
+  sttConfig:
+    | { provider: 'deepgram'; apiKey: string; model?: 'nova-2' | 'nova-3' }
+    | { provider: 'elevenlabs'; apiKey: string; language?: string }
+    | { provider: 'web-speech'; language?: string; continuous?: boolean; interimResults?: boolean };
+  ttsConfig:
+    | { provider: 'elevenlabs'; apiKey: string; voiceId?: string; modelId?: string }
+    | { provider: 'web-speech'; voice?: string; rate?: number; pitch?: number; language?: string };
   debug?: boolean;
 }
 
@@ -112,8 +121,8 @@ export class VoicePipeline {
   private _audioContext: AudioContext | null = null;
   private _mediaStream: MediaStream | null = null;
   private _vad: VADInstance | null = null;
-  private _stt: DeepgramSTT | null = null;
-  private _tts: ElevenLabsTTS | null = null;
+  private _stt: DeepgramSTT | ElevenLabsSTT | WebSpeechSTT | null = null;
+  private _tts: ElevenLabsTTS | WebSpeechTTS | null = null;
 
   // ── Audio capture (mic → ScriptProcessor → STT) ─────────────────────
   private _micSourceNode: MediaStreamAudioSourceNode | null = null;
@@ -230,19 +239,46 @@ export class VoicePipeline {
     }
 
     // ── 3. Create STT adapter ───────────────────────────────────────
-    this._stt = new DeepgramSTT({
-      apiKey: this._sttConfig.apiKey,
-      model: this._sttConfig.model,
-      debug: this._debug,
-    });
+    if (this._sttConfig.provider === 'deepgram') {
+      this._stt = new DeepgramSTT({
+        apiKey: this._sttConfig.apiKey,
+        model: this._sttConfig.model,
+        debug: this._debug,
+      });
+    } else if (this._sttConfig.provider === 'elevenlabs') {
+      this._stt = new ElevenLabsSTT({
+        apiKey: this._sttConfig.apiKey,
+        language: this._sttConfig.language,
+        debug: this._debug,
+      });
+    } else {
+      // web-speech provider (browser-native, zero-config)
+      this._stt = new WebSpeechSTT({
+        language: this._sttConfig.language,
+        continuous: this._sttConfig.continuous,
+        interimResults: this._sttConfig.interimResults,
+        debug: this._debug,
+      });
+    }
 
     // ── 4. Create TTS adapter ───────────────────────────────────────
-    this._tts = new ElevenLabsTTS({
-      apiKey: this._ttsConfig.apiKey,
-      voiceId: this._ttsConfig.voiceId,
-      modelId: this._ttsConfig.modelId,
-      debug: this._debug,
-    });
+    if (this._ttsConfig.provider === 'elevenlabs') {
+      this._tts = new ElevenLabsTTS({
+        apiKey: this._ttsConfig.apiKey,
+        voiceId: this._ttsConfig.voiceId,
+        modelId: 'modelId' in this._ttsConfig ? this._ttsConfig.modelId : undefined,
+        debug: this._debug,
+      });
+    } else {
+      // web-speech provider (browser-native, zero-config)
+      this._tts = new WebSpeechTTS({
+        voice: this._ttsConfig.voice,
+        rate: this._ttsConfig.rate,
+        pitch: this._ttsConfig.pitch,
+        language: this._ttsConfig.language,
+        debug: this._debug,
+      });
+    }
 
     this._log('Initialization complete');
   }
@@ -326,7 +362,7 @@ export class VoicePipeline {
 
     // ── Wire STT transcript events ──────────────────────────────────
     this._unsubSTTTranscript?.();
-    this._unsubSTTTranscript = this._stt.onTranscript((event: TranscriptEvent) => {
+    this._unsubSTTTranscript = this._stt.onTranscript((event: STTTranscriptEvent) => {
       this._handleTranscript(event);
     });
 
@@ -426,11 +462,13 @@ export class VoicePipeline {
   // speak()
   // ────────────────────────────────────────────────────────────────────
 
-  /** Speak text via ElevenLabs TTS. */
+  /** Speak text via TTS (ElevenLabs or Web Speech API). */
   async speak(text: string): Promise<void> {
     if (this._destroyed || !text.trim()) return;
 
-    if (!this._tts || !this._audioContext) {
+    // Web Speech TTS does not require AudioContext for playback
+    const isWebSpeechTTS = this._tts instanceof WebSpeechTTS;
+    if (!this._tts || (!this._audioContext && !isWebSpeechTTS)) {
       this._log('TTS or AudioContext not available — cannot speak');
       this._bus.emit('voice:degraded', { reason: 'TTS not available', fallback: 'text' });
       this._setState('idle');
@@ -489,13 +527,27 @@ export class VoicePipeline {
         resolve();
       };
 
-      this._unsubTTSAudio = this._tts!.onAudio((event: TTSAudioEvent) => {
-        this._handleTTSAudio(event, done);
-      });
-
-      // Send text and flush
-      this._tts!.speak(text);
-      this._tts!.flush();
+      if (isWebSpeechTTS) {
+        // Web Speech TTS: browser handles audio playback internally.
+        // We only listen for start/end events to manage pipeline state.
+        this._unsubTTSAudio = (this._tts as WebSpeechTTS).onAudio(
+          (event: WebSpeechTTSAudioEvent) => {
+            if (event.isFinal) {
+              done();
+            }
+          },
+        );
+        (this._tts as WebSpeechTTS).speak(text);
+      } else {
+        // ElevenLabs TTS: audio arrives as chunks over WebSocket
+        this._unsubTTSAudio = (this._tts as ElevenLabsTTS).onAudio(
+          (event: TTSAudioEvent) => {
+            this._handleTTSAudio(event, done);
+          },
+        );
+        (this._tts as ElevenLabsTTS).speak(text);
+        (this._tts as ElevenLabsTTS).flush();
+      }
     });
   }
 
@@ -535,8 +587,10 @@ export class VoicePipeline {
       this._pendingLLMAbort = null;
     }
 
-    // Close and recreate TTS connection for next utterance
-    if (this._tts?.isConnected) {
+    // Stop Web Speech TTS playback or close ElevenLabs TTS connection
+    if (this._tts instanceof WebSpeechTTS) {
+      this._tts.stop();
+    } else if (this._tts?.isConnected) {
       this._tts.close();
     }
   }
@@ -802,7 +856,7 @@ export class VoicePipeline {
   // PRIVATE: STT transcript handler
   // ════════════════════════════════════════════════════════════════════
 
-  private _handleTranscript(event: TranscriptEvent): void {
+  private _handleTranscript(event: STTTranscriptEvent): void {
     const { text, isFinal } = event;
 
     if (!text || !text.trim()) return;
@@ -957,8 +1011,21 @@ export class VoicePipeline {
    * sequential playback via AudioBufferSourceNode.
    */
   private _decodeAndSchedule(audioData: ArrayBuffer, onDone?: () => void): void {
+    // Guard against multiple invocations of onDone. This can happen when
+    // multiple pending decode operations reference the same callback, or
+    // when both the success and error paths fire (e.g. state change
+    // during decode).
+    let onDoneCalled = false;
+    const safeOnDone = onDone
+      ? () => {
+          if (onDoneCalled) return;
+          onDoneCalled = true;
+          onDone();
+        }
+      : undefined;
+
     if (!this._audioContext || this._state !== 'speaking') {
-      onDone?.();
+      safeOnDone?.();
       return;
     }
 
@@ -971,7 +1038,7 @@ export class VoicePipeline {
       copy,
       (decodedBuffer) => {
         if (this._state !== 'speaking' || !this._audioContext) {
-          onDone?.();
+          safeOnDone?.();
           return;
         }
 
@@ -990,8 +1057,8 @@ export class VoicePipeline {
           }
 
           // If this was the last source and we have onDone, call it
-          if (onDone) {
-            onDone();
+          if (safeOnDone) {
+            safeOnDone();
           }
         };
 
@@ -1010,7 +1077,7 @@ export class VoicePipeline {
       },
       (err) => {
         this._log('Failed to decode audio chunk:', err);
-        onDone?.();
+        safeOnDone?.();
       },
     );
   }
@@ -1102,6 +1169,12 @@ export class VoicePipeline {
 export { WebSocketManager } from './websocket-manager.js';
 export type { WSState, WebSocketManagerOptions } from './websocket-manager.js';
 export { DeepgramSTT } from './deepgram-stt.js';
-export type { DeepgramSTTOptions, TranscriptEvent } from './deepgram-stt.js';
+export type { DeepgramSTTOptions, STTTranscriptEvent } from './deepgram-stt.js';
+export { ElevenLabsSTT } from './elevenlabs-stt.js';
+export type { ElevenLabsSTTOptions } from './elevenlabs-stt.js';
 export { ElevenLabsTTS } from './elevenlabs-tts.js';
 export type { ElevenLabsTTSOptions, TTSAudioEvent } from './elevenlabs-tts.js';
+export { WebSpeechSTT } from './web-speech-stt.js';
+export type { WebSpeechSTTOptions } from './web-speech-stt.js';
+export { WebSpeechTTS } from './web-speech-tts.js';
+export type { WebSpeechTTSOptions, WebSpeechTTSAudioEvent } from './web-speech-tts.js';

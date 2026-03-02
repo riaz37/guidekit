@@ -1,7 +1,7 @@
 {
   "name": "@guidekit/server",
-  "version": "0.1.0-beta.1",
-  "description": "Server-side utilities for GuideKit SDK \u2014 token generation, auth middleware",
+  "version": "0.1.0-beta.2",
+  "description": "Server-side utilities for GuideKit SDK — token generation, auth middleware",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -38,6 +38,19 @@
   },
   "sideEffects": false,
   "license": "MIT",
+  "author": "Riazul Islam",
+  "keywords": [
+    "guidekit",
+    "server",
+    "sdk",
+    "ai",
+    "auth",
+    "jwt",
+    "middleware"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/riaz37/guidekit.git",

@@ -13,9 +13,11 @@
     "clean": "turbo clean",
     "test:e2e": "playwright test",
     "size": "size-limit",
-    "size:check": "size-limit --limit"
+    "size:check": "size-limit --limit",
+    "release": "pnpm changeset version && pnpm install && pnpm build && pnpm changeset publish"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.27.0",
     "@axe-core/playwright": "^4.11.1",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.58.2",
@@ -35,5 +37,5 @@
       "esbuild"
     ]
   },
-  "version": "0.1.0-beta.1"
+  "version": "0.1.0-beta.2"
 }

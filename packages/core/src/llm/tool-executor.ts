@@ -313,7 +313,7 @@ export class ToolExecutor {
       }
     }
 
-    if (rounds >= this.maxRounds && allToolCalls.length > 0) {
+    if (rounds >= this.maxRounds) {
       this.log(
         `Max rounds (${this.maxRounds}) reached. Returning current text.`,
       );
@@ -452,7 +452,21 @@ export class ToolExecutor {
 
       // This branch should be unreachable because executeTool catches all
       // errors, but we handle it defensively.
-      const tc = toolCalls[i]!;
+      const tc = toolCalls[i];
+      if (!tc) {
+        const errorMsg =
+          s.reason instanceof Error ? s.reason.message : String(s.reason);
+        return {
+          toolCallId: `unknown-${i}`,
+          record: {
+            name: 'unknown',
+            args: {},
+            result: undefined,
+            durationMs: 0,
+            error: errorMsg,
+          },
+        };
+      }
       const errorMsg =
         s.reason instanceof Error ? s.reason.message : String(s.reason);
 

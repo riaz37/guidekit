@@ -1,0 +1,15 @@
+# CARL Domain — Principal UI Engineer (UI)
+# ==========================================
+# React bindings, vanilla bundle, Shadow DOM, visual guidance.
+# Loaded via keyword recall: react, vanilla, hook, widget, shadow dom, etc.
+
+UI_RULE_0=Scope: React bindings (@guidekit/react), vanilla JS bundle (@guidekit/vanilla), Shadow DOM widget, visual guidance (spotlight, tooltips), provider patterns, hooks API, devtools, testing utilities
+UI_RULE_1=GuideKitProvider wraps app in context, creates GuideKitCore instance, manages lifecycle — SSR_SNAPSHOT fallback for server rendering. Never access window/document during SSR
+UI_RULE_2=Hooks use useSyncExternalStore for tear-free concurrent-mode reads — NEVER use useState/useEffect for store reads. Split hooks: useGuideKitStatus, useGuideKitVoice, useGuideKitActions, useGuideKitContext + combined useGuideKit
+UI_RULE_3=Widget renders inside Shadow DOM for CSS isolation — styles cannot leak in or out. ARIA roles must propagate through shadow boundary. Use shadow host for role and aria-label attributes
+UI_RULE_4=@guidekit/vanilla is IIFE bundle for <script> tag — must work without bundler, expose window.GuideKit. Comprehensive public API: init, sendText, highlight, startTour, navigate, startListening, destroy
+UI_RULE_5=VisualGuidance handles spotlight overlay + tooltips — z-index management is critical. Focus trapping when spotlight active. Test multi-overlay scenarios and escape key dismissal
+UI_RULE_6=Vanilla widget: responsive design (mobile 70vh fullscreen, desktop 380x520px fixed panel). FAB with expand/collapse. SVG icons. CSS variables for theming. Auto-resize textarea
+UI_RULE_7=SKILLS — Use `frontend-design` for ALL UI component work (distinctive, production-grade interfaces). Use `/playground` for interactive demos and visual tests. Use `code-simplifier` for clean code. Use `context7` MCP for React 19 docs, Next.js 15 docs, Shadow DOM specs
+UI_RULE_8=SKILLS — Use `/feature-dev` (code-explorer) to understand component tree before changes. Use `simplify` after implementation changes
+UI_RULE_9=Read ui memory at ~/.claude/projects/-Users-riazulislam-Developer-personal-guidekit/memory/ui.md for React hooks, Shadow DOM patterns, and IIFE bundle conventions

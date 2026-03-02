@@ -1,7 +1,7 @@
 // @guidekit/vad — Silero VAD ONNX model wrapper for voice activity detection
 import * as ort from 'onnxruntime-web';
 
-export const VAD_VERSION = '0.1.0';
+export const VAD_VERSION = '0.1.0-beta.2';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -306,9 +306,9 @@ export class SileroVAD {
     // Begin noise floor calibration.
     this._isCalibrating = true;
     this._calibrationSamples = [];
-    this._calibrationFramesNeeded = Math.ceil(
+    this._calibrationFramesNeeded = Math.max(1, Math.floor(
       (CALIBRATION_DURATION_MS / 1000) * this._sampleRate / FRAME_SIZE,
-    );
+    ));
     this._log('Calibrating noise floor for', this._calibrationFramesNeeded, 'frames');
 
     // Build the audio processing pipeline.

@@ -1,7 +1,7 @@
 {
   "name": "@guidekit/react",
-  "version": "0.1.0-beta.1",
-  "description": "React bindings for GuideKit SDK \u2014 Provider, hooks, and Widget",
+  "version": "0.1.0-beta.2",
+  "description": "React bindings for GuideKit SDK — Provider, hooks, and Widget",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -38,7 +38,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@guidekit/core": "workspace:*"
+    "@guidekit/core": "workspace:^"
   },
   "peerDependencies": {
     "react": ">=18.0.0",
@@ -55,6 +55,19 @@
   },
   "sideEffects": false,
   "license": "MIT",
+  "author": "Riazul Islam",
+  "keywords": [
+    "guidekit",
+    "react",
+    "sdk",
+    "ai",
+    "widget",
+    "hooks",
+    "assistant"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/riaz37/guidekit.git",

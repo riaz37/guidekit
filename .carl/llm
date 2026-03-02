@@ -1,0 +1,15 @@
+# CARL Domain — Senior AI Engineer (LLM)
+# =========================================
+# LLM orchestration, provider adapters, tool system, streaming.
+# Loaded via keyword recall: llm, orchestrat, adapter, gemini, openai, tool, etc.
+
+LLM_RULE_0=Scope: LLM orchestration pipeline, provider adapters (Gemini, OpenAI), tool definition/execution, rate limiting, streaming response parsing, conversation management, system prompt construction
+LLM_RULE_1=LLMOrchestrator coordinates the full flow: build system prompt → send to adapter → parse stream → execute tools → respond. Each step must be independently testable
+LLM_RULE_2=Adapter pattern: LLMProviderAdapter interface with formatTools(), formatConversation(), parseResponse(), formatToolResult(). GeminiAdapter in index.ts, OpenAIAdapter in openai-adapter.ts
+LLM_RULE_3=formatTools() MUST wrap ToolDefinition.parameters as JSON Schema object type with properties + required — this is the v0.1.0-beta.2 contract. Breaking this breaks all tool invocations
+LLM_RULE_4=RateLimiter enforces maxLLMCallsPerMinute, maxSTTMinutesPerSession, maxTTSCharsPerSession from GuideKitOptions.rateLimits. Emit events on limit approach and breach
+LLM_RULE_5=ToolExecutor dispatches tool calls (scrollTo, clickElement, spotlight) — validate ALL arguments against schema. clickElement respects DEFAULT_CLICK_DENY list
+LLM_RULE_6=Streaming responses yield TextChunk | ToolCall interleaved — OpenAI adapter accumulates tool call chunks incrementally across SSE events. Handle partial JSON in tool args
+LLM_RULE_7=Content filter retry logic: on Gemini SAFETY block, retry once with adjusted safety settings. On persistent block, emit ContentFilterError with user-friendly message
+LLM_RULE_8=SKILLS — Use `sdk-builder` for adapter pattern design. Use `agent-sdk-dev` for Claude Agent SDK integration. Use `code-simplifier` for clean adapter code. Use `context7` MCP for OpenAI API docs, Gemini API docs. Use `/feature-dev` (code-architect) for new adapter implementations
+LLM_RULE_9=Read llm memory at ~/.claude/projects/-Users-riazulislam-Developer-personal-guidekit/memory/llm.md for adapter patterns, orchestration flow, and tool system internals

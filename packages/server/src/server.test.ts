@@ -57,18 +57,18 @@ describe('createSessionToken()', () => {
   it('token does NOT contain provider keys in payload', async () => {
     const result = await createSessionToken({
       signingSecret: TEST_SECRET,
-      deepgramKey: 'dg-secret-key',
-      elevenlabsKey: 'el-secret-key',
-      geminiKey: 'gem-secret-key',
+      sttApiKey: 'dg-secret-key',
+      ttsApiKey: 'el-secret-key',
+      llmApiKey: 'gem-secret-key',
       expiresIn: '15m',
     });
 
     const payload = decodePayload(result.token);
 
     // Provider keys must NEVER appear in the JWT
-    expect(payload).not.toHaveProperty('deepgramKey');
-    expect(payload).not.toHaveProperty('elevenlabsKey');
-    expect(payload).not.toHaveProperty('geminiKey');
+    expect(payload).not.toHaveProperty('sttApiKey');
+    expect(payload).not.toHaveProperty('ttsApiKey');
+    expect(payload).not.toHaveProperty('llmApiKey');
     expect(payload).not.toHaveProperty('dg-secret-key');
     expect(payload).not.toHaveProperty('el-secret-key');
     expect(payload).not.toHaveProperty('gem-secret-key');
@@ -356,16 +356,16 @@ describe('getSessionKeys()', () => {
     await createSessionToken({
       signingSecret: TEST_SECRET,
       sessionId,
-      deepgramKey: 'dg-key-123',
-      elevenlabsKey: 'el-key-456',
-      geminiKey: 'gem-key-789',
+      sttApiKey: 'dg-key-123',
+      ttsApiKey: 'el-key-456',
+      llmApiKey: 'gem-key-789',
     });
 
     const keys = getSessionKeys(sessionId);
     expect(keys).toBeDefined();
-    expect(keys!.deepgramKey).toBe('dg-key-123');
-    expect(keys!.elevenlabsKey).toBe('el-key-456');
-    expect(keys!.geminiKey).toBe('gem-key-789');
+    expect(keys!.sttApiKey).toBe('dg-key-123');
+    expect(keys!.ttsApiKey).toBe('el-key-456');
+    expect(keys!.llmApiKey).toBe('gem-key-789');
   });
 
   it('returns undefined for unknown session', () => {
@@ -392,7 +392,7 @@ describe('getSessionKeys()', () => {
     await createSessionToken({
       signingSecret: TEST_SECRET,
       sessionId,
-      geminiKey: 'gem-key-to-clear',
+      llmApiKey: 'gem-key-to-clear',
     });
 
     expect(getSessionKeys(sessionId)).toBeDefined();

@@ -1,0 +1,17 @@
+# CARL Domain — Principal Experience Engineer (EXPERIENCE)
+# ==========================================================
+# Documentation, DX, onboarding, WCAG 2.1 AA, ARIA, accessibility.
+# Loaded via keyword recall: docs, documentation, readme, a11y, wcag, aria, etc.
+
+EXPERIENCE_RULE_0=Scope: API documentation, developer guides, interactive playground, error message quality, onboarding, WCAG 2.1 AA compliance, screen reader compatibility, keyboard navigation, ARIA attributes, focus management, color contrast, changelogs
+EXPERIENCE_RULE_1=Docs site in apps/docs/ (Nextra/MDX) — every public API must have documentation with usage examples. apps/playground/ provides interactive demos — keep synced with latest API
+EXPERIENCE_RULE_2=Error messages in packages/core/src/errors/ must be actionable — always include suggestion (how to fix) and docsUrl (where to learn more). GuideKitError hierarchy with ErrorCodes enum
+EXPERIENCE_RULE_3=README.md files are the first developer touchpoint — keep accurate with quickstart examples. CHANGELOG.md follows Keep a Changelog format (Added, Changed, Fixed, Removed sections)
+EXPERIENCE_RULE_4=Shadow DOM widget: ARIA roles must propagate through shadow boundary. Use aria-label and role on shadow host element. Test with screen readers (VoiceOver, NVDA)
+EXPERIENCE_RULE_5=Spotlight overlay: focus trapping when active (Tab cycles within spotlight). Tooltips: role="tooltip", aria-describedby linking, Escape to dismiss. Test focus management thoroughly
+EXPERIENCE_RULE_6=Voice state changes: announce via aria-live="polite" region. All interactive elements keyboard-accessible (Tab, Enter, Escape). No keyboard traps
+EXPERIENCE_RULE_7=GuideKitTheme.primaryColor: validate contrast ratio ≥4.5:1 against background (WCAG AA). Respect prefers-reduced-motion — disable animations when set. Respect prefers-color-scheme
+EXPERIENCE_RULE_8=Write guides for common use cases: setup, voice mode, custom LLM adapter, content map, theming, server tokens. All code examples must be tested and runnable
+EXPERIENCE_RULE_9=e2e/accessibility.spec.ts: expand to cover all visual guidance components, focus management flows, keyboard navigation paths, screen reader announcements
+EXPERIENCE_RULE_10=SKILLS — Use `frontend-design` for accessible UI components. Use `/playground` for interactive demos. Use `explanatory-output-style` for educational code comments. Use `code-simplifier` for clean code. Use `context7` MCP for WCAG 2.1 guidelines, ARIA Authoring Practices, Nextra docs, MDX specs
+EXPERIENCE_RULE_11=Read experience memory at ~/.claude/projects/-Users-riazulislam-Developer-personal-guidekit/memory/experience.md for docs structure, WCAG checklist, ARIA patterns, a11y findings, documentation gaps

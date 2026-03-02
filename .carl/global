@@ -1,0 +1,14 @@
+# CARL Global Domain — Guidekit
+# ================================
+# Universal rules for all sessions in the Guidekit monorepo.
+# These load on every prompt regardless of active agent.
+
+GLOBAL_RULE_0=Guidekit is a pnpm monorepo (pnpm 10.25+, Turborepo, tsup) with 6 packages (@guidekit/core, react, vanilla, server, cli, vad) and 2 apps (example-nextjs, docs). Current version: 0.1.0-beta.2
+GLOBAL_RULE_1=TypeScript strict mode (ES2022 target, noUncheckedIndexedAccess). All packages built with tsup — dual ESM/CJS output, sideEffects: false, TypeScript declarations
+GLOBAL_RULE_2=Dependencies between workspace packages MUST use `workspace:^` — NEVER `workspace:*`. Verify with: grep -r "workspace:\*" packages/*/package.json (should return nothing)
+GLOBAL_RULE_3=Run `pnpm typecheck` after any type changes. Run `pnpm test` after implementation changes. Run `pnpm size:check` to verify bundle limits
+GLOBAL_RULE_4=Coverage thresholds enforced: 80% statements, 70% branches (v8 provider). CI blocks merges below this
+GLOBAL_RULE_5=Bundle size limits (gzip): core ≤80KB, react ≤10KB, server ≤5KB, vanilla ≤120KB, cli ≤8KB, vad ≤23KB. Check with `pnpm size:check`
+GLOBAL_RULE_6=Changes to `packages/core/src/types/index.ts` or `packages/core/src/core.ts` exports affect downstream packages (react, vanilla, server) — always consider impact
+GLOBAL_RULE_7=When an agent role is activated via *command or keyword match, read the corresponding memory file at ~/.claude/projects/-Users-riazulislam-Developer-personal-guidekit/memory/{role}.md for context
+GLOBAL_RULE_8=New shared types go in `packages/core/src/types/index.ts` — never define shared types in individual packages. Public API surface exported from `packages/core/src/core.ts` → `packages/core/src/index.ts`

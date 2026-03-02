@@ -9,6 +9,10 @@
 // ---------------------------------------------------------------------------
 
 import { WebSocketManager } from './websocket-manager.js';
+import type { STTTranscriptEvent } from '../types/index.js';
+
+// Re-export the shared type for consumers that only import from this module
+export type { STTTranscriptEvent };
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -34,13 +38,6 @@ export interface DeepgramSTTOptions {
   model?: 'nova-2' | 'nova-3';
   language?: string;
   debug?: boolean;
-}
-
-export interface TranscriptEvent {
-  text: string;
-  isFinal: boolean;
-  confidence: number;
-  timestamp: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -81,7 +78,7 @@ export class DeepgramSTT {
   private _suspended = false;
 
   /** Registered transcript callbacks. */
-  private readonly transcriptCallbacks: Set<(event: TranscriptEvent) => void> =
+  private readonly transcriptCallbacks: Set<(event: STTTranscriptEvent) => void> =
     new Set();
 
   // -----------------------------------------------------------------------
@@ -183,7 +180,7 @@ export class DeepgramSTT {
    *
    * @returns An unsubscribe function. Calling it more than once is safe.
    */
-  onTranscript(callback: (event: TranscriptEvent) => void): () => void {
+  onTranscript(callback: (event: STTTranscriptEvent) => void): () => void {
     this.transcriptCallbacks.add(callback);
 
     let removed = false;
@@ -338,7 +335,7 @@ export class DeepgramSTT {
     const isFinal =
       (parsed['is_final'] === true) && (parsed['speech_final'] === true);
 
-    const transcriptEvent: TranscriptEvent = {
+    const transcriptEvent: STTTranscriptEvent = {
       text: transcript,
       isFinal,
       confidence,
@@ -392,7 +389,7 @@ export class DeepgramSTT {
    * Errors thrown by individual callbacks are caught and logged so one
    * misbehaving subscriber does not prevent others from receiving the event.
    */
-  private emitTranscript(event: TranscriptEvent): void {
+  private emitTranscript(event: STTTranscriptEvent): void {
     for (const cb of this.transcriptCallbacks) {
       try {
         cb(event);
@@ -408,6 +405,8 @@ export class DeepgramSTT {
 
   /** Build the Deepgram streaming endpoint URL with query parameters. */
   private buildUrl(): string {
+    // NOTE: API key in WebSocket URL is inherent to Deepgram's WS protocol.
+    // This is a known limitation — keys should only be session-scoped tokens.
     const params = new URLSearchParams({
       model: this.model,
       language: this.language,

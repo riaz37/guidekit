@@ -16,9 +16,9 @@ export interface TokenPayload {
 
 export interface CreateSessionTokenOptions {
   signingSecret: string | string[];
-  deepgramKey?: string;
-  elevenlabsKey?: string;
-  geminiKey?: string;
+  sttApiKey?: string;
+  ttsApiKey?: string;
+  llmApiKey?: string;
   expiresIn?: string;
   allowedOrigins?: string[];
   permissions?: string[];
@@ -48,9 +48,9 @@ export interface ValidateSessionTokenOptions {
 // ---------------------------------------------------------------------------
 
 interface ProviderKeys {
-  deepgramKey?: string;
-  elevenlabsKey?: string;
-  geminiKey?: string;
+  sttApiKey?: string;
+  ttsApiKey?: string;
+  llmApiKey?: string;
 }
 
 /**
@@ -196,7 +196,7 @@ function resolveAllSecrets(signingSecret: string | string[]): string[] {
 /**
  * Create a signed session token (JWT) for use with GuideKit client SDKs.
  *
- * Provider API keys (`deepgramKey`, `elevenlabsKey`, `geminiKey`) are
+ * Provider API keys (`sttApiKey`, `ttsApiKey`, `llmApiKey`) are
  * **never** embedded in the JWT. They are stored in a server-side in-memory
  * map keyed by `sessionId` and can be retrieved via {@link getSessionKeys}.
  */
@@ -205,9 +205,9 @@ export async function createSessionToken(
 ): Promise<CreateSessionTokenResult> {
   const {
     signingSecret,
-    deepgramKey,
-    elevenlabsKey,
-    geminiKey,
+    sttApiKey,
+    ttsApiKey,
+    llmApiKey,
     expiresIn = '15m',
     allowedOrigins,
     permissions = ['stt', 'tts', 'llm'],
@@ -256,9 +256,9 @@ export async function createSessionToken(
 
   // Store provider keys server-side, keyed by sessionId.
   const providerKeys: ProviderKeys = {};
-  if (deepgramKey) providerKeys.deepgramKey = deepgramKey;
-  if (elevenlabsKey) providerKeys.elevenlabsKey = elevenlabsKey;
-  if (geminiKey) providerKeys.geminiKey = geminiKey;
+  if (sttApiKey) providerKeys.sttApiKey = sttApiKey;
+  if (ttsApiKey) providerKeys.ttsApiKey = ttsApiKey;
+  if (llmApiKey) providerKeys.llmApiKey = llmApiKey;
 
   if (Object.keys(providerKeys).length > 0) {
     sessionKeyStore.set(sessionId, providerKeys);

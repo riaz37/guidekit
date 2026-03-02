@@ -1,0 +1,94 @@
+# CARL Manifest — Guidekit Development Team
+# ============================================
+# 8 specialized agents + GLOBAL/CONTEXT/COMMANDS
+# Agent domains use keyword-based recall (not always_on)
+# so they only activate when relevant to the conversation.
+#
+# Team: *lead, *dom, *llm, *voice, *ui, *infra, *quality, *experience
+
+# ============================================================================
+# SETTINGS
+# ============================================================================
+DEVMODE=false
+
+# ============================================================================
+# GLOBAL — Universal Guidekit rules (always loaded)
+# ============================================================================
+GLOBAL_STATE=active
+GLOBAL_ALWAYS_ON=true
+
+# ============================================================================
+# CONTEXT — Dynamic bracket rules based on context window usage
+# ============================================================================
+CONTEXT_STATE=active
+CONTEXT_ALWAYS_ON=true
+
+# ============================================================================
+# COMMANDS — Star-commands: *lead, *dom, *llm, *voice, *ui, *infra,
+#            *quality, *experience, *team + standard (*dev, *review, etc.)
+# ============================================================================
+COMMANDS_STATE=active
+
+# ============================================================================
+# LEAD — Chief Architect
+# Types, public API, cross-package interfaces, architecture decisions
+# ============================================================================
+LEAD_STATE=active
+LEAD_ALWAYS_ON=false
+LEAD_RECALL=architect,lead,types/index,core.ts,public api,interface,cross-package,breaking change,export,event bus,error codes,i18n,resources,bus/,errors/,coordinate,decision,review all,assign
+
+# ============================================================================
+# DOM — Principal DOM Engineer
+# DOM scanning, page model, context, awareness, navigation, connectivity
+# ============================================================================
+DOM_STATE=active
+DOM_ALWAYS_ON=false
+DOM_RECALL=dom,scanner,page model,section,awareness,viewport,dwell,rage click,idle,proactive,trigger,navigation,connectivity,context manager
+
+# ============================================================================
+# LLM — Senior AI Engineer
+# LLM adapters, orchestration, tool system, streaming, rate limiting
+# ============================================================================
+LLM_STATE=active
+LLM_ALWAYS_ON=false
+LLM_RECALL=llm,orchestrat,adapter,gemini,openai,tool definition,tool executor,rate limit,streaming,formatTools,conversation,system prompt
+
+# ============================================================================
+# VOICE — Senior Voice Engineer
+# STT/TTS, WebSocket, audio pipeline, VAD, echo detection
+# ============================================================================
+VOICE_STATE=active
+VOICE_ALWAYS_ON=false
+VOICE_RECALL=voice,pipeline,stt,tts,deepgram,elevenlabs,audio,microphone,websocket,echo,vad,onnx,silero,speech,transcript
+
+# ============================================================================
+# UI — Principal UI Engineer
+# React, vanilla, Shadow DOM, visual guidance, hooks, widget
+# ============================================================================
+UI_STATE=active
+UI_ALWAYS_ON=false
+UI_RECALL=react,vanilla,hook,widget,shadow dom,provider,devtools,visual,spotlight,tooltip,overlay,iife,cdn,useSyncExternalStore
+
+# ============================================================================
+# INFRA — Principal Infrastructure Engineer
+# Server auth, CLI, CI/CD, builds, releases, performance, benchmarks
+# ============================================================================
+INFRA_STATE=active
+INFRA_ALWAYS_ON=false
+INFRA_RECALL=server,jwt,token,cli,build,turbo,tsup,bundle,size-limit,changeset,publish,workflow,deploy,ci,cd,release,pnpm,jose,performance,benchmark,profil,memory leak,latency,throughput,optimize
+
+# ============================================================================
+# QUALITY — Principal Quality Engineer
+# Tests, coverage, E2E, security, threat modeling, OWASP
+# ============================================================================
+QUALITY_STATE=active
+QUALITY_ALWAYS_ON=false
+QUALITY_RECALL=test,vitest,playwright,coverage,e2e,spec,assertion,mock,fixture,quality,regression,security,xss,injection,csrf,auth,owasp,vulnerability,cve,sanitize,deny-list
+
+# ============================================================================
+# EXPERIENCE — Principal Experience Engineer
+# Docs, DX, onboarding, accessibility, WCAG, ARIA
+# ============================================================================
+EXPERIENCE_STATE=active
+EXPERIENCE_ALWAYS_ON=false
+EXPERIENCE_RECALL=docs,documentation,readme,changelog,guide,tutorial,migration,onboarding,playground,error message,nextra,mdx,api reference,accessibility,a11y,wcag,aria,screen reader,keyboard,focus,contrast,reduced motion

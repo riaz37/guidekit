@@ -20,9 +20,8 @@ import {
   ErrorCodes,
 } from '../errors/index.js';
 
-import { OpenAIAdapter } from './openai-adapter.js';
-
 export { OpenAIAdapter } from './openai-adapter.js';
+export type { OpenAIAdapterConfig } from './openai-adapter.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -72,9 +71,21 @@ export class GeminiAdapter implements LLMProviderAdapter {
   private readonly apiKey: string;
   private readonly model: string;
 
+  /**
+   * Token usage extracted from the most recent `parseResponse` call.
+   * Updated as each SSE chunk is parsed; the final value reflects the
+   * cumulative usage metadata sent by Gemini (typically in the last chunk).
+   */
+  private _lastUsage: TokenUsage = emptyUsage();
+
   constructor(config: Extract<LLMConfig, { provider: 'gemini' }>) {
     this.apiKey = config.apiKey;
     this.model = config.model ?? DEFAULT_GEMINI_MODEL;
+  }
+
+  /** Token usage from the most recent parseResponse call. */
+  get lastUsage(): TokenUsage {
+    return this._lastUsage;
   }
 
   // -----------------------------------------------------------------------
@@ -93,7 +104,11 @@ export class GeminiAdapter implements LLMProviderAdapter {
         functionDeclarations: tools.map((tool) => ({
           name: tool.name,
           description: tool.description,
-          parameters: tool.parameters,
+          parameters: {
+            type: 'object',
+            properties: { ...tool.parameters },
+            required: tool.required ?? [],
+          },
         })),
       },
     ];
@@ -119,6 +134,10 @@ export class GeminiAdapter implements LLMProviderAdapter {
    * The Gemini `streamGenerateContent?alt=sse` endpoint sends each chunk
    * as a JSON object prefixed by `data: `. We parse line-by-line, extract
    * text parts and function call parts, and yield the appropriate types.
+   *
+   * This method also:
+   * - Detects content filtering and throws `ContentFilterError`.
+   * - Tracks token usage (accessible via `lastUsage` after iteration).
    */
   async *parseResponse(
     stream: ReadableStream<Uint8Array>,
@@ -126,6 +145,7 @@ export class GeminiAdapter implements LLMProviderAdapter {
     const reader = stream.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    this._lastUsage = emptyUsage();
 
     try {
       while (true) {
@@ -154,6 +174,22 @@ export class GeminiAdapter implements LLMProviderAdapter {
             continue;
           }
 
+          // Check for content filtering — throws if blocked.
+          if (this.isContentFiltered(parsed)) {
+            throw new ContentFilterError({
+              code: ErrorCodes.CONTENT_FILTER_TRIGGERED,
+              message: 'Response was blocked by provider content safety filter.',
+              provider: 'gemini',
+              suggestion: 'Rephrase your question or adjust safety settings.',
+            });
+          }
+
+          // Track token usage (usually present in the last chunk).
+          const chunkUsage = this.extractUsage(parsed);
+          if (chunkUsage) {
+            this._lastUsage = chunkUsage;
+          }
+
           yield* this.extractChunks(parsed);
         }
       }
@@ -164,9 +200,25 @@ export class GeminiAdapter implements LLMProviderAdapter {
         if (jsonStr !== '' && jsonStr !== '[DONE]') {
           try {
             const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
+
+            if (this.isContentFiltered(parsed)) {
+              throw new ContentFilterError({
+                code: ErrorCodes.CONTENT_FILTER_TRIGGERED,
+                message: 'Response was blocked by provider content safety filter.',
+                provider: 'gemini',
+                suggestion: 'Rephrase your question or adjust safety settings.',
+              });
+            }
+
+            const chunkUsage = this.extractUsage(parsed);
+            if (chunkUsage) {
+              this._lastUsage = chunkUsage;
+            }
+
             yield* this.extractChunks(parsed);
-          } catch {
-            // Ignore trailing malformed data.
+          } catch (error: unknown) {
+            // Re-throw ContentFilterError, ignore other parse errors.
+            if (error instanceof ContentFilterError) throw error;
           }
         }
       }
@@ -208,11 +260,16 @@ export class GeminiAdapter implements LLMProviderAdapter {
   /**
    * Build and execute a streaming request to the Gemini API.
    * Returns the raw `ReadableStream` for the response body together with
-   * a promise that resolves to token usage extracted from the final chunk.
+   * the raw Response object.
+   *
+   * Note: The Gemini API key is passed as a URL query parameter (`key=`).
+   * This is inherent to the Gemini REST SSE endpoint design; the key is
+   * transmitted over HTTPS so it remains encrypted in transit. (H3)
    */
   async streamRequest(params: {
     systemPrompt: string;
-    contents: Array<{ role: string; parts: Array<{ text: string }> }>;
+    contents: unknown;
+    userMessage?: string;
     tools?: unknown;
     signal?: AbortSignal;
     timeoutMs?: number;
@@ -220,13 +277,19 @@ export class GeminiAdapter implements LLMProviderAdapter {
     stream: ReadableStream<Uint8Array>;
     response: Response;
   }> {
+    // Build the full contents array: formatted history + the new user message.
+    const contentsArray = params.contents as Array<unknown>;
+    const fullContents = params.userMessage
+      ? [...contentsArray, { role: 'user', parts: [{ text: params.userMessage }] }]
+      : contentsArray;
+
     const url = `${GEMINI_BASE_URL}/${this.model}:streamGenerateContent?alt=sse&key=${this.apiKey}`;
 
     const body: Record<string, unknown> = {
       systemInstruction: {
         parts: [{ text: params.systemPrompt }],
       },
-      contents: params.contents,
+      contents: fullContents,
       safetySettings: DEFAULT_SAFETY_SETTINGS,
       generationConfig: {
         temperature: 0.7,
@@ -314,7 +377,7 @@ export class GeminiAdapter implements LLMProviderAdapter {
   }
 
   // -----------------------------------------------------------------------
-  // Internal helpers
+  // Public helpers (LLMProviderAdapter interface)
   // -----------------------------------------------------------------------
 
   /**
@@ -492,12 +555,16 @@ interface OrchestratorCallbacks {
  * High-level orchestrator that manages LLM interactions for the GuideKit SDK.
  *
  * Responsibilities:
- * - Owns the active `LLMProviderAdapter` (currently only `GeminiAdapter`).
+ * - Owns the active `LLMProviderAdapter`.
  * - Streams responses from the provider, emitting callbacks for text chunks,
  *   tool calls, and token usage.
  * - Handles content filter retries: if the initial response is blocked, it
  *   retries once with a stripped-down prompt (no tools).
  * - Surfaces all errors through the SDK error hierarchy.
+ *
+ * The orchestrator is fully adapter-agnostic: all provider-specific logic
+ * (SSE parsing, content filter detection, usage extraction) lives in the
+ * adapter implementations.
  */
 export class LLMOrchestrator {
   private _adapter: LLMProviderAdapter;
@@ -585,7 +652,8 @@ export class LLMOrchestrator {
   updateConfig(config: LLMConfig): void {
     this._config = config;
     this._adapter = this.createAdapter(config);
-    this.log(`Config updated: provider=${config.provider}`);
+    const label = 'provider' in config ? config.provider : 'custom adapter';
+    this.log(`Config updated: ${label}`);
   }
 
   /** Get the current provider adapter. */
@@ -599,6 +667,11 @@ export class LLMOrchestrator {
 
   /**
    * Execute a streaming LLM request and collect the results.
+   *
+   * This method is fully adapter-agnostic: it delegates streaming,
+   * response parsing, content-filter detection, and usage extraction
+   * entirely to the active `LLMProviderAdapter`. No provider-specific
+   * SSE parsing lives in the orchestrator.
    */
   private async executeStream(
     params: {
@@ -614,208 +687,60 @@ export class LLMOrchestrator {
     toolCalls: ToolCall[];
     usage: TokenUsage;
   }> {
-    // Currently only Gemini is supported.
-    const geminiAdapter = this._adapter as GeminiAdapter;
+    const adapter = this._adapter;
 
-    // Format conversation: history + the new user message.
-    const historyContents = geminiAdapter.formatConversation(params.history);
-    const contents = [
-      ...historyContents,
-      { role: 'user', parts: [{ text: params.userMessage }] },
-    ];
+    // Format conversation history via the adapter.
+    const historyContents = adapter.formatConversation(params.history);
 
     // Format tools if provided.
     const tools =
       params.tools && params.tools.length > 0
-        ? geminiAdapter.formatTools(params.tools)
+        ? adapter.formatTools(params.tools)
         : undefined;
 
-    // Execute the streaming request.
-    const { stream } = await geminiAdapter.streamRequest({
+    // Execute the streaming request via the adapter.
+    // The adapter's streamRequest accepts the formatted history as `contents`
+    // and appends the user message internally using `userMessage`.
+    const { stream } = await adapter.streamRequest({
       systemPrompt: params.systemPrompt,
-      contents,
+      contents: historyContents,
+      userMessage: params.userMessage,
       tools,
       signal: params.signal,
     });
 
-    // Parse the stream and accumulate results.
+    // Parse the stream using the adapter's parseResponse.
+    // Content filter detection and usage tracking are handled within
+    // the adapter's parseResponse — a ContentFilterError will propagate
+    // up naturally from the async iteration.
     let fullText = '';
     const toolCalls: ToolCall[] = [];
+
+    for await (const item of adapter.parseResponse(stream)) {
+      if ('name' in item && 'arguments' in item) {
+        // ToolCall
+        const toolCall = item as ToolCall;
+        toolCalls.push(toolCall);
+        this.callbacks.onToolCall?.(toolCall);
+      } else {
+        // TextChunk
+        const chunk = item as TextChunk;
+        if (chunk.text) {
+          fullText += chunk.text;
+        }
+        this.callbacks.onChunk?.(chunk);
+      }
+    }
+
+    // Always emit a final "done" chunk to signal stream completion,
+    // regardless of whether text was received (M3 fix).
+    this.callbacks.onChunk?.({ text: '', done: true });
+
+    // Retrieve token usage from the adapter. The adapter tracks usage
+    // internally during parseResponse via the `lastUsage` property.
     let usage: TokenUsage = emptyUsage();
-    let wasContentFiltered = false;
-
-    // We need to parse the SSE stream and also extract usage metadata.
-    // The adapter's `parseResponse` yields text/tool chunks, but we also
-    // need to inspect the raw JSON for usage and content filter info.
-    // So we do our own SSE parsing here for the orchestrator layer.
-    const reader = stream.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith('data:')) continue;
-
-          const jsonStr = trimmed.slice(5).trim();
-          if (jsonStr === '' || jsonStr === '[DONE]') continue;
-
-          let parsed: Record<string, unknown>;
-          try {
-            parsed = JSON.parse(jsonStr) as Record<string, unknown>;
-          } catch {
-            continue;
-          }
-
-          // Check for content filtering.
-          if (geminiAdapter.isContentFiltered(parsed)) {
-            wasContentFiltered = true;
-            break;
-          }
-
-          // Extract token usage (usually in the last chunk).
-          const chunkUsage = geminiAdapter.extractUsage(parsed);
-          if (chunkUsage) {
-            usage = chunkUsage;
-          }
-
-          // Extract text and tool call chunks.
-          const candidates = parsed.candidates as
-            | Array<Record<string, unknown>>
-            | undefined;
-
-          if (!candidates || candidates.length === 0) continue;
-
-          for (const candidate of candidates) {
-            const content = candidate.content as
-              | { parts?: Array<Record<string, unknown>> }
-              | undefined;
-
-            if (!content?.parts) continue;
-
-            const finishReason = candidate.finishReason as
-              | string
-              | undefined;
-            const isDone =
-              finishReason === 'STOP' ||
-              finishReason === 'MAX_TOKENS';
-
-            for (const part of content.parts) {
-              // Handle text chunks.
-              if (typeof part.text === 'string') {
-                fullText += part.text;
-                const chunk: TextChunk = { text: part.text, done: isDone };
-                this.callbacks.onChunk?.(chunk);
-              }
-
-              // Handle function calls.
-              if (part.functionCall) {
-                const fc = part.functionCall as {
-                  name: string;
-                  args?: Record<string, unknown>;
-                };
-                const toolCall: ToolCall = {
-                  id: fc.name,
-                  name: fc.name,
-                  arguments: fc.args ?? {},
-                };
-                toolCalls.push(toolCall);
-                this.callbacks.onToolCall?.(toolCall);
-              }
-            }
-          }
-        }
-
-        if (wasContentFiltered) break;
-      }
-
-      // Process any remaining buffer.
-      if (!wasContentFiltered && buffer.trim().startsWith('data:')) {
-        const jsonStr = buffer.trim().slice(5).trim();
-        if (jsonStr !== '' && jsonStr !== '[DONE]') {
-          try {
-            const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
-            if (geminiAdapter.isContentFiltered(parsed)) {
-              wasContentFiltered = true;
-            } else {
-              const chunkUsage = geminiAdapter.extractUsage(parsed);
-              if (chunkUsage) usage = chunkUsage;
-
-              const candidates = parsed.candidates as
-                | Array<Record<string, unknown>>
-                | undefined;
-
-              if (candidates) {
-                for (const candidate of candidates) {
-                  const content = candidate.content as
-                    | { parts?: Array<Record<string, unknown>> }
-                    | undefined;
-
-                  if (!content?.parts) continue;
-
-                  const finishReason = candidate.finishReason as
-                    | string
-                    | undefined;
-                  const isDone =
-                    finishReason === 'STOP' ||
-                    finishReason === 'MAX_TOKENS';
-
-                  for (const part of content.parts) {
-                    if (typeof part.text === 'string') {
-                      fullText += part.text;
-                      const chunk: TextChunk = {
-                        text: part.text,
-                        done: isDone,
-                      };
-                      this.callbacks.onChunk?.(chunk);
-                    }
-
-                    if (part.functionCall) {
-                      const fc = part.functionCall as {
-                        name: string;
-                        args?: Record<string, unknown>;
-                      };
-                      const toolCall: ToolCall = {
-                        id: fc.name,
-                        name: fc.name,
-                        arguments: fc.args ?? {},
-                      };
-                      toolCalls.push(toolCall);
-                      this.callbacks.onToolCall?.(toolCall);
-                    }
-                  }
-                }
-              }
-            }
-          } catch {
-            // Ignore trailing malformed data.
-          }
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
-
-    if (wasContentFiltered) {
-      throw new ContentFilterError({
-        code: ErrorCodes.CONTENT_FILTER_TRIGGERED,
-        message: 'Response was blocked by Gemini content safety filter.',
-        provider: 'gemini',
-        suggestion: 'Rephrase your question or adjust safety settings.',
-      });
-    }
-
-    // Emit a final "done" chunk if we haven't already.
-    if (fullText.length > 0) {
-      this.callbacks.onChunk?.({ text: '', done: true });
+    if ('lastUsage' in adapter) {
+      usage = (adapter as unknown as { lastUsage: TokenUsage }).lastUsage;
     }
 
     // Report token usage.
@@ -834,27 +759,35 @@ export class LLMOrchestrator {
 
   /**
    * Create the appropriate adapter for the given config.
-   * Currently only Gemini is implemented; other providers will be added
-   * as the SDK evolves.
+   *
+   * Built-in providers:
+   * - `'gemini'` — uses the bundled `GeminiAdapter`.
+   *
+   * Custom adapters:
+   * - Pass `{ adapter: myAdapter }` to use any `LLMProviderAdapter`.
+   *   Example: `llm: { adapter: new OpenAIAdapter({ ... }) }`
    */
   private createAdapter(config: LLMConfig): LLMProviderAdapter {
+    // Custom adapter — pass-through.
+    if ('adapter' in config) {
+      return config.adapter;
+    }
+
+    // Built-in providers.
     switch (config.provider) {
       case 'gemini':
         return new GeminiAdapter(config);
-      case 'openai':
-        return new OpenAIAdapter(config);
       default:
         throw new Error(
-          `LLM provider "${(config as LLMConfig).provider}" is not yet supported. ` +
-            'Currently only "gemini" and "openai" are implemented.',
+          `LLM provider "${(config as { provider: string }).provider}" is not yet supported. ` +
+            'Use { adapter: yourAdapter } for custom providers.',
         );
     }
   }
 
   /** Convenience accessor for the current provider name. */
-  private get providerName(): 'gemini' | 'openai' | undefined {
-    if (this._config.provider === 'gemini') return 'gemini';
-    if (this._config.provider === 'openai') return 'openai';
+  private get providerName(): string | undefined {
+    if ('provider' in this._config) return this._config.provider;
     return undefined;
   }
 

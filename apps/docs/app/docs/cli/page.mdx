@@ -45,8 +45,8 @@ npx guidekit doctor
 - `.env` / `.env.local` file exists
 - `.gitignore` includes `.env` files
 - `GUIDEKIT_SECRET` is set and valid length
-- `GEMINI_KEY` is present
-- `DEEPGRAM_KEY` and `ELEVENLABS_KEY` (optional, for voice)
+- `LLM_API_KEY` is present
+- `STT_API_KEY` and `TTS_API_KEY` (optional, for voice)
 - `@guidekit/core`, `@guidekit/react`, `@guidekit/server` are installed
 - Connectivity to Google AI, Deepgram, and ElevenLabs APIs
 
@@ -60,9 +60,9 @@ Environment
 ✓ .env file: Found .env.local
 ✓ .gitignore: .env files are ignored
 ✓ GUIDEKIT_SECRET: Set and valid length
-✓ Gemini API Key: Found
-○ Deepgram API Key: Not set (optional)
-○ ElevenLabs API Key: Not set (optional)
+✓ LLM API Key: Found
+○ STT API Key: Not set (optional)
+○ TTS API Key: Not set (optional)
 
 Packages
 ✓ @guidekit/core: Installed (^0.1.0)
@@ -70,9 +70,9 @@ Packages
 ✓ @guidekit/server: Installed (^0.1.0)
 
 Connectivity
-✓ Google AI connectivity: Reachable
-✓ Deepgram connectivity: Reachable
-✓ ElevenLabs connectivity: Reachable
+✓ LLM provider connectivity: Reachable
+✓ STT provider connectivity: Reachable
+✓ TTS provider connectivity: Reachable
 
 ✓ All checks passed! Your GuideKit setup looks good.
 ```

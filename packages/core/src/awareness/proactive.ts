@@ -250,13 +250,16 @@ export class ProactiveTriggerEngine {
 
       // Return visitor — check if within 7 days
       const visitedAt = parseInt(visited, 10);
-      if (!Number.isNaN(visitedAt)) {
-        const elapsed = Date.now() - visitedAt;
-        if (elapsed <= SEVEN_DAYS_MS && this.debug) {
-          console.debug(LOG_PREFIX, 'Return visitor within 7 days — silent');
-        } else if (this.debug) {
-          console.debug(LOG_PREFIX, 'Return visitor after 7 days');
-        }
+      if (Number.isNaN(visitedAt)) {
+        // Stored timestamp is corrupt — skip return-visitor logic
+        return;
+      }
+
+      const elapsed = Date.now() - visitedAt;
+      if (elapsed <= SEVEN_DAYS_MS && this.debug) {
+        console.debug(LOG_PREFIX, 'Return visitor within 7 days — silent');
+      } else if (this.debug) {
+        console.debug(LOG_PREFIX, 'Return visitor after 7 days');
       }
     } catch {
       // localStorage may be unavailable (e.g. iframe sandbox)

@@ -3,7 +3,6 @@
 // ---------------------------------------------------------------------------
 
 import type {
-  LLMConfig,
   LLMProviderAdapter,
   ToolDefinition,
   ToolCall,
@@ -16,6 +15,7 @@ import {
   RateLimitError,
   NetworkError,
   TimeoutError,
+  ContentFilterError,
   ErrorCodes,
 } from '../errors/index.js';
 
@@ -37,6 +37,20 @@ interface TokenUsage {
   total: number;
 }
 
+function emptyUsage(): TokenUsage {
+  return { prompt: 0, completion: 0, total: 0 };
+}
+
+// ---------------------------------------------------------------------------
+// OpenAI adapter config
+// ---------------------------------------------------------------------------
+
+/** Configuration for the OpenAI adapter (custom adapter pattern). */
+export interface OpenAIAdapterConfig {
+  apiKey: string;
+  model?: 'gpt-4o' | 'gpt-4o-mini' | (string & {});
+}
+
 // ---------------------------------------------------------------------------
 // OpenAIAdapter
 // ---------------------------------------------------------------------------
@@ -45,14 +59,34 @@ interface TokenUsage {
  * Adapter that translates between GuideKit's internal types and the
  * OpenAI Chat Completions API wire format. Handles streaming via SSE,
  * tool formatting, and response parsing.
+ *
+ * Usage as a custom adapter:
+ * ```ts
+ * import { OpenAIAdapter } from '@guidekit/core';
+ * const llmConfig = { adapter: new OpenAIAdapter({ apiKey: '...', model: 'gpt-4o' }) };
+ * ```
  */
 export class OpenAIAdapter implements LLMProviderAdapter {
   private readonly apiKey: string;
   private readonly model: string;
 
-  constructor(config: Extract<LLMConfig, { provider: 'openai' }>) {
+  /** Tracks whether the last extractChunks call emitted a done chunk. */
+  private lastExtractEmittedDone = false;
+
+  /**
+   * Token usage extracted from the most recent `parseResponse` call.
+   * Updated as each SSE chunk is parsed.
+   */
+  private _lastUsage: TokenUsage = emptyUsage();
+
+  constructor(config: OpenAIAdapterConfig) {
     this.apiKey = config.apiKey;
     this.model = config.model ?? DEFAULT_OPENAI_MODEL;
+  }
+
+  /** Token usage from the most recent parseResponse call. */
+  get lastUsage(): TokenUsage {
+    return this._lastUsage;
   }
 
   // -----------------------------------------------------------------------
@@ -71,7 +105,11 @@ export class OpenAIAdapter implements LLMProviderAdapter {
       function: {
         name: tool.name,
         description: tool.description,
-        parameters: tool.parameters,
+        parameters: {
+          type: 'object',
+          properties: { ...tool.parameters },
+          required: tool.required ?? [],
+        },
       },
     }));
   }
@@ -97,6 +135,10 @@ export class OpenAIAdapter implements LLMProviderAdapter {
    * prefixed by `data: `. The final line is `data: [DONE]`.
    * Text content arrives in `choices[0].delta.content` and tool calls
    * arrive in `choices[0].delta.tool_calls`.
+   *
+   * This method also:
+   * - Detects content filtering and throws `ContentFilterError`.
+   * - Tracks token usage (accessible via `lastUsage` after iteration).
    */
   async *parseResponse(
     stream: ReadableStream<Uint8Array>,
@@ -104,6 +146,8 @@ export class OpenAIAdapter implements LLMProviderAdapter {
     const reader = stream.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let doneEmitted = false;
+    this._lastUsage = emptyUsage();
 
     // Accumulators for tool calls that arrive incrementally across chunks.
     const pendingToolCalls = new Map<
@@ -132,7 +176,10 @@ export class OpenAIAdapter implements LLMProviderAdapter {
             if (jsonStr === '[DONE]') {
               // Flush any accumulated tool calls.
               yield* this.flushPendingToolCalls(pendingToolCalls);
-              yield { text: '', done: true } as TextChunk;
+              if (!doneEmitted) {
+                doneEmitted = true;
+                yield { text: '', done: true } as TextChunk;
+              }
             }
             continue;
           }
@@ -145,7 +192,26 @@ export class OpenAIAdapter implements LLMProviderAdapter {
             continue;
           }
 
-          yield* this.extractChunks(parsed, pendingToolCalls);
+          // Check for content filtering — throws if blocked.
+          if (this.isContentFiltered(parsed)) {
+            throw new ContentFilterError({
+              code: ErrorCodes.CONTENT_FILTER_TRIGGERED,
+              message: 'Response was blocked by provider content safety filter.',
+              provider: 'openai',
+              suggestion: 'Rephrase your question or adjust safety settings.',
+            });
+          }
+
+          // Track token usage.
+          const chunkUsage = this.extractUsage(parsed);
+          if (chunkUsage) {
+            this._lastUsage = chunkUsage;
+          }
+
+          yield* this.extractChunks(parsed, pendingToolCalls, doneEmitted);
+          if (!doneEmitted && this.lastExtractEmittedDone) {
+            doneEmitted = true;
+          }
         }
       }
 
@@ -154,13 +220,35 @@ export class OpenAIAdapter implements LLMProviderAdapter {
         const jsonStr = buffer.trim().slice(5).trim();
         if (jsonStr === '[DONE]') {
           yield* this.flushPendingToolCalls(pendingToolCalls);
-          yield { text: '', done: true } as TextChunk;
+          if (!doneEmitted) {
+            doneEmitted = true;
+            yield { text: '', done: true } as TextChunk;
+          }
         } else if (jsonStr !== '') {
           try {
             const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
-            yield* this.extractChunks(parsed, pendingToolCalls);
-          } catch {
-            // Ignore trailing malformed data.
+
+            if (this.isContentFiltered(parsed)) {
+              throw new ContentFilterError({
+                code: ErrorCodes.CONTENT_FILTER_TRIGGERED,
+                message: 'Response was blocked by provider content safety filter.',
+                provider: 'openai',
+                suggestion: 'Rephrase your question or adjust safety settings.',
+              });
+            }
+
+            const chunkUsage = this.extractUsage(parsed);
+            if (chunkUsage) {
+              this._lastUsage = chunkUsage;
+            }
+
+            yield* this.extractChunks(parsed, pendingToolCalls, doneEmitted);
+            if (!doneEmitted && this.lastExtractEmittedDone) {
+              doneEmitted = true;
+            }
+          } catch (error: unknown) {
+            // Re-throw ContentFilterError, ignore other parse errors.
+            if (error instanceof ContentFilterError) throw error;
           }
         }
       }
@@ -198,7 +286,8 @@ export class OpenAIAdapter implements LLMProviderAdapter {
    */
   async streamRequest(params: {
     systemPrompt: string;
-    contents: Array<{ role: string; content: string }>;
+    contents: unknown;
+    userMessage?: string;
     tools?: unknown;
     signal?: AbortSignal;
     timeoutMs?: number;
@@ -206,10 +295,16 @@ export class OpenAIAdapter implements LLMProviderAdapter {
     stream: ReadableStream<Uint8Array>;
     response: Response;
   }> {
+    // Build the full messages array: system prompt + history + user message.
+    const contentsArray = params.contents as Array<{ role: string; content: string }>;
     const messages: Array<{ role: string; content: string }> = [
       { role: 'system', content: params.systemPrompt },
-      ...params.contents,
+      ...contentsArray,
     ];
+
+    if (params.userMessage) {
+      messages.push({ role: 'user', content: params.userMessage });
+    }
 
     const body: Record<string, unknown> = {
       model: this.model,
@@ -320,7 +415,10 @@ export class OpenAIAdapter implements LLMProviderAdapter {
       number,
       { id: string; name: string; argumentsJson: string }
     >,
+    doneEmitted: boolean,
   ): Generator<TextChunk | ToolCall> {
+    this.lastExtractEmittedDone = false;
+
     const choices = parsed.choices as
       | Array<Record<string, unknown>>
       | undefined;
@@ -374,8 +472,9 @@ export class OpenAIAdapter implements LLMProviderAdapter {
         yield* this.flushPendingToolCalls(pendingToolCalls);
       }
 
-      // When finish_reason is 'stop', yield a done text chunk.
-      if (finishReason === 'stop') {
+      // When finish_reason is 'stop', yield a done text chunk (once only).
+      if (finishReason === 'stop' && !doneEmitted && !this.lastExtractEmittedDone) {
+        this.lastExtractEmittedDone = true;
         yield { text: '', done: true } as TextChunk;
       }
     }
@@ -399,8 +498,8 @@ export class OpenAIAdapter implements LLMProviderAdapter {
       let args: Record<string, unknown> = {};
       try {
         args = JSON.parse(tc.argumentsJson) as Record<string, unknown>;
-      } catch {
-        // If arguments cannot be parsed, use empty object.
+      } catch (_e) {
+        console.warn('[GuideKit:LLM] Failed to parse tool call arguments:', tc.argumentsJson);
       }
 
       yield {

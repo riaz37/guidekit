@@ -143,17 +143,26 @@ export type AgentState =
 /** Speech-to-text provider configuration. */
 export type STTConfig =
   | { provider: 'deepgram'; apiKey: string; model?: 'nova-2' | 'nova-3' }
-  | { provider: 'assemblyai'; apiKey: string };
+  | { provider: 'elevenlabs'; apiKey: string; language?: string }
+  | { provider: 'web-speech'; language?: string; continuous?: boolean; interimResults?: boolean };
 
 /** Text-to-speech provider configuration. */
 export type TTSConfig =
   | { provider: 'elevenlabs'; apiKey: string; voiceId?: string }
-  | { provider: 'cartesia'; apiKey: string; voiceId?: string };
+  | { provider: 'web-speech'; voice?: string; rate?: number; pitch?: number; language?: string };
+
+/** Transcript event emitted by any STT adapter. */
+export interface STTTranscriptEvent {
+  text: string;
+  isFinal: boolean;
+  confidence: number;
+  timestamp: number;
+}
 
 /** Large language model provider configuration. */
 export type LLMConfig =
   | { provider: 'gemini'; apiKey: string; model?: 'gemini-2.5-flash' | 'gemini-2.5-pro' }
-  | { provider: 'openai'; apiKey: string; model?: 'gpt-4o' | 'gpt-4o-mini' };
+  | { adapter: LLMProviderAdapter };
 
 // ---------------------------------------------------------------------------
 // GuideKit options
@@ -291,11 +300,26 @@ export interface GuideKitProviderProps {
 // LLM types
 // ---------------------------------------------------------------------------
 
+/** A single JSON-Schema-style property descriptor used in tool parameter maps. */
+export interface ToolParameterSchema {
+  type: string;
+  description?: string;
+  enum?: string[];
+  items?: { type: string };
+  [key: string]: unknown;
+}
+
 /** Definition of a tool that can be invoked by the LLM. */
 export interface ToolDefinition {
   name: string;
   description: string;
-  parameters: Record<string, unknown>;
+  /** Flat map of param name → JSON Schema property descriptor. */
+  parameters: Record<string, ToolParameterSchema>;
+  /**
+   * List of parameter names the LLM must always provide.
+   * Omit or use [] for fully optional parameters.
+   */
+  required?: string[];
   schemaVersion: number;
 }
 
@@ -322,6 +346,28 @@ export interface LLMProviderAdapter {
   formatConversation(history: ConversationTurn[]): unknown;
   parseResponse(stream: ReadableStream): AsyncIterable<TextChunk | ToolCall>;
   formatToolResult(callId: string, result: unknown): unknown;
+  /**
+   * Build and execute a streaming request to the provider API.
+   * Returns the raw ReadableStream for the response body.
+   */
+  streamRequest(params: {
+    systemPrompt: string;
+    contents: unknown;
+    userMessage?: string;
+    tools?: unknown;
+    signal?: AbortSignal;
+    timeoutMs?: number;
+  }): Promise<{ stream: ReadableStream<Uint8Array>; response: Response }>;
+  /**
+   * Check whether a parsed response chunk indicates the response was
+   * blocked by a content/safety filter.
+   */
+  isContentFiltered(chunk: Record<string, unknown>): boolean;
+  /**
+   * Extract token usage from a parsed response chunk.
+   * Returns `null` if no usage metadata is present in this chunk.
+   */
+  extractUsage(chunk: Record<string, unknown>): { prompt: number; completion: number; total: number } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -349,9 +395,9 @@ export interface TokenResponse {
 /** Options for `createSessionToken()` on the server side. */
 export interface CreateSessionTokenOptions {
   signingSecret: string | string[];
-  deepgramKey?: string;
-  elevenlabsKey?: string;
-  geminiKey?: string;
+  sttApiKey?: string;
+  ttsApiKey?: string;
+  llmApiKey?: string;
   expiresIn?: string;
   allowedOrigins?: string[];
   permissions?: string[];

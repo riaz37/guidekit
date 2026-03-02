@@ -31,9 +31,9 @@ import { createSessionToken } from '@guidekit/server';
 export async function POST() {
   const token = await createSessionToken({
     signingSecret: process.env.GUIDEKIT_SECRET!,
-    geminiKey: process.env.GEMINI_KEY!,
-    deepgramKey: process.env.DEEPGRAM_KEY,
-    elevenlabsKey: process.env.ELEVENLABS_KEY,
+    llmApiKey: process.env.LLM_API_KEY!,
+    sttApiKey: process.env.STT_API_KEY,
+    ttsApiKey: process.env.TTS_API_KEY,
     expiresIn: '15m',
   });
 
@@ -57,9 +57,9 @@ export default async function handler(
 
   const token = await createSessionToken({
     signingSecret: process.env.GUIDEKIT_SECRET!,
-    geminiKey: process.env.GEMINI_KEY!,
-    deepgramKey: process.env.DEEPGRAM_KEY,
-    elevenlabsKey: process.env.ELEVENLABS_KEY,
+    llmApiKey: process.env.LLM_API_KEY!,
+    sttApiKey: process.env.STT_API_KEY,
+    ttsApiKey: process.env.TTS_API_KEY,
     expiresIn: '15m',
   });
 
@@ -75,9 +75,9 @@ import { createSessionToken } from '@guidekit/server';
 export async function handleTokenRequest(req: any, res: any) {
   const token = await createSessionToken({
     signingSecret: process.env.GUIDEKIT_SECRET!,
-    geminiKey: process.env.GEMINI_KEY!,
-    deepgramKey: process.env.DEEPGRAM_KEY,
-    elevenlabsKey: process.env.ELEVENLABS_KEY,
+    llmApiKey: process.env.LLM_API_KEY!,
+    sttApiKey: process.env.STT_API_KEY,
+    ttsApiKey: process.env.TTS_API_KEY,
     expiresIn: '15m',
   });
 
@@ -142,11 +142,11 @@ function envTemplate(): string {
 GUIDEKIT_SECRET=
 
 # LLM Provider (required)
-GEMINI_KEY=
+LLM_API_KEY=
 
 # Voice Providers (optional — for voice mode)
-DEEPGRAM_KEY=
-ELEVENLABS_KEY=
+STT_API_KEY=
+TTS_API_KEY=
 `;
 }
 
@@ -232,7 +232,7 @@ export async function runInit(): Promise<void> {
       success(`Created ${c.dim}${path.relative(root, envPath)}${c.reset}`);
     }
   } else {
-    info('.env file already exists — make sure GUIDEKIT_SECRET and GEMINI_KEY are set');
+    info('.env file already exists — make sure GUIDEKIT_SECRET and LLM_API_KEY are set');
   }
 
   // Step 4: Create token endpoint (if token auth)

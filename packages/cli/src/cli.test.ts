@@ -540,7 +540,7 @@ describe('doctor — checkEnvFile', () => {
     );
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
     process.env.GUIDEKIT_SECRET = 'a'.repeat(32);
-    process.env.GEMINI_KEY = 'AIxxxxxxxxxxxxxxxxxxxxxxx';
+    process.env.LLM_API_KEY = 'AIxxxxxxxxxxxxxxxxxxxxxxx';
 
     const { runDoctor } = await import('./commands/doctor.js');
     await runDoctor();
@@ -628,7 +628,7 @@ describe('doctor — checkGuidekitSecret', () => {
   });
 });
 
-describe('doctor — checkGeminiKey', () => {
+describe('doctor — checkLlmApiKey', () => {
   beforeEach(() => {
     captureConsole();
     resetFsMocks();
@@ -646,34 +646,46 @@ describe('doctor — checkGeminiKey', () => {
     process.env = { ...originalEnv };
   });
 
-  it('reports ok when GEMINI_KEY is set', async () => {
+  it('reports ok when LLM_API_KEY is set', async () => {
+    process.env.LLM_API_KEY = 'AIabcdefghijklmnopqrstuvwxyz';
+    const { runDoctor } = await import('./commands/doctor.js');
+    await runDoctor();
+    const output = allOutput();
+    expect(output).toMatch(/LLM.*Found/s);
+  });
+
+  it('reports ok when GEMINI_KEY is set as fallback', async () => {
+    delete process.env.LLM_API_KEY;
     process.env.GEMINI_KEY = 'AIabcdefghijklmnopqrstuvwxyz';
     const { runDoctor } = await import('./commands/doctor.js');
     await runDoctor();
     const output = allOutput();
-    expect(output).toMatch(/Gemini.*Found/s);
+    expect(output).toMatch(/LLM.*Found/s);
   });
 
-  it('reports ok when GEMINI_API_KEY is set', async () => {
+  it('reports ok when GEMINI_API_KEY is set as fallback', async () => {
+    delete process.env.LLM_API_KEY;
     delete process.env.GEMINI_KEY;
     process.env.GEMINI_API_KEY = 'AIabcdefghijklmnopqrstuvwxyz';
     const { runDoctor } = await import('./commands/doctor.js');
     await runDoctor();
     const output = allOutput();
-    expect(output).toMatch(/Gemini.*Found/s);
+    expect(output).toMatch(/LLM.*Found/s);
   });
 
-  it('reports ok when GOOGLE_AI_KEY is set', async () => {
+  it('reports ok when GOOGLE_AI_KEY is set as fallback', async () => {
+    delete process.env.LLM_API_KEY;
     delete process.env.GEMINI_KEY;
     delete process.env.GEMINI_API_KEY;
     process.env.GOOGLE_AI_KEY = 'AIabcdefghijklmnopqrstuvwxyz';
     const { runDoctor } = await import('./commands/doctor.js');
     await runDoctor();
     const output = allOutput();
-    expect(output).toMatch(/Gemini.*Found/s);
+    expect(output).toMatch(/LLM.*Found/s);
   });
 
-  it('reports warning when no Gemini key is set', async () => {
+  it('reports warning when no LLM key is set', async () => {
+    delete process.env.LLM_API_KEY;
     delete process.env.GEMINI_KEY;
     delete process.env.GEMINI_API_KEY;
     delete process.env.GOOGLE_AI_KEY;
@@ -681,11 +693,11 @@ describe('doctor — checkGeminiKey', () => {
     await runDoctor();
     const output = allOutput();
     expect(output).toContain('Not found');
-    expect(output).toContain('GEMINI_KEY');
+    expect(output).toContain('LLM_API_KEY');
   });
 });
 
-describe('doctor — checkDeepgramKey', () => {
+describe('doctor — checkSttApiKey', () => {
   beforeEach(() => {
     captureConsole();
     resetFsMocks();
@@ -703,24 +715,35 @@ describe('doctor — checkDeepgramKey', () => {
     process.env = { ...originalEnv };
   });
 
-  it('reports ok when DEEPGRAM_KEY is set', async () => {
+  it('reports ok when STT_API_KEY is set', async () => {
+    process.env.STT_API_KEY = 'some-stt-key';
+    const { runDoctor } = await import('./commands/doctor.js');
+    await runDoctor();
+    const output = allOutput();
+    expect(output).toMatch(/STT API Key.*Found/s);
+  });
+
+  it('reports ok when DEEPGRAM_KEY is set as fallback', async () => {
+    delete process.env.STT_API_KEY;
     process.env.DEEPGRAM_KEY = 'some-deepgram-key';
     const { runDoctor } = await import('./commands/doctor.js');
     await runDoctor();
     const output = allOutput();
-    expect(output).toMatch(/Deepgram API Key.*Found/s);
+    expect(output).toMatch(/STT API Key.*Found/s);
   });
 
   it('reports ok when DEEPGRAM_API_KEY is set as fallback', async () => {
+    delete process.env.STT_API_KEY;
     delete process.env.DEEPGRAM_KEY;
     process.env.DEEPGRAM_API_KEY = 'some-deepgram-api-key';
     const { runDoctor } = await import('./commands/doctor.js');
     await runDoctor();
     const output = allOutput();
-    expect(output).toMatch(/Deepgram API Key.*Found/s);
+    expect(output).toMatch(/STT API Key.*Found/s);
   });
 
-  it('reports skip when no Deepgram key is set', async () => {
+  it('reports skip when no STT key is set', async () => {
+    delete process.env.STT_API_KEY;
     delete process.env.DEEPGRAM_KEY;
     delete process.env.DEEPGRAM_API_KEY;
     const { runDoctor } = await import('./commands/doctor.js');
@@ -730,7 +753,7 @@ describe('doctor — checkDeepgramKey', () => {
   });
 });
 
-describe('doctor — checkElevenlabsKey', () => {
+describe('doctor — checkTtsApiKey', () => {
   beforeEach(() => {
     captureConsole();
     resetFsMocks();
@@ -748,24 +771,35 @@ describe('doctor — checkElevenlabsKey', () => {
     process.env = { ...originalEnv };
   });
 
-  it('reports ok when ELEVENLABS_KEY is set', async () => {
+  it('reports ok when TTS_API_KEY is set', async () => {
+    process.env.TTS_API_KEY = 'some-tts-key';
+    const { runDoctor } = await import('./commands/doctor.js');
+    await runDoctor();
+    const output = allOutput();
+    expect(output).toMatch(/TTS API Key.*Found/s);
+  });
+
+  it('reports ok when ELEVENLABS_KEY is set as fallback', async () => {
+    delete process.env.TTS_API_KEY;
     process.env.ELEVENLABS_KEY = 'some-elevenlabs-key';
     const { runDoctor } = await import('./commands/doctor.js');
     await runDoctor();
     const output = allOutput();
-    expect(output).toMatch(/ElevenLabs API Key.*Found/s);
+    expect(output).toMatch(/TTS API Key.*Found/s);
   });
 
   it('reports ok when ELEVENLABS_API_KEY is set as fallback', async () => {
+    delete process.env.TTS_API_KEY;
     delete process.env.ELEVENLABS_KEY;
     process.env.ELEVENLABS_API_KEY = 'some-elevenlabs-api-key';
     const { runDoctor } = await import('./commands/doctor.js');
     await runDoctor();
     const output = allOutput();
-    expect(output).toMatch(/ElevenLabs API Key.*Found/s);
+    expect(output).toMatch(/TTS API Key.*Found/s);
   });
 
-  it('reports skip when no ElevenLabs key is set', async () => {
+  it('reports skip when no TTS key is set', async () => {
+    delete process.env.TTS_API_KEY;
     delete process.env.ELEVENLABS_KEY;
     delete process.env.ELEVENLABS_API_KEY;
     const { runDoctor } = await import('./commands/doctor.js');
@@ -1016,7 +1050,7 @@ describe('doctor — summary output', () => {
     });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
     process.env.GUIDEKIT_SECRET = 'a'.repeat(32);
-    process.env.GEMINI_KEY = 'AIabcdefghijklmnopqrstuvwxyz';
+    process.env.LLM_API_KEY = 'AIabcdefghijklmnopqrstuvwxyz';
 
     const { runDoctor } = await import('./commands/doctor.js');
     await runDoctor();
@@ -1069,6 +1103,7 @@ describe('doctor — summary output', () => {
     );
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
     delete process.env.GUIDEKIT_SECRET;
+    delete process.env.LLM_API_KEY;
     delete process.env.GEMINI_KEY;
     delete process.env.GEMINI_API_KEY;
     delete process.env.GOOGLE_AI_KEY;

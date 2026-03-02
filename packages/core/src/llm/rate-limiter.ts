@@ -164,7 +164,22 @@ export class RateLimiter {
   private get sttMinutesUsed(): number {
     let totalMs = this.sttMs;
     if (this.sttStartedAt !== null) {
-      totalMs += Date.now() - this.sttStartedAt;
+      const activeMs = Date.now() - this.sttStartedAt;
+      const maxSessionMs = this.maxSTTMinutesPerSession * 60_000;
+      const maxActiveMs = maxSessionMs * 2;
+
+      if (activeMs > maxActiveMs) {
+        console.warn(
+          `${LOG_PREFIX} STT stream running for ${Math.round(activeMs / 60_000)}min without sttStop() — ` +
+          `capping at 2x session limit (${this.maxSTTMinutesPerSession * 2}min).`,
+        );
+        // Auto-cap: freeze the accumulated time and clear the start marker
+        this.sttMs += maxActiveMs;
+        this.sttStartedAt = null;
+        totalMs = this.sttMs;
+      } else {
+        totalMs += activeMs;
+      }
     }
     return totalMs / 60_000;
   }

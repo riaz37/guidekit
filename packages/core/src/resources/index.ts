@@ -214,6 +214,10 @@ export class ResourceManager {
       }
 
       try {
+        /**
+         * Cleanup timeout: logs warning but resolves promise regardless.
+         * Resources may leak if cleanup takes longer than the timeout period.
+         */
         await withTimeout(resource.cleanup(), CLEANUP_TIMEOUT_MS, () => {
           console.warn(
             `${LOG_PREFIX} Cleanup timeout for "${name}" (${CLEANUP_TIMEOUT_MS}ms)`,

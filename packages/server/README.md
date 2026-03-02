@@ -19,9 +19,9 @@ import { createSessionToken } from '@guidekit/server';
 export async function POST() {
   const token = await createSessionToken({
     signingSecret: process.env.GUIDEKIT_SECRET!,
-    geminiKey: process.env.GEMINI_KEY!,
-    deepgramKey: process.env.DEEPGRAM_KEY,
-    elevenlabsKey: process.env.ELEVENLABS_KEY,
+    llmApiKey: process.env.LLM_API_KEY!,
+    sttApiKey: process.env.STT_API_KEY,
+    ttsApiKey: process.env.TTS_API_KEY,
     expiresIn: '15m',
   });
 
@@ -36,10 +36,14 @@ Validate an incoming token (useful for custom middleware):
 ```typescript
 import { validateSessionToken } from '@guidekit/server';
 
-const payload = await validateSessionToken({
-  token: bearerToken,
-  signingSecret: process.env.GUIDEKIT_SECRET!,
-});
+const result = await validateSessionToken(
+  bearerToken,
+  process.env.GUIDEKIT_SECRET!,
+);
+
+if (result.valid) {
+  console.log(result.payload);
+}
 ```
 
 ## Secret Rotation

@@ -975,7 +975,7 @@ export class DOMScanner {
 
       const style = window.getComputedStyle(el);
       const position = style.position;
-      const zIndex = parseInt(style.zIndex, 10);
+      const zIndex = parseInt(style.zIndex, 10) || 0;
 
       if (
         (position === 'fixed' || position === 'absolute') &&

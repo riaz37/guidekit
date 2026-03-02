@@ -1,7 +1,7 @@
 {
   "name": "@guidekit/vad",
-  "version": "0.1.0-beta.1",
-  "description": "Silero VAD model for GuideKit SDK \u2014 voice activity detection via ONNX Runtime",
+  "version": "0.1.0-beta.2",
+  "description": "Silero VAD model for GuideKit SDK — voice activity detection via ONNX Runtime",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -37,6 +37,18 @@
   },
   "sideEffects": false,
   "license": "MIT",
+  "author": "Riazul Islam",
+  "keywords": [
+    "guidekit",
+    "vad",
+    "voice-activity-detection",
+    "silero",
+    "onnx",
+    "audio"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/riaz37/guidekit.git",

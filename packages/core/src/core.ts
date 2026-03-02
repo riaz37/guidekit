@@ -15,12 +15,12 @@ import { LLMOrchestrator } from './llm/index.js';
 import { ToolExecutor } from './llm/tool-executor.js';
 import { ConnectionManager } from './connectivity/index.js';
 import { NavigationController } from './navigation/index.js';
-import { VoicePipeline } from './voice/index.js';
+import { VoicePipeline, type VoicePipelineOptions } from './voice/index.js';
 import { VisualGuidance } from './visual/index.js';
 import { AwarenessSystem } from './awareness/index.js';
 import { ProactiveTriggerEngine } from './awareness/proactive.js';
 import { RateLimiter } from './llm/rate-limiter.js';
-import { I18n } from './i18n/index.js';
+import { I18n, type LocaleInput } from './i18n/index.js';
 import { TokenManager } from './auth/token-manager.js';
 import type {
   PageModel,
@@ -31,6 +31,7 @@ import type {
   TTSConfig,
   GuideKitOptions,
   ToolDefinition,
+  ToolParameterSchema,
   GuideKitEvent,
   AgentState,
   GuideKitStore,
@@ -208,7 +209,7 @@ export class GuideKitCore {
 
     // Create I18n (auto-detect is SSR-safe)
     this._i18n = new I18n({
-      locale: options.options?.locale as any ?? 'auto',
+      locale: (options.options?.locale as LocaleInput) ?? 'auto',
       debug: this._debug,
     });
 
@@ -279,6 +280,13 @@ export class GuideKitCore {
         debug: this._debug,
       });
       await this.tokenManager.start();
+      if (!this._options.llm) {
+        console.warn(
+          '[GuideKit] tokenEndpoint provided without llm config. ' +
+          'The session token handles auth only — llm: { provider, apiKey } is still required ' +
+          'for LLM calls. See: https://guidekit.dev/docs/provider#token-endpoint',
+        );
+      }
       this.resourceManager.register({
         name: 'token-manager',
         cleanup: () => this.tokenManager?.destroy(),
@@ -437,23 +445,58 @@ export class GuideKitCore {
     this.registerBuiltinTools();
 
     // -- Voice Pipeline (lazy — only init on first startListening) ----------
+    // Default to web-speech (browser-native, zero-config) when no STT/TTS
+    // config is provided. Falls back gracefully in non-browser environments.
 
-    if (this._options.stt && this._options.tts) {
-      const sttConfig = this._options.stt;
-      const ttsConfig = this._options.tts;
+    {
+      const sttConfig: STTConfig = this._options.stt ?? { provider: 'web-speech' };
+      const ttsConfig: TTSConfig = this._options.tts ?? { provider: 'web-speech' };
 
-      if (sttConfig.provider === 'deepgram' && ttsConfig.provider === 'elevenlabs') {
+      // Build the VoicePipeline options based on provider type
+      let voiceSttConfig: VoicePipelineOptions['sttConfig'];
+      let voiceTtsConfig: VoicePipelineOptions['ttsConfig'];
+
+      if (sttConfig.provider === 'deepgram') {
+        voiceSttConfig = {
+          provider: 'deepgram',
+          apiKey: sttConfig.apiKey,
+          model: sttConfig.model,
+        };
+      } else if (sttConfig.provider === 'elevenlabs') {
+        voiceSttConfig = {
+          provider: 'elevenlabs',
+          apiKey: sttConfig.apiKey,
+          language: sttConfig.language,
+        };
+      } else {
+        voiceSttConfig = {
+          provider: 'web-speech',
+          language: sttConfig.language,
+          continuous: sttConfig.continuous,
+          interimResults: sttConfig.interimResults,
+        };
+      }
+
+      if (ttsConfig.provider === 'elevenlabs') {
+        voiceTtsConfig = {
+          provider: 'elevenlabs',
+          apiKey: ttsConfig.apiKey,
+          voiceId: 'voiceId' in ttsConfig ? ttsConfig.voiceId : undefined,
+        };
+      } else {
+        voiceTtsConfig = {
+          provider: 'web-speech',
+          voice: ttsConfig.voice,
+          rate: ttsConfig.rate,
+          pitch: ttsConfig.pitch,
+          language: ttsConfig.language,
+        };
+      }
+
+      try {
         this.voicePipeline = new VoicePipeline({
-          sttConfig: {
-            provider: 'deepgram',
-            apiKey: sttConfig.apiKey,
-            model: 'model' in sttConfig ? sttConfig.model : undefined,
-          },
-          ttsConfig: {
-            provider: 'elevenlabs',
-            apiKey: ttsConfig.apiKey,
-            voiceId: 'voiceId' in ttsConfig ? ttsConfig.voiceId : undefined,
-          },
+          sttConfig: voiceSttConfig,
+          ttsConfig: voiceTtsConfig,
           debug: this._debug,
         });
 
@@ -491,6 +534,12 @@ export class GuideKitCore {
           name: 'voice-pipeline',
           cleanup: () => this.voicePipeline?.destroy(),
         });
+      } catch (_err) {
+        // Voice pipeline may fail in non-browser environments (SSR, jsdom)
+        this.voicePipeline = null as unknown as VoicePipeline;
+        if (this._debug) {
+          console.debug('[GuideKit:Core] Voice pipeline unavailable in this environment');
+        }
       }
     }
 
@@ -660,7 +709,7 @@ export class GuideKitCore {
         error instanceof GuideKitError
           ? error
           : new GuideKitError({
-              code: 'UNKNOWN',
+              code: ErrorCodes.UNKNOWN,
               message:
                 error instanceof Error ? error.message : 'Unknown error',
               recoverable: false,
@@ -900,12 +949,13 @@ export class GuideKitCore {
       }
     }
 
-    // STT check — verify config exists
+    // STT check — report as configured only if user explicitly provided STT config
+    // or if voice pipeline is active (web-speech auto-default still works on demand)
     if (this._options.stt) {
       results.stt = { status: this.voicePipeline ? 'ok' : 'degraded' };
     }
 
-    // TTS check — verify config exists
+    // TTS check — same logic as STT
     if (this._options.tts) {
       results.tts = { status: this.voicePipeline ? 'ok' : 'degraded' };
     }
@@ -988,196 +1038,11 @@ export class GuideKitCore {
   }
 
   /**
-   * Register all built-in tool handlers with the ToolExecutor.
-   * Called once during init() after VisualGuidance and all subsystems are ready.
+   * Unified built-in tool specifications — single source of truth for both
+   * tool definitions (sent to LLM) and handler registration.
    */
-  private registerBuiltinTools(): void {
-    if (!this.toolExecutor) return;
-
-    // highlight — spotlight an element
-    this.toolExecutor.registerTool({
-      name: 'highlight',
-      execute: async (args) => {
-        const sectionId = args.sectionId as string | undefined;
-        const selector = args.selector as string | undefined;
-        const tooltip = args.tooltip as string | undefined;
-        const position = args.position as 'top' | 'bottom' | 'left' | 'right' | 'auto' | undefined;
-        const result = this.highlight({ sectionId, selector, tooltip, position });
-        return { success: result };
-      },
-    });
-
-    // dismissHighlight — remove spotlight
-    this.toolExecutor.registerTool({
-      name: 'dismissHighlight',
-      execute: async () => {
-        this.dismissHighlight();
-        return { success: true };
-      },
-    });
-
-    // scrollToSection — smooth scroll
-    this.toolExecutor.registerTool({
-      name: 'scrollToSection',
-      execute: async (args) => {
-        const sectionId = args.sectionId as string;
-        const offset = args.offset as number | undefined;
-        this.scrollToSection(sectionId, offset);
-        return { success: true };
-      },
-    });
-
-    // navigate — SPA navigation (same-origin only)
-    this.toolExecutor.registerTool({
-      name: 'navigate',
-      execute: async (args) => {
-        const href = args.href as string;
-        const result = await this.navigate(href);
-        return { success: result, navigatedTo: result ? href : null };
-      },
-    });
-
-    // startTour — guided tour
-    this.toolExecutor.registerTool({
-      name: 'startTour',
-      execute: async (args) => {
-        const sectionIds = args.sectionIds as string[];
-        const mode = (args.mode as 'auto' | 'manual') ?? 'manual';
-        this.startTour(sectionIds, mode);
-        return { success: true, steps: sectionIds.length };
-      },
-    });
-
-    // readPageContent — read section text or search
-    this.toolExecutor.registerTool({
-      name: 'readPageContent',
-      execute: async (args) => {
-        const sectionId = args.sectionId as string | undefined;
-        const query = args.query as string | undefined;
-        const model = this._currentPageModel;
-        if (!model) return { error: 'No page model available' };
-
-        if (sectionId) {
-          const section = model.sections.find((s) => s.id === sectionId);
-          if (section) {
-            // Try dynamic contentMap for enriched content
-            const contentMapResult = await this.contextManager.getContent(sectionId);
-            return {
-              sectionId: section.id,
-              label: section.label,
-              summary: section.summary,
-              contentMap: contentMapResult,
-            };
-          }
-          return { error: `Section "${sectionId}" not found` };
-        }
-
-        if (query) {
-          const queryLower = query.toLowerCase();
-          const matches = model.sections.filter(
-            (s) =>
-              s.label?.toLowerCase().includes(queryLower) ||
-              s.summary?.toLowerCase().includes(queryLower),
-          );
-          return {
-            query,
-            results: matches.slice(0, 5).map((s) => ({
-              sectionId: s.id,
-              label: s.label,
-              snippet: s.summary?.slice(0, 200),
-            })),
-          };
-        }
-
-        return { error: 'Provide either sectionId or query' };
-      },
-    });
-
-    // getVisibleSections — list visible sections
-    this.toolExecutor.registerTool({
-      name: 'getVisibleSections',
-      execute: async () => {
-        const model = this._currentPageModel;
-        if (!model) return { sections: [] };
-        // Return top sections by score (already sorted)
-        return {
-          sections: model.sections.slice(0, 10).map((s) => ({
-            id: s.id,
-            label: s.label,
-            selector: s.selector,
-            score: s.score,
-          })),
-        };
-      },
-    });
-
-    // clickElement — programmatic click (with default deny-list + whitelist/blacklist validation)
-    this.toolExecutor.registerTool({
-      name: 'clickElement',
-      execute: async (args) => {
-        if (typeof document === 'undefined') return { success: false, error: 'Not in browser' };
-        const selector = args.selector as string;
-
-        // Default deny-list: block dangerous elements unless developer explicitly allows
-        const el = document.querySelector(selector);
-        if (!el) return { success: false, error: `Element not found: ${selector}` };
-        if (!(el instanceof HTMLElement)) return { success: false, error: 'Element is not clickable' };
-
-        const clickableRules = this._options.options?.clickableSelectors;
-        const isInDevAllowList = clickableRules?.allow?.some((pattern) => {
-          try { return el.matches(pattern); } catch { return selector === pattern; }
-        }) ?? false;
-
-        // Check default deny-list (bypass only if element is in developer's explicit allow-list)
-        if (!isInDevAllowList) {
-          const defaultDenied = DEFAULT_CLICK_DENY.some((pattern) => {
-            try { return el.matches(pattern); } catch { return false; }
-          });
-          if (defaultDenied) {
-            return { success: false, error: `Selector "${selector}" matches the default deny list. Add it to clickableSelectors.allow to override.` };
-          }
-        }
-
-        // Developer deny-list
-        if (clickableRules?.deny?.length) {
-          const denied = clickableRules.deny.some((pattern) => {
-            try { return el.matches(pattern); } catch { return selector === pattern; }
-          });
-          if (denied) {
-            return { success: false, error: `Selector "${selector}" is blocked by the deny list.` };
-          }
-        }
-
-        // Developer allow-list (if provided, ONLY allow listed elements)
-        if (clickableRules?.allow?.length && !isInDevAllowList) {
-          return { success: false, error: `Selector "${selector}" is not in the allowed clickable selectors list.` };
-        }
-
-        el.click();
-        return { success: true };
-      },
-    });
-
-    // executeCustomAction — delegate to developer-registered actions
-    this.toolExecutor.registerTool({
-      name: 'executeCustomAction',
-      execute: async (args) => {
-        const actionId = args.actionId as string;
-        const params = (args.params as Record<string, unknown>) ?? {};
-        const action = this.customActions.get(actionId);
-        if (!action) return { error: `Unknown action: ${actionId}` };
-        try {
-          const result = await action.handler(params);
-          return { success: true, result };
-        } catch (err) {
-          return { success: false, error: err instanceof Error ? err.message : String(err) };
-        }
-      },
-    });
-  }
-
-  private getToolDefinitions(): ToolDefinition[] {
-    const builtinTools: ToolDefinition[] = [
+  private getBuiltinToolSpecs(): Array<ToolDefinition & { execute: (args: Record<string, unknown>) => Promise<unknown> }> {
+    return [
       {
         name: 'highlight',
         description:
@@ -1188,13 +1053,27 @@ export class GuideKitCore {
           tooltip: { type: 'string', description: 'Text to show in tooltip' },
           position: { type: 'string', enum: ['top', 'bottom', 'left', 'right', 'auto'], description: 'Tooltip position' },
         },
+        required: [],
         schemaVersion: 1,
+        execute: async (args) => {
+          const sectionId = args.sectionId as string | undefined;
+          const selector = args.selector as string | undefined;
+          const tooltip = args.tooltip as string | undefined;
+          const position = args.position as 'top' | 'bottom' | 'left' | 'right' | 'auto' | undefined;
+          const result = this.highlight({ sectionId, selector, tooltip, position });
+          return { success: result };
+        },
       },
       {
         name: 'dismissHighlight',
         description: 'Remove the current spotlight overlay.',
         parameters: {},
+        required: [],
         schemaVersion: 1,
+        execute: async () => {
+          this.dismissHighlight();
+          return { success: true };
+        },
       },
       {
         name: 'scrollToSection',
@@ -1204,7 +1083,14 @@ export class GuideKitCore {
           sectionId: { type: 'string', description: 'ID of the section to scroll to' },
           offset: { type: 'number', description: 'Pixel offset for sticky headers' },
         },
+        required: ['sectionId'],
         schemaVersion: 1,
+        execute: async (args) => {
+          const sectionId = args.sectionId as string;
+          const offset = args.offset as number | undefined;
+          this.scrollToSection(sectionId, offset);
+          return { success: true };
+        },
       },
       {
         name: 'navigate',
@@ -1213,7 +1099,13 @@ export class GuideKitCore {
         parameters: {
           href: { type: 'string', description: 'URL or path to navigate to (same-origin only)' },
         },
+        required: ['href'],
         schemaVersion: 1,
+        execute: async (args) => {
+          const href = args.href as string;
+          const result = await this.navigate(href);
+          return { success: result, navigatedTo: result ? href : null };
+        },
       },
       {
         name: 'startTour',
@@ -1223,7 +1115,14 @@ export class GuideKitCore {
           sectionIds: { type: 'array', items: { type: 'string' }, description: 'Section IDs in tour order' },
           mode: { type: 'string', enum: ['auto', 'manual'], description: 'auto advances automatically; manual waits for user' },
         },
+        required: ['sectionIds'],
         schemaVersion: 1,
+        execute: async (args) => {
+          const sectionIds = args.sectionIds as string[];
+          const mode = (args.mode as 'auto' | 'manual') ?? 'manual';
+          this.startTour(sectionIds, mode);
+          return { success: true, steps: sectionIds.length };
+        },
       },
       {
         name: 'readPageContent',
@@ -1233,14 +1132,67 @@ export class GuideKitCore {
           sectionId: { type: 'string', description: 'Section ID to read' },
           query: { type: 'string', description: 'Keyword to search for across sections' },
         },
+        required: [],
         schemaVersion: 1,
+        execute: async (args) => {
+          const sectionId = args.sectionId as string | undefined;
+          const query = args.query as string | undefined;
+          const model = this._currentPageModel;
+          if (!model) return { error: 'No page model available' };
+
+          if (sectionId) {
+            const section = model.sections.find((s) => s.id === sectionId);
+            if (section) {
+              const contentMapResult = await this.contextManager.getContent(sectionId);
+              return {
+                sectionId: section.id,
+                label: section.label,
+                summary: section.summary,
+                contentMap: contentMapResult,
+              };
+            }
+            return { error: `Section "${sectionId}" not found` };
+          }
+
+          if (query) {
+            const queryLower = query.toLowerCase();
+            const matches = model.sections.filter(
+              (s) =>
+                s.label?.toLowerCase().includes(queryLower) ||
+                s.summary?.toLowerCase().includes(queryLower),
+            );
+            return {
+              query,
+              results: matches.slice(0, 5).map((s) => ({
+                sectionId: s.id,
+                label: s.label,
+                snippet: s.summary?.slice(0, 200),
+              })),
+            };
+          }
+
+          return { error: 'Provide either sectionId or query' };
+        },
       },
       {
         name: 'getVisibleSections',
         description:
           'Get the list of sections currently visible in the user viewport.',
         parameters: {},
+        required: [],
         schemaVersion: 1,
+        execute: async () => {
+          const model = this._currentPageModel;
+          if (!model) return { sections: [] };
+          return {
+            sections: model.sections.slice(0, 10).map((s) => ({
+              id: s.id,
+              label: s.label,
+              selector: s.selector,
+              score: s.score,
+            })),
+          };
+        },
       },
       {
         name: 'clickElement',
@@ -1249,7 +1201,46 @@ export class GuideKitCore {
         parameters: {
           selector: { type: 'string', description: 'CSS selector of the element to click' },
         },
+        required: ['selector'],
         schemaVersion: 1,
+        execute: async (args) => {
+          if (typeof document === 'undefined') return { success: false, error: 'Not in browser' };
+          const selector = args.selector as string;
+
+          const el = document.querySelector(selector);
+          if (!el) return { success: false, error: `Element not found: ${selector}` };
+          if (!(el instanceof HTMLElement)) return { success: false, error: 'Element is not clickable' };
+
+          const clickableRules = this._options.options?.clickableSelectors;
+          const isInDevAllowList = clickableRules?.allow?.some((pattern) => {
+            try { return el.matches(pattern); } catch { return selector === pattern; }
+          }) ?? false;
+
+          if (!isInDevAllowList) {
+            const defaultDenied = DEFAULT_CLICK_DENY.some((pattern) => {
+              try { return el.matches(pattern); } catch { return false; }
+            });
+            if (defaultDenied) {
+              return { success: false, error: `Selector "${selector}" matches the default deny list. Add it to clickableSelectors.allow to override.` };
+            }
+          }
+
+          if (clickableRules?.deny?.length) {
+            const denied = clickableRules.deny.some((pattern) => {
+              try { return el.matches(pattern); } catch { return selector === pattern; }
+            });
+            if (denied) {
+              return { success: false, error: `Selector "${selector}" is blocked by the deny list.` };
+            }
+          }
+
+          if (clickableRules?.allow?.length && !isInDevAllowList) {
+            return { success: false, error: `Selector "${selector}" is not in the allowed clickable selectors list.` };
+          }
+
+          el.click();
+          return { success: true };
+        },
       },
       {
         name: 'executeCustomAction',
@@ -1259,16 +1250,46 @@ export class GuideKitCore {
           actionId: { type: 'string', description: 'ID of the custom action' },
           params: { type: 'object', description: 'Parameters for the action' },
         },
+        required: ['actionId'],
         schemaVersion: 1,
+        execute: async (args) => {
+          const actionId = args.actionId as string;
+          const params = (args.params as Record<string, unknown>) ?? {};
+          const action = this.customActions.get(actionId);
+          if (!action) return { error: `Unknown action: ${actionId}` };
+          try {
+            const result = await action.handler(params);
+            return { success: true, result };
+          } catch (err) {
+            return { success: false, error: err instanceof Error ? err.message : String(err) };
+          }
+        },
       },
     ];
+  }
+
+  /**
+   * Register all built-in tool handlers with the ToolExecutor.
+   * Called once during init() after VisualGuidance and all subsystems are ready.
+   */
+  private registerBuiltinTools(): void {
+    if (!this.toolExecutor) return;
+    for (const spec of this.getBuiltinToolSpecs()) {
+      this.toolExecutor.registerTool({ name: spec.name, execute: spec.execute });
+    }
+  }
+
+  private getToolDefinitions(): ToolDefinition[] {
+    const builtinTools: ToolDefinition[] = this.getBuiltinToolSpecs().map(
+      ({ execute: _execute, ...def }) => def,
+    );
 
     // Add custom actions as individual tool definitions for better LLM discoverability
     for (const [actionId, action] of this.customActions) {
       builtinTools.push({
         name: `action_${actionId}`,
         description: action.description,
-        parameters: action.parameters,
+        parameters: action.parameters as Record<string, ToolParameterSchema>,
         schemaVersion: 1,
       });
     }

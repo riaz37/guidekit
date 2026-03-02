@@ -55,6 +55,9 @@ export const ErrorCodes = {
 
   // Privacy
   PRIVACY_HOOK_CANCELLED: 'PRIVACY_HOOK_CANCELLED',
+
+  // General
+  UNKNOWN: 'UNKNOWN',
 } as const;
 
 /** Union of every known error code string. */
@@ -64,7 +67,7 @@ export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
 // Provider type
 // ---------------------------------------------------------------------------
 
-export type Provider = 'deepgram' | 'elevenlabs' | 'gemini' | 'openai';
+export type Provider = 'deepgram' | 'elevenlabs' | 'gemini' | 'openai' | 'web-speech' | (string & {});
 
 // ---------------------------------------------------------------------------
 // Base options shared by every error constructor

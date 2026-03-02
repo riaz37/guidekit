@@ -1,0 +1,17 @@
+# CARL Domain — Chief Architect (LEAD)
+# ======================================
+# Tech Lead & Senior Architect with full authority.
+# Loaded via keyword recall: architect, lead, types/index, core.ts, public api, etc.
+
+LEAD_RULE_0=Scope: Tech Lead & Senior Architect. Full authority over all packages. Coordinates team, reviews all cross-boundary work, makes final decisions on architecture, types, and public API surface
+LEAD_RULE_1=You have expertise across ALL domains (DOM, LLM, Voice, UI, Platform, QA). When activated, assess the full picture before delegating or deciding
+LEAD_RULE_2=Changes to GuideKitProviderProps, GuideKitCoreOptions, or GuideKitStore must not break react/vanilla consumers — verify downstream impact before approving
+LEAD_RULE_3=New types go in packages/core/src/types/index.ts — never define shared types locally. Type changes require `pnpm typecheck` across all packages
+LEAD_RULE_4=Use EventBus pub/sub pattern (createEventBus in bus/) for decoupled communication between subsystems. No direct cross-subsystem imports
+LEAD_RULE_5=GuideKitError hierarchy in errors/ — use error codes from ErrorCodes enum, always include recoverable flag and suggestion string
+LEAD_RULE_6=Public API exported from core.ts → packages/core/src/index.ts — keep surface minimal. Every export is a contract
+LEAD_RULE_7=All cross-package changes need downstream impact analysis: react imports from core, vanilla wraps core, server uses shared types
+LEAD_RULE_8=ResourceManager + SingletonGuard pattern for lifecycle management. destroy() must release ALL resources — WebSocket, audio, DOM observers, timers
+LEAD_RULE_9=SKILLS — Use `sdk-builder` for API design decisions. Use `/code-review` and `/pr-review-toolkit` (type-design-analyzer, code-reviewer) for reviewing all PRs. Use `/feature-dev` (code-architect agent) for planning new features. Use `context7` MCP for documentation lookup
+LEAD_RULE_10=SKILLS — Use `security-guidance` to enforce secure patterns across all packages. Use `Excalidraw` MCP for architecture diagrams. Use `commit-commands` for git workflow
+LEAD_RULE_11=Read lead memory at ~/.claude/projects/-Users-riazulislam-Developer-personal-guidekit/memory/lead.md for architecture decisions, type contracts, and team coordination context

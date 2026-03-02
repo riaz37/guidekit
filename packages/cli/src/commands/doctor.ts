@@ -55,47 +55,47 @@ function checkGuidekitSecret(): CheckResult {
   return { name: 'GUIDEKIT_SECRET', status: 'ok', message: 'Set and valid length' };
 }
 
-function checkGeminiKey(): CheckResult {
-  const key = process.env.GEMINI_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
+function checkLlmApiKey(): CheckResult {
+  const key = process.env.LLM_API_KEY || process.env.GEMINI_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
   if (!key) {
     return {
-      name: 'Gemini API Key',
+      name: 'LLM API Key',
       status: 'warn',
-      message: 'Not found (GEMINI_KEY / GEMINI_API_KEY / GOOGLE_AI_KEY). Required for LLM.',
+      message: 'Not found (LLM_API_KEY / GEMINI_KEY / GEMINI_API_KEY / GOOGLE_AI_KEY). Required for LLM.',
     };
   }
   if (!key.startsWith('AI') && key.length < 20) {
     return {
-      name: 'Gemini API Key',
+      name: 'LLM API Key',
       status: 'warn',
-      message: 'Key format looks unusual. Verify at https://aistudio.google.com/apikey',
+      message: 'Key format looks unusual. Verify with your LLM provider.',
     };
   }
-  return { name: 'Gemini API Key', status: 'ok', message: 'Found' };
+  return { name: 'LLM API Key', status: 'ok', message: 'Found' };
 }
 
-function checkDeepgramKey(): CheckResult {
-  const key = process.env.DEEPGRAM_KEY || process.env.DEEPGRAM_API_KEY;
+function checkSttApiKey(): CheckResult {
+  const key = process.env.STT_API_KEY || process.env.DEEPGRAM_KEY || process.env.DEEPGRAM_API_KEY;
   if (!key) {
     return {
-      name: 'Deepgram API Key',
+      name: 'STT API Key',
       status: 'skip',
       message: 'Not set (optional — required for voice/STT)',
     };
   }
-  return { name: 'Deepgram API Key', status: 'ok', message: 'Found' };
+  return { name: 'STT API Key', status: 'ok', message: 'Found' };
 }
 
-function checkElevenlabsKey(): CheckResult {
-  const key = process.env.ELEVENLABS_KEY || process.env.ELEVENLABS_API_KEY;
+function checkTtsApiKey(): CheckResult {
+  const key = process.env.TTS_API_KEY || process.env.ELEVENLABS_KEY || process.env.ELEVENLABS_API_KEY;
   if (!key) {
     return {
-      name: 'ElevenLabs API Key',
+      name: 'TTS API Key',
       status: 'skip',
       message: 'Not set (optional — required for voice/TTS)',
     };
   }
-  return { name: 'ElevenLabs API Key', status: 'ok', message: 'Found' };
+  return { name: 'TTS API Key', status: 'ok', message: 'Found' };
 }
 
 function checkPackageInstalled(root: string, pkg: string): CheckResult {
@@ -182,9 +182,9 @@ export async function runDoctor(): Promise<void> {
   results.push(checkEnvFile(root));
   results.push(checkGitignore(root));
   results.push(checkGuidekitSecret());
-  results.push(checkGeminiKey());
-  results.push(checkDeepgramKey());
-  results.push(checkElevenlabsKey());
+  results.push(checkLlmApiKey());
+  results.push(checkSttApiKey());
+  results.push(checkTtsApiKey());
 
   log(`${c.bold}Packages${c.reset}`);
   results.push(checkPackageInstalled(root, '@guidekit/core'));
