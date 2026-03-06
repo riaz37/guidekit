@@ -50,9 +50,9 @@ describe('GuideKitError', () => {
     expect(err.name).toBe('GuideKitError');
   });
 
-  it('docsUrl defaults to https://guidekit.dev/docs/error-codes#{code}', () => {
+  it('docsUrl defaults to https://guidekit-docs.vercel.app/docs/error-codes#{code}', () => {
     const err = new GuideKitError(baseOpts);
-    expect(err.docsUrl).toBe(`https://guidekit.dev/docs/error-codes#${baseOpts.code}`);
+    expect(err.docsUrl).toBe(`https://guidekit-docs.vercel.app/docs/error-codes#${baseOpts.code}`);
   });
 
   it('custom docsUrl overrides default', () => {

@@ -170,7 +170,7 @@ describe('run() — CLI entry point', () => {
     const { run } = await import('./cli.js');
     await run(['--help']);
     const output = allOutput();
-    expect(output).toContain('https://guidekit.dev/docs/cli');
+    expect(output).toContain('https://guidekit-docs.vercel.app/docs/cli');
   });
 
   it('help output includes examples section', async () => {

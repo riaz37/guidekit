@@ -36,7 +36,7 @@ ${c.bold}Examples:${c.reset}
   ${c.dim}$ npx guidekit doctor${c.reset}
   ${c.dim}$ npx guidekit generate-secret${c.reset}
 
-${c.dim}Documentation: https://guidekit.dev/docs/cli${c.reset}
+${c.dim}Documentation: https://guidekit-docs.vercel.app/docs/cli${c.reset}
 `;
 
 export async function run(args: string[] = process.argv.slice(2)): Promise<void> {

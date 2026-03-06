@@ -294,7 +294,7 @@ export class GuideKitCore {
         console.warn(
           '[GuideKit] tokenEndpoint provided without llm config. ' +
           'The session token handles auth only — llm: { provider, apiKey } is still required ' +
-          'for LLM calls. See: https://guidekit.dev/docs/provider#token-endpoint',
+          'for LLM calls. See: https://guidekit-docs.vercel.app/docs/provider#token-endpoint',
         );
       }
       this.resourceManager.register({

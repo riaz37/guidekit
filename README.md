@@ -14,9 +14,9 @@
 </p>
 
 <p align="center">
-  <a href="https://guidekit.dev/docs/getting-started">Getting Started</a> ·
-  <a href="https://guidekit.dev/docs">Documentation</a> ·
-  <a href="https://guidekit.dev/docs/architecture">Architecture</a> ·
+  <a href="https://guidekit-docs.vercel.app/docs/getting-started">Getting Started</a> ·
+  <a href="https://guidekit-docs.vercel.app/docs">Documentation</a> ·
+  <a href="https://guidekit-docs.vercel.app/docs/architecture">Architecture</a> ·
   <a href="#quick-start">Quick Start</a>
 </p>
 
@@ -324,15 +324,15 @@ import { MockGuideKitProvider, simulateVoiceInput } from '@guidekit/react/testin
 
 | Topic | Link |
 |-------|------|
-| Getting Started | [guidekit.dev/docs/getting-started](https://guidekit.dev/docs/getting-started) |
-| Provider Setup | [guidekit.dev/docs/provider](https://guidekit.dev/docs/provider) |
-| Hooks API | [guidekit.dev/docs/hooks](https://guidekit.dev/docs/hooks) |
-| Voice | [guidekit.dev/docs/voice](https://guidekit.dev/docs/voice) |
-| Server SDK | [guidekit.dev/docs/server](https://guidekit.dev/docs/server) |
-| Privacy & Security | [guidekit.dev/docs/privacy](https://guidekit.dev/docs/privacy) |
-| Error Codes | [guidekit.dev/docs/error-codes](https://guidekit.dev/docs/error-codes) |
-| Architecture | [guidekit.dev/docs/architecture](https://guidekit.dev/docs/architecture) |
-| Vanilla (Non-React) | [guidekit.dev/docs/vanilla](https://guidekit.dev/docs/vanilla) |
+| Getting Started | [guidekit-docs.vercel.app/docs/getting-started](https://guidekit-docs.vercel.app/docs/getting-started) |
+| Provider Setup | [guidekit-docs.vercel.app/docs/provider](https://guidekit-docs.vercel.app/docs/provider) |
+| Hooks API | [guidekit-docs.vercel.app/docs/hooks](https://guidekit-docs.vercel.app/docs/hooks) |
+| Voice | [guidekit-docs.vercel.app/docs/voice](https://guidekit-docs.vercel.app/docs/voice) |
+| Server SDK | [guidekit-docs.vercel.app/docs/server](https://guidekit-docs.vercel.app/docs/server) |
+| Privacy & Security | [guidekit-docs.vercel.app/docs/privacy](https://guidekit-docs.vercel.app/docs/privacy) |
+| Error Codes | [guidekit-docs.vercel.app/docs/error-codes](https://guidekit-docs.vercel.app/docs/error-codes) |
+| Architecture | [guidekit-docs.vercel.app/docs/architecture](https://guidekit-docs.vercel.app/docs/architecture) |
+| Vanilla (Non-React) | [guidekit-docs.vercel.app/docs/vanilla](https://guidekit-docs.vercel.app/docs/vanilla) |
 
 ## Development
 

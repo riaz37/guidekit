@@ -53,7 +53,7 @@ destroy();
 
 ## Documentation
 
-- Full documentation: [guidekit.dev/docs/vanilla](https://guidekit.dev/docs/vanilla)
+- Full documentation: [guidekit-docs.vercel.app/docs/vanilla](https://guidekit-docs.vercel.app/docs/vanilla)
 - [Main README](../../README.md)
 
 ## License

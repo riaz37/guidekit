@@ -70,7 +70,7 @@ All errors extend `GuideKitError` with structured metadata:
 
 ## Documentation
 
-- Full documentation: [guidekit.dev/docs](https://guidekit.dev/docs)
+- Full documentation: [guidekit-docs.vercel.app/docs](https://guidekit-docs.vercel.app/docs)
 - [Main README](../../README.md)
 
 ## License

@@ -51,7 +51,7 @@ vad.destroy();
 
 ## Documentation
 
-- Full documentation: [guidekit.dev/docs/voice](https://guidekit.dev/docs/voice)
+- Full documentation: [guidekit-docs.vercel.app/docs/voice](https://guidekit-docs.vercel.app/docs/voice)
 - [Main README](../../README.md)
 
 ## License

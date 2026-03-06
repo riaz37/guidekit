@@ -137,7 +137,7 @@ export class GuideKitError extends Error {
     this.recoverable = options.recoverable;
     this.suggestion = options.suggestion;
     this.docsUrl =
-      options.docsUrl ?? `https://guidekit.dev/docs/error-codes#${options.code}`;
+      options.docsUrl ?? `https://guidekit-docs.vercel.app/docs/error-codes#${options.code}`;
   }
 }
 

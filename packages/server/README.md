@@ -67,7 +67,7 @@ npx guidekit generate-secret
 
 ## Documentation
 
-- Full documentation: [guidekit.dev/docs/server](https://guidekit.dev/docs/server)
+- Full documentation: [guidekit-docs.vercel.app/docs/server](https://guidekit-docs.vercel.app/docs/server)
 - [Main README](../../README.md)
 
 ## License

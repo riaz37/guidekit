@@ -55,7 +55,7 @@ Copy the output into your `.env.local` as `GUIDEKIT_SECRET`.
 
 ## Documentation
 
-- Full documentation: [guidekit.dev/docs/cli](https://guidekit.dev/docs/cli)
+- Full documentation: [guidekit-docs.vercel.app/docs/cli](https://guidekit-docs.vercel.app/docs/cli)
 - [Main README](../../README.md)
 
 ## License
