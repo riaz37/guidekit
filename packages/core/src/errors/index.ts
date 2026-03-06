@@ -56,6 +56,30 @@ export const ErrorCodes = {
   // Privacy
   PRIVACY_HOOK_CANCELLED: 'PRIVACY_HOOK_CANCELLED',
 
+  // Send
+  SEND_IN_FLIGHT: 'SEND_IN_FLIGHT',
+  INPUT_TOO_LONG: 'INPUT_TOO_LONG',
+
+  // Knowledge
+  KNOWLEDGE_INGESTION_FAILED: 'KNOWLEDGE_INGESTION_FAILED',
+  KNOWLEDGE_STORE_QUOTA: 'KNOWLEDGE_STORE_QUOTA',
+  KNOWLEDGE_DOCUMENT_PARSE_FAILED: 'KNOWLEDGE_DOCUMENT_PARSE_FAILED',
+  KNOWLEDGE_SEARCH_FAILED: 'KNOWLEDGE_SEARCH_FAILED',
+
+  // Cognitive
+  COGNITIVE_PLAN_DEPTH_EXCEEDED: 'COGNITIVE_PLAN_DEPTH_EXCEEDED',
+  COGNITIVE_BUDGET_EXCEEDED: 'COGNITIVE_BUDGET_EXCEEDED',
+  COGNITIVE_MODEL_CAPABILITY: 'COGNITIVE_MODEL_CAPABILITY',
+
+  // Plugin
+  PLUGIN_INSTALL_FAILED: 'PLUGIN_INSTALL_FAILED',
+  PLUGIN_DEPENDENCY_MISSING: 'PLUGIN_DEPENDENCY_MISSING',
+  PLUGIN_TOOL_CONFLICT: 'PLUGIN_TOOL_CONFLICT',
+  PLUGIN_LIFECYCLE_ERROR: 'PLUGIN_LIFECYCLE_ERROR',
+
+  // Memory
+  MEMORY_STORAGE_UNAVAILABLE: 'MEMORY_STORAGE_UNAVAILABLE',
+
   // General
   UNKNOWN: 'UNKNOWN',
 } as const;
@@ -67,7 +91,7 @@ export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
 // Provider type
 // ---------------------------------------------------------------------------
 
-export type Provider = 'deepgram' | 'elevenlabs' | 'gemini' | 'openai' | 'web-speech' | (string & {});
+export type Provider = 'deepgram' | 'elevenlabs' | 'gemini' | 'openai' | 'anthropic' | 'web-speech' | (string & {});
 
 // ---------------------------------------------------------------------------
 // Base options shared by every error constructor
@@ -245,6 +269,42 @@ export class ContentFilterError extends GuideKitError {
   ) {
     super({ recoverable: false, ...options });
     this.name = 'ContentFilterError';
+  }
+}
+
+/** Knowledge base ingestion, search, or quota failure. */
+export class KnowledgeError extends GuideKitError {
+  constructor(
+    options: Omit<GuideKitErrorOptions, 'recoverable'> & {
+      recoverable?: boolean;
+    },
+  ) {
+    super({ recoverable: true, ...options });
+    this.name = 'KnowledgeError';
+  }
+}
+
+/** Plugin installation, dependency, or conflict failure. */
+export class PluginError extends GuideKitError {
+  constructor(
+    options: Omit<GuideKitErrorOptions, 'recoverable'> & {
+      recoverable?: boolean;
+    },
+  ) {
+    super({ recoverable: true, ...options });
+    this.name = 'PluginError';
+  }
+}
+
+/** Cognitive engine plan depth or budget limit exceeded. */
+export class CognitiveError extends GuideKitError {
+  constructor(
+    options: Omit<GuideKitErrorOptions, 'recoverable'> & {
+      recoverable?: boolean;
+    },
+  ) {
+    super({ recoverable: true, ...options });
+    this.name = 'CognitiveError';
   }
 }
 

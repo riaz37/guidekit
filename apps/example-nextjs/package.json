@@ -8,9 +8,9 @@
     "start": "next start -p 3099"
   },
   "dependencies": {
-    "@guidekit/core": "workspace:*",
-    "@guidekit/react": "workspace:*",
-    "@guidekit/server": "workspace:*",
+    "@guidekit/core": "workspace:^",
+    "@guidekit/react": "workspace:^",
+    "@guidekit/server": "workspace:^",
     "next": "^15.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

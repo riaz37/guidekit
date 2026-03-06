@@ -313,6 +313,17 @@ export class VoicePipeline {
     }
 
     // ── Get mic access ──────────────────────────────────────────────
+    if (!navigator.mediaDevices?.getUserMedia) {
+      const err = new BrowserSupportError({
+        code: ErrorCodes.BROWSER_NO_WEB_AUDIO,
+        message: 'navigator.mediaDevices is not available. A secure context (HTTPS) is required for microphone access.',
+        suggestion: 'Serve your app over HTTPS or use localhost with a secure context.',
+      });
+      this._setState('error');
+      this._bus.emit('error', err);
+      throw err;
+    }
+
     try {
       this._mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {

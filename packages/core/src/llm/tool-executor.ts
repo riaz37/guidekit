@@ -334,6 +334,184 @@ export class ToolExecutor {
   }
 
   // -----------------------------------------------------------------------
+  // Streaming multi-turn execution loop
+  // -----------------------------------------------------------------------
+
+  /**
+   * Execute a multi-turn conversation with tool calls, streaming text
+   * chunks to the consumer as they arrive.
+   *
+   * The method uses `llm.sendMessageStream()` instead of `llm.sendMessage()`.
+   * Text chunks (strings) are yielded to the consumer between rounds.
+   * Tool calls are executed silently (not yielded) and their results are
+   * fed back to the LLM for subsequent rounds.
+   *
+   * The generator return value is a `ToolExecutionResult` identical to
+   * what `executeWithTools()` returns.
+   */
+  async *executeWithToolsStream(params: {
+    llm: LLMOrchestrator;
+    systemPrompt: string;
+    history: ConversationTurn[];
+    userMessage: string;
+    tools: ToolDefinition[];
+    signal?: AbortSignal;
+  }): AsyncGenerator<string, ToolExecutionResult> {
+    const { llm, systemPrompt, userMessage, tools, signal } = params;
+
+    // Accumulate results across rounds.
+    const allToolCalls: ToolCallRecord[] = [];
+    const totalUsage: AggregatedUsage = { prompt: 0, completion: 0, total: 0 };
+    let rounds = 0;
+    let finalText = '';
+
+    // Build the running conversation. We start with the caller-supplied
+    // history and progressively append assistant / tool turns as the
+    // loop executes.
+    const internalHistory: InternalTurn[] = [...params.history];
+
+    // The user message for the *first* round. On subsequent rounds the
+    // LLM is called with an empty user message because the new context
+    // is conveyed through the tool result turns appended to the history.
+    let currentUserMessage = userMessage;
+
+    while (rounds < this.maxRounds) {
+      // Check for abort before each round.
+      if (signal?.aborted) {
+        this.log('Aborted before round ' + (rounds + 1));
+        break;
+      }
+
+      rounds++;
+      this.log(`--- Stream Round ${rounds} ---`);
+
+      // Convert internal history to standard ConversationTurn[] for the
+      // LLMOrchestrator, which only understands 'user' | 'assistant' roles.
+      const llmHistory = this.flattenHistory(internalHistory);
+
+      // Send to LLM using the streaming generator.
+      const gen = llm.sendMessageStream({
+        systemPrompt,
+        history: llmHistory,
+        userMessage: currentUserMessage,
+        tools,
+        signal,
+      });
+
+      // Consume the generator, yielding text chunks to our consumer
+      // and collecting tool calls internally.
+      let roundText = '';
+      const roundToolCalls: ToolCall[] = [];
+      let streamResult = await gen.next();
+
+      while (!streamResult.done) {
+        const item = streamResult.value;
+        if ('name' in item && 'arguments' in item) {
+          // ToolCall — collect internally, do not yield to consumer.
+          roundToolCalls.push(item as ToolCall);
+        } else {
+          // TextChunk — yield the text string to the consumer.
+          const chunk = item as { text: string; done: boolean };
+          if (chunk.text) {
+            roundText += chunk.text;
+            yield chunk.text;
+          }
+        }
+        streamResult = await gen.next();
+      }
+
+      // The generator return value contains accumulated usage.
+      const response = streamResult.value;
+
+      // Accumulate token usage.
+      totalUsage.prompt += response.usage.prompt;
+      totalUsage.completion += response.usage.completion;
+      totalUsage.total += response.usage.total;
+
+      // Capture any text the LLM produced alongside tool calls.
+      if (roundText) {
+        finalText += roundText;
+      }
+
+      // If there are no tool calls, we are done.
+      if (roundToolCalls.length === 0) {
+        this.log(`Stream Round ${rounds}: text-only response, finishing loop`);
+        break;
+      }
+
+      this.log(
+        `Stream Round ${rounds}: ${roundToolCalls.length} tool call(s) received`,
+      );
+
+      // Record the assistant turn with its tool calls.
+      const assistantTurn: AssistantToolCallTurn = {
+        role: 'assistant',
+        content: roundText,
+        toolCalls: roundToolCalls.map((tc) => ({
+          id: tc.id,
+          name: tc.name,
+          args: tc.arguments,
+        })),
+        timestamp: Date.now(),
+      };
+      internalHistory.push(assistantTurn);
+
+      // Execute all tool calls from this round in parallel.
+      const toolResults = await this.executeToolCallsInParallel(
+        roundToolCalls,
+        signal,
+      );
+
+      // Append each tool result as a separate turn and record it.
+      for (const tr of toolResults) {
+        allToolCalls.push(tr.record);
+
+        const resultTurn: ToolResultTurn = {
+          role: 'tool',
+          content: JSON.stringify(
+            tr.record.error != null
+              ? { error: tr.record.error }
+              : tr.record.result,
+          ),
+          toolCallId: tr.toolCallId,
+          toolName: tr.record.name,
+          timestamp: Date.now(),
+        };
+        internalHistory.push(resultTurn);
+      }
+
+      // On subsequent rounds the new context is carried by the tool
+      // result turns, so we send an empty user message.
+      currentUserMessage = '';
+
+      // Check abort again before looping.
+      if (signal?.aborted) {
+        this.log('Aborted after tool execution in stream round ' + rounds);
+        break;
+      }
+    }
+
+    if (rounds >= this.maxRounds) {
+      this.log(
+        `Max rounds (${this.maxRounds}) reached in stream. Returning current text.`,
+      );
+    }
+
+    this.log(
+      `Stream execution complete: ${rounds} round(s), ` +
+        `${allToolCalls.length} tool call(s), ` +
+        `${totalUsage.total} total tokens`,
+    );
+
+    return {
+      text: finalText,
+      toolCallsExecuted: allToolCalls,
+      totalUsage,
+      rounds,
+    };
+  }
+
+  // -----------------------------------------------------------------------
   // Private: execute a single tool call
   // -----------------------------------------------------------------------
 

@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// GuideKit SDK – LLM Orchestrator & Gemini Adapter
+// GuideKit SDK – LLM Orchestrator & Adapters
 // ---------------------------------------------------------------------------
 
 import type {
@@ -19,6 +19,9 @@ import {
   ContentFilterError,
   ErrorCodes,
 } from '../errors/index.js';
+
+import { OpenAIAdapter } from './openai-adapter.js';
+import { AnthropicAdapter } from './anthropic-adapter.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -643,6 +646,59 @@ export class LLMOrchestrator {
   }
 
   /**
+   * Send a message and stream the response from the LLM as an async generator.
+   *
+   * Yields `TextChunk` and `ToolCall` items as they arrive from the provider.
+   * The generator return value contains the accumulated text, tool calls, and
+   * token usage.
+   *
+   * If the initial response is blocked by a content filter, retries once
+   * without tools (simplified prompt).
+   */
+  async *sendMessageStream(params: {
+    systemPrompt: string;
+    history: ConversationTurn[];
+    userMessage: string;
+    tools?: ToolDefinition[];
+    signal?: AbortSignal;
+  }): AsyncGenerator<
+    TextChunk | ToolCall,
+    { text: string; toolCalls: ToolCall[]; usage: { prompt: number; completion: number; total: number } }
+  > {
+    try {
+      return yield* this.executeStreamGenerator(params, /* isRetry */ false);
+    } catch (error: unknown) {
+      if (error instanceof ContentFilterError) {
+        // Retry once without tools (simplified prompt).
+        this.log('Content filter triggered – retrying without tools');
+        try {
+          return yield* this.executeStreamGenerator(
+            { ...params, tools: undefined },
+            /* isRetry */ true,
+          );
+        } catch (_retryError: unknown) {
+          const cfError = new ContentFilterError({
+            code: ErrorCodes.CONTENT_FILTER_TRIGGERED,
+            message:
+              'Response blocked by content safety filter after retry.',
+            provider: this.providerName,
+            suggestion:
+              'Rephrase your question or adjust safety settings.',
+          });
+          this.callbacks.onError?.(cfError);
+          throw cfError;
+        }
+      }
+
+      // For non-content-filter errors, notify and re-throw.
+      if (error instanceof Error) {
+        this.callbacks.onError?.(error);
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Hot-swap the LLM configuration. Creates a new adapter for the
    * updated provider/model.
    */
@@ -669,6 +725,9 @@ export class LLMOrchestrator {
    * response parsing, content-filter detection, and usage extraction
    * entirely to the active `LLMProviderAdapter`. No provider-specific
    * SSE parsing lives in the orchestrator.
+   *
+   * Internally delegates to `executeStreamGenerator()` and consumes
+   * the generator to accumulate the final result.
    */
   private async executeStream(
     params: {
@@ -684,6 +743,38 @@ export class LLMOrchestrator {
     toolCalls: ToolCall[];
     usage: TokenUsage;
   }> {
+    const gen = this.executeStreamGenerator(params, _isRetry);
+
+    // Consume the generator, invoking callbacks along the way.
+    let result = await gen.next();
+    while (!result.done) {
+      result = await gen.next();
+    }
+
+    return result.value;
+  }
+
+  /**
+   * Internal async generator that performs a streaming LLM request.
+   * Yields each `TextChunk` or `ToolCall` as it arrives, and returns
+   * the accumulated result when the stream ends.
+   *
+   * Both `executeStream()` and `sendMessageStream()` delegate to this
+   * method to avoid duplicating provider interaction logic.
+   */
+  private async *executeStreamGenerator(
+    params: {
+      systemPrompt: string;
+      history: ConversationTurn[];
+      userMessage: string;
+      tools?: ToolDefinition[];
+      signal?: AbortSignal;
+    },
+    _isRetry: boolean,
+  ): AsyncGenerator<
+    TextChunk | ToolCall,
+    { text: string; toolCalls: ToolCall[]; usage: TokenUsage }
+  > {
     const adapter = this._adapter;
 
     // Format conversation history via the adapter.
@@ -727,6 +818,7 @@ export class LLMOrchestrator {
         }
         this.callbacks.onChunk?.(chunk);
       }
+      yield item;
     }
 
     // Always emit a final "done" chunk to signal stream completion,
@@ -759,6 +851,8 @@ export class LLMOrchestrator {
    *
    * Built-in providers:
    * - `'gemini'` — uses the bundled `GeminiAdapter`.
+   * - `'openai'` — uses the bundled `OpenAIAdapter`.
+   * - `'anthropic'` — uses the bundled `AnthropicAdapter`.
    *
    * Custom adapters:
    * - Pass `{ adapter: myAdapter }` to use any `LLMProviderAdapter`.
@@ -774,6 +868,10 @@ export class LLMOrchestrator {
     switch (config.provider) {
       case 'gemini':
         return new GeminiAdapter(config);
+      case 'openai':
+        return new OpenAIAdapter(config);
+      case 'anthropic':
+        return new AnthropicAdapter(config);
       default:
         throw new Error(
           `LLM provider "${(config as { provider: string }).provider}" is not yet supported. ` +
@@ -795,3 +893,12 @@ export class LLMOrchestrator {
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Re-exports
+// ---------------------------------------------------------------------------
+
+export { OpenAIAdapter } from './openai-adapter.js';
+export type { OpenAIAdapterConfig } from './openai-adapter.js';
+export { AnthropicAdapter } from './anthropic-adapter.js';
+export type { AnthropicAdapterConfig } from './anthropic-adapter.js';

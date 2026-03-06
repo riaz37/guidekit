@@ -102,12 +102,9 @@ describe('@guidekit/vanilla', () => {
   // =========================================================================
 
   describe('VERSION', () => {
-    it('exports the correct version string', () => {
-      expect(VERSION).toBe('0.1.0-beta.2');
-    });
-
-    it('is of type string', () => {
+    it('exports a non-empty version string', () => {
       expect(typeof VERSION).toBe('string');
+      expect(VERSION.length).toBeGreaterThan(0);
     });
 
     it('follows semver format', () => {

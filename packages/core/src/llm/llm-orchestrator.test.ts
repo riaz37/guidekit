@@ -384,7 +384,7 @@ describe('LLMOrchestrator', () => {
         () =>
           new LLMOrchestrator({
             // @ts-expect-error -- intentionally passing unsupported provider
-            config: { provider: 'anthropic', apiKey: 'test-key' },
+            config: { provider: 'cohere', apiKey: 'test-key' },
           }),
       ).toThrow('not yet supported');
     });
@@ -632,6 +632,191 @@ describe('LLMOrchestrator', () => {
 
       // Adapter instance should be different
       expect(orchestrator.adapter).not.toBe(originalAdapter);
+    });
+  });
+
+  describe('sendMessageStream()', () => {
+    it('yields text chunks in order', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        createMockSSEResponse([
+          geminiTextChunk('Hello '),
+          geminiTextChunk('world'),
+          geminiTextChunk('!', 'STOP'),
+          geminiUsageChunk(10, 5, 15),
+        ]),
+      );
+
+      const orchestrator = createOrchestrator();
+      const gen = orchestrator.sendMessageStream({
+        systemPrompt: 'You are helpful.',
+        history: [],
+        userMessage: 'Hi',
+        tools: [],
+      });
+
+      const chunks: Array<{ text?: string; done?: boolean }> = [];
+      let result = await gen.next();
+      while (!result.done) {
+        chunks.push(result.value as { text?: string; done?: boolean });
+        result = await gen.next();
+      }
+
+      // Verify text chunks arrived in order
+      const textChunks = chunks.filter(
+        (c): c is { text: string; done: boolean } => 'text' in c && typeof c.text === 'string',
+      );
+      expect(textChunks.length).toBeGreaterThanOrEqual(3);
+      expect(textChunks[0]!.text).toBe('Hello ');
+      expect(textChunks[1]!.text).toBe('world');
+      expect(textChunks[2]!.text).toBe('!');
+    });
+
+    it('yields tool calls within stream', async () => {
+      const fnCallChunk = JSON.stringify({
+        candidates: [
+          {
+            content: {
+              parts: [
+                { text: 'Let me highlight that. ' },
+                {
+                  functionCall: {
+                    name: 'highlight',
+                    args: { selector: '#hero' },
+                  },
+                },
+              ],
+              role: 'model',
+            },
+          },
+        ],
+      });
+
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        createMockSSEResponse([fnCallChunk, geminiUsageChunk(50, 30, 80)]),
+      );
+
+      const orchestrator = createOrchestrator();
+      const gen = orchestrator.sendMessageStream({
+        systemPrompt: 'System',
+        history: [],
+        userMessage: 'Highlight the hero',
+        tools: mockTools,
+      });
+
+      const textChunks: Array<{ text: string; done: boolean }> = [];
+      const toolCallChunks: Array<{ id: string; name: string; arguments: Record<string, unknown> }> = [];
+
+      let result = await gen.next();
+      while (!result.done) {
+        const item = result.value;
+        if ('name' in item && 'arguments' in item) {
+          toolCallChunks.push(item as { id: string; name: string; arguments: Record<string, unknown> });
+        } else {
+          textChunks.push(item as { text: string; done: boolean });
+        }
+        result = await gen.next();
+      }
+
+      // Verify text chunk was yielded
+      expect(textChunks.some((c) => c.text === 'Let me highlight that. ')).toBe(true);
+
+      // Verify tool call was yielded
+      expect(toolCallChunks).toHaveLength(1);
+      expect(toolCallChunks[0]!.name).toBe('highlight');
+      expect(toolCallChunks[0]!.arguments).toEqual({ selector: '#hero' });
+    });
+
+    it('returns accumulated result on completion', async () => {
+      const fnCallChunk = JSON.stringify({
+        candidates: [
+          {
+            content: {
+              parts: [
+                { text: 'Sure, ' },
+                {
+                  functionCall: {
+                    name: 'scrollToSection',
+                    args: { sectionId: 'about' },
+                  },
+                },
+              ],
+              role: 'model',
+            },
+          },
+        ],
+      });
+
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        createMockSSEResponse([
+          geminiTextChunk('Hello '),
+          fnCallChunk,
+          geminiUsageChunk(100, 50, 150),
+        ]),
+      );
+
+      const orchestrator = createOrchestrator();
+      const gen = orchestrator.sendMessageStream({
+        systemPrompt: 'System',
+        history: [],
+        userMessage: 'Scroll and greet',
+        tools: mockTools,
+      });
+
+      // Consume the entire generator
+      let result = await gen.next();
+      while (!result.done) {
+        result = await gen.next();
+      }
+
+      // The return value should have accumulated text, tool calls, and usage
+      const returnValue = result.value;
+      expect(returnValue.text).toContain('Hello ');
+      expect(returnValue.text).toContain('Sure, ');
+      expect(returnValue.toolCalls).toHaveLength(1);
+      expect(returnValue.toolCalls[0]!.name).toBe('scrollToSection');
+      expect(returnValue.usage).toEqual({ prompt: 100, completion: 50, total: 150 });
+    });
+
+    it('handles content filter retry with streaming', async () => {
+      let callCount = 0;
+
+      globalThis.fetch = vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          // First call returns content-filtered response
+          return Promise.resolve(createMockSSEResponse([geminiFilteredChunk()]));
+        }
+        // Retry call (without tools) returns normal response
+        return Promise.resolve(
+          createMockSSEResponse([
+            geminiTextChunk('Safe response'),
+            geminiUsageChunk(10, 5, 15),
+          ]),
+        );
+      });
+
+      const orchestrator = createOrchestrator();
+      const gen = orchestrator.sendMessageStream({
+        systemPrompt: 'System',
+        history: [],
+        userMessage: 'Hello',
+        tools: mockTools,
+      });
+
+      // Consume the generator
+      const chunks: Array<{ text?: string; done?: boolean }> = [];
+      let result = await gen.next();
+      while (!result.done) {
+        chunks.push(result.value as { text?: string; done?: boolean });
+        result = await gen.next();
+      }
+
+      // Should have retried (2 fetch calls)
+      expect(callCount).toBe(2);
+
+      // The return value should contain the safe response text
+      const returnValue = result.value;
+      expect(returnValue.text).toContain('Safe response');
     });
   });
 });

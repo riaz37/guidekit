@@ -1,7 +1,11 @@
 // @guidekit/vad — Silero VAD ONNX model wrapper for voice activity detection
 import * as ort from 'onnxruntime-web';
 
-export const VAD_VERSION = '0.1.0-beta.2';
+// Suppress harmless "Unknown CPU vendor" warning from ONNX Runtime WASM backend
+// (fires on Apple Silicon / ARM where cpuinfo_vendor is unrecognised).
+ort.env.logLevel = 'error';
+
+export const VAD_VERSION = '0.1.0-beta.3';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -256,7 +260,7 @@ export class SileroVAD {
     }
 
     const inputTensor = new ort.Tensor('float32', audioData, [1, FRAME_SIZE]);
-    const srTensor = new ort.Tensor('int64', BigInt64Array.from([BigInt(this._sampleRate)]), [1]);
+    const srTensor = new ort.Tensor('int64', BigInt64Array.from([BigInt(this._sampleRate)]), []);
 
     const feeds: Record<string, ort.Tensor> = {
       input: inputTensor,
@@ -266,8 +270,10 @@ export class SileroVAD {
 
     const results = await this._session.run(feeds);
 
-    // Update LSTM state for the next frame.
+    // Update LSTM state for the next frame (dispose the old tensor to free memory).
+    const oldState = this._state;
     this._state = results['stateN'] as ort.Tensor;
+    oldState?.dispose();
 
     const probability = (results['output'] as ort.Tensor).data[0] as number;
     return probability;

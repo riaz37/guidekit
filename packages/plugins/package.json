@@ -1,0 +1,33 @@
+{
+  "name": "@guidekit/plugins",
+  "version": "1.0.0",
+  "description": "Plugin system for GuideKit SDK",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run --root ../.. --config vitest.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@guidekit/core": "workspace:^"
+  },
+  "devDependencies": {
+    "@guidekit/core": "workspace:^"
+  }
+}

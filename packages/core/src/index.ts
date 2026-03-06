@@ -29,6 +29,9 @@ export {
   TimeoutError,
   BrowserSupportError,
   ContentFilterError,
+  KnowledgeError,
+  PluginError,
+  CognitiveError,
   isGuideKitError,
 } from './errors/index.js';
 export type { ErrorCode, Provider, GuideKitErrorOptions } from './errors/index.js';
@@ -44,6 +47,13 @@ export type {
   FormSummary,
   OverlayElement,
   PageModel,
+  ComponentNode,
+  FlowState,
+  PageErrorState,
+  HeadingNode,
+  HallucinationIssue,
+  HallucinationResult,
+  SemanticPageModel,
   AgentState,
   STTConfig,
   TTSConfig,
@@ -68,6 +78,29 @@ export type {
   TokenResponse,
   CreateSessionTokenOptions,
   GuideKitStore,
+  StreamResult,
+  TextStream,
+  ToolParameterSchema,
+  STTTranscriptEvent,
+  PluginMetadata,
+  MiddlewareFunction,
+  BeforeLLMCallCtx,
+  AfterLLMCallCtx,
+  BeforeToolExecCtx,
+  AfterToolExecCtx,
+  OnErrorCtx,
+  PluginHooks,
+  PluginContext,
+  PluginDefinition,
+  KnowledgeDocument,
+  KnowledgeChunk,
+  SearchResult,
+  SourceAttribution,
+  ChunkStrategy,
+  ChunkerOptions,
+  SearchEngine,
+  KnowledgeStoreOptions,
+  KnowledgeSearchOptions,
 } from './types/index.js';
 
 // Resources
@@ -79,11 +112,13 @@ export { DOMScanner } from './dom/index.js';
 export type { DOMScannerOptions } from './dom/index.js';
 
 // Context
-export { ContextManager } from './context/index.js';
+export { ContextManager, estimateTokens } from './context/index.js';
 export type { ContextManagerOptions } from './context/index.js';
 
 // LLM
-export { LLMOrchestrator, GeminiAdapter } from './llm/index.js';
+export { LLMOrchestrator, GeminiAdapter, OpenAIAdapter, AnthropicAdapter } from './llm/index.js';
+export type { OpenAIAdapterConfig } from './llm/openai-adapter.js';
+export type { AnthropicAdapterConfig } from './llm/anthropic-adapter.js';
 
 // Tool Executor
 export { ToolExecutor } from './llm/tool-executor.js';
@@ -102,6 +137,12 @@ export type {
   TooltipOptions,
   SpotlightState,
 } from './visual/index.js';
+
+// Rendering
+export { MarkdownRenderer, defaultMarkdownRenderer, MARKDOWN_CSS } from './rendering/markdown-renderer.js';
+
+// Theme
+export { ThemeEngine, LIGHT_TOKENS, DARK_TOKENS } from './rendering/theme-engine.js';
 
 // Connectivity
 export { ConnectionManager } from './connectivity/index.js';

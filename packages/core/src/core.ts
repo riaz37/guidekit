@@ -35,6 +35,8 @@ import type {
   GuideKitEvent,
   AgentState,
   GuideKitStore,
+  TextStream,
+  StreamResult,
 } from './types/index.js';
 import { GuideKitError, ConfigurationError, ErrorCodes } from './errors/index.js';
 
@@ -156,6 +158,8 @@ export class GuideKitCore {
   private readonly _options: GuideKitCoreOptions;
   private _debug: boolean;
   private _sendInFlight = false;
+  private _isStreaming = false;
+  private _streamingText = '';
   private _instanceAbortController = new AbortController();
   private _initPromise: Promise<void> | null = null;
 
@@ -199,6 +203,12 @@ export class GuideKitCore {
       contentMap: options.contentMap,
       debug: this._debug,
     });
+
+    // Sync initial mode → userPreference so the system prompt is voice-aware
+    const mode = options.options?.mode;
+    if (mode === 'voice' || mode === 'text') {
+      this.contextManager.userPreference = mode;
+    }
 
     // Create RateLimiter (no browser APIs)
     this.rateLimiter = new RateLimiter({
@@ -570,11 +580,26 @@ export class GuideKitCore {
   }
 
   // -------------------------------------------------------------------------
-  // sendText — send a text message to the LLM
+  // sendText — send a text message to the LLM (delegates to sendTextStream)
   // -------------------------------------------------------------------------
 
-  async sendText(message_: string): Promise<string> {
-    let message = message_;
+  async sendText(message: string): Promise<string> {
+    const { stream, done } = this.sendTextStream(message);
+    // Prevent unhandled rejection on the done promise if the stream throws.
+    done.catch(() => {});
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    for await (const _ of stream) { /* consume to drive completion */ }
+    const result = await done;
+    return result.fullText;
+  }
+
+  // -------------------------------------------------------------------------
+  // sendTextStream — streaming text message to the LLM
+  // -------------------------------------------------------------------------
+
+  sendTextStream(message_: string): TextStream {
+    // ---- Synchronous validations (throw before returning) ----------------
+
     if (!this._isReady || !this.llmOrchestrator) {
       throw new ConfigurationError({
         code: ErrorCodes.CONFIG_MISSING_REQUIRED,
@@ -592,7 +617,6 @@ export class GuideKitCore {
         suggestion: 'Await the previous sendText() call before sending another message.',
       });
     }
-    this._sendInFlight = true;
 
     const maxLen = this._options.options?.maxMessageLength ?? 10_000;
     if (message_.length > maxLen) {
@@ -607,121 +631,190 @@ export class GuideKitCore {
     // Check rate limits before proceeding
     this.rateLimiter.checkLLMCall();
 
-    // Update agent state
-    this.setAgentState({ status: 'processing', transcript: message });
+    // Set _sendInFlight synchronously to prevent concurrent calls.
+    this._sendInFlight = true;
 
-    // Add user turn
-    this.contextManager.addTurn({
-      role: 'user',
-      content: message,
-      timestamp: Date.now(),
+    // ---- Deferred promise for the done signal ----------------------------
+
+    let resolveDone!: (result: StreamResult) => void;
+    let rejectDone!: (error: Error) => void;
+    const done = new Promise<StreamResult>((resolve, reject) => {
+      resolveDone = resolve;
+      rejectDone = reject;
     });
 
-    // Build system prompt
-    let systemPrompt = this.contextManager.buildSystemPrompt(
-      this._currentPageModel!,
-      this.getToolDefinitions(),
-    );
+    // Capture references for the generator closure.
+    const self = this;
+    const llmOrchestrator = this.llmOrchestrator;
 
-    // Privacy hook — allow developer to scrub PII before LLM call
-    if (this._options.onBeforeLLMCall) {
+    async function* generate(): AsyncGenerator<string> {
+      let message = message_;
+      let responseText = '';
+      let totalTokens = 0;
+      let toolCallsExecuted = 0;
+      let rounds = 0;
+
       try {
-        const ctx = await this._options.onBeforeLLMCall({
-          systemPrompt,
-          userMessage: message,
-          conversationHistory: this.contextManager
-            .getHistory()
-            .map((t) => ({ role: t.role, content: t.content })),
+        self._isStreaming = true;
+        self._streamingText = '';
+        self.notifyStoreListeners();
+
+        // Update agent state
+        self.setAgentState({ status: 'processing', transcript: message });
+
+        // Add user turn
+        self.contextManager.addTurn({
+          role: 'user',
+          content: message,
+          timestamp: Date.now(),
         });
-        systemPrompt = ctx.systemPrompt;
-        message = ctx.userMessage;
-      } catch (hookErr) {
-        // Hook threw — cancel the LLM call
-        this.setAgentState({ status: 'idle' });
-        const err =
-          hookErr instanceof GuideKitError
-            ? hookErr
-            : new GuideKitError({
-                code: ErrorCodes.PRIVACY_HOOK_CANCELLED,
-                message:
-                  hookErr instanceof Error
-                    ? hookErr.message
-                    : 'onBeforeLLMCall hook cancelled the request.',
-                recoverable: true,
-                suggestion: 'Check your onBeforeLLMCall implementation.',
-              });
-        this.bus.emit('error', err);
-        throw err;
-      }
-    }
 
-    const conversationId = generateUUID();
-    this.bus.emit('llm:response-start', { conversationId });
+        // Build system prompt
+        let systemPrompt = self.contextManager.buildSystemPrompt(
+          self._currentPageModel!,
+          self.getToolDefinitions(),
+        );
 
-    try {
-      let responseText: string;
-      let totalTokens: number;
-
-      // Use multi-turn ToolExecutor if available, else single-turn
-      if (this.toolExecutor) {
-        const result = await this.toolExecutor.executeWithTools({
-          llm: this.llmOrchestrator,
-          systemPrompt,
-          history: this.contextManager.getHistory().slice(0, -1),
-          userMessage: message,
-          tools: this.getToolDefinitions(),
-          signal: this._instanceAbortController.signal,
-        });
-        responseText = result.text;
-        totalTokens = result.totalUsage.total;
-      } else {
-        const result = await this.llmOrchestrator.sendMessage({
-          systemPrompt,
-          history: this.contextManager.getHistory().slice(0, -1),
-          userMessage: message,
-          tools: this.getToolDefinitions(),
-          signal: this._instanceAbortController.signal,
-        });
-        responseText = result.text;
-        totalTokens = result.usage.total;
-      }
-
-      // Add assistant turn
-      this.contextManager.addTurn({
-        role: 'assistant',
-        content: responseText,
-        timestamp: Date.now(),
-      });
-
-      // Save session
-      this.contextManager.saveSession();
-
-      this.bus.emit('llm:response-end', {
-        conversationId,
-        totalTokens,
-      });
-
-      this.setAgentState({ status: 'idle' });
-
-      return responseText;
-    } catch (error) {
-      const err =
-        error instanceof GuideKitError
-          ? error
-          : new GuideKitError({
-              code: ErrorCodes.UNKNOWN,
-              message:
-                error instanceof Error ? error.message : 'Unknown error',
-              recoverable: false,
-              suggestion: 'Check the console for details.',
+        // Privacy hook — allow developer to scrub PII before LLM call
+        if (self._options.onBeforeLLMCall) {
+          try {
+            const ctx = await self._options.onBeforeLLMCall({
+              systemPrompt,
+              userMessage: message,
+              conversationHistory: self.contextManager
+                .getHistory()
+                .map((t) => ({ role: t.role, content: t.content })),
             });
+            systemPrompt = ctx.systemPrompt;
+            message = ctx.userMessage;
+          } catch (hookErr) {
+            // Hook threw — cancel the LLM call
+            self.setAgentState({ status: 'idle' });
+            const err =
+              hookErr instanceof GuideKitError
+                ? hookErr
+                : new GuideKitError({
+                    code: ErrorCodes.PRIVACY_HOOK_CANCELLED,
+                    message:
+                      hookErr instanceof Error
+                        ? hookErr.message
+                        : 'onBeforeLLMCall hook cancelled the request.',
+                    recoverable: true,
+                    suggestion: 'Check your onBeforeLLMCall implementation.',
+                  });
+            self.bus.emit('error', err);
+            throw err;
+          }
+        }
 
-      this.setAgentState({ status: 'error', error: err });
-      this.bus.emit('error', err);
-      throw err;
-    } finally {
-      this._sendInFlight = false;
+        const conversationId = generateUUID();
+        self.bus.emit('llm:response-start', { conversationId });
+
+        // Use multi-turn ToolExecutor streaming if available, else single-turn
+        if (self.toolExecutor) {
+          const gen = self.toolExecutor.executeWithToolsStream({
+            llm: llmOrchestrator,
+            systemPrompt,
+            history: self.contextManager.getHistory().slice(0, -1),
+            userMessage: message,
+            tools: self.getToolDefinitions(),
+            signal: self._instanceAbortController.signal,
+          });
+
+          let streamResult = await gen.next();
+          while (!streamResult.done) {
+            const chunk = streamResult.value;
+            responseText += chunk;
+            self._streamingText = responseText;
+            self.notifyStoreListeners();
+            yield chunk;
+            streamResult = await gen.next();
+          }
+
+          const result = streamResult.value;
+          totalTokens = result.totalUsage.total;
+          toolCallsExecuted = result.toolCallsExecuted.length;
+          rounds = result.rounds;
+        } else {
+          const gen = llmOrchestrator.sendMessageStream({
+            systemPrompt,
+            history: self.contextManager.getHistory().slice(0, -1),
+            userMessage: message,
+            tools: self.getToolDefinitions(),
+            signal: self._instanceAbortController.signal,
+          });
+
+          let streamResult = await gen.next();
+          while (!streamResult.done) {
+            const item = streamResult.value;
+            if ('text' in item && typeof item.text === 'string' && item.text) {
+              responseText += item.text;
+              self._streamingText = responseText;
+              self.notifyStoreListeners();
+              yield item.text;
+            }
+            streamResult = await gen.next();
+          }
+
+          const result = streamResult.value;
+          totalTokens = result.usage.total;
+          rounds = 1;
+        }
+
+        // Add assistant turn
+        self.contextManager.addTurn({
+          role: 'assistant',
+          content: responseText,
+          timestamp: Date.now(),
+        });
+
+        // Save session
+        self.contextManager.saveSession();
+
+        self.bus.emit('llm:response-end', {
+          conversationId,
+          totalTokens,
+        });
+
+        self.setAgentState({ status: 'idle' });
+
+        resolveDone({
+          fullText: responseText,
+          totalTokens,
+          toolCallsExecuted,
+          rounds,
+        });
+      } catch (error) {
+        const err =
+          error instanceof GuideKitError
+            ? error
+            : new GuideKitError({
+                code: ErrorCodes.UNKNOWN,
+                message:
+                  error instanceof Error ? error.message : 'Unknown error',
+                recoverable: false,
+                suggestion: 'Check the console for details.',
+              });
+
+        // Privacy hook errors already set state to 'idle' and emitted 'error';
+        // avoid overwriting the state or double-emitting.
+        const isPrivacyHookError =
+          err instanceof GuideKitError &&
+          (err.code === ErrorCodes.PRIVACY_HOOK_CANCELLED || self._agentState.status === 'idle');
+        if (!isPrivacyHookError) {
+          self.setAgentState({ status: 'error', error: err });
+          self.bus.emit('error', err);
+        }
+        rejectDone(err);
+      } finally {
+        self._sendInFlight = false;
+        self._isStreaming = false;
+        self._streamingText = '';
+        self.notifyStoreListeners();
+      }
     }
+
+    return { stream: generate(), done };
   }
 
   // -------------------------------------------------------------------------
@@ -1033,6 +1126,10 @@ export class GuideKitCore {
       voice: {
         isListening: this._agentState.status === 'listening',
         isSpeaking: this._agentState.status === 'speaking',
+      },
+      streaming: {
+        isStreaming: this._isStreaming,
+        streamingText: this._streamingText,
       },
     };
   }

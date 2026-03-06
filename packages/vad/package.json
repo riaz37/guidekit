@@ -1,6 +1,6 @@
 {
   "name": "@guidekit/vad",
-  "version": "0.1.0-beta.3",
+  "version": "0.1.0",
   "description": "Silero VAD model for GuideKit SDK — voice activity detection via ONNX Runtime",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -22,8 +22,8 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "test": "echo 'No tests yet'",
-    "test:unit": "echo 'No tests yet'",
+    "test": "vitest run",
+    "test:unit": "vitest run",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },

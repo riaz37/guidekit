@@ -15,6 +15,7 @@
  * - Respects prefers-reduced-motion.
  */
 
+import { computePosition, autoUpdate, flip, shift, offset, arrow as arrowMiddleware, type Placement } from '@floating-ui/dom';
 import { DOMScanner } from '../dom/index.js';
 
 // ---------------------------------------------------------------------------
@@ -60,8 +61,6 @@ export interface SpotlightState {
   sectionId: string | null;
   tooltip: string | null;
 }
-
-type TooltipPosition = 'top' | 'bottom' | 'left' | 'right';
 
 // ---------------------------------------------------------------------------
 // Utility: Scrollable ancestor detection
@@ -139,6 +138,9 @@ export class VisualGuidance {
 
   // DOMScanner for resolving sectionIds
   private domScanner: DOMScanner | null = null;
+
+  // Floating-UI auto-update cleanup
+  private floatingCleanup: (() => void) | null = null;
 
   // Track whether destroy() has been called
   private destroyed = false;
@@ -449,7 +451,11 @@ export class VisualGuidance {
     }
     this.spotlightEl = null;
 
-    // Remove tooltip
+    // Remove floating-ui cleanup and tooltip
+    if (this.floatingCleanup) {
+      this.floatingCleanup();
+      this.floatingCleanup = null;
+    }
     this.removeTooltip();
 
     // Remove live region
@@ -713,6 +719,12 @@ export class VisualGuidance {
   ): void {
     if (typeof document === 'undefined') return;
 
+    // Clean up any previous floating-ui auto-update
+    if (this.floatingCleanup) {
+      this.floatingCleanup();
+      this.floatingCleanup = null;
+    }
+
     // Create or reuse tooltip element
     if (!this.tooltipEl) {
       const tooltip = document.createElement('div');
@@ -757,13 +769,46 @@ export class VisualGuidance {
       target.setAttribute('aria-describedby', tooltipId);
     }
 
-    // Position the tooltip
-    const rect = target.getBoundingClientRect();
-    const position = positionPref === 'auto'
-      ? this.computeAutoPosition(rect)
-      : positionPref;
+    // Create arrow element
+    const arrowEl = document.createElement('div');
+    arrowEl.setAttribute('data-guidekit-arrow', 'true');
+    arrowEl.setAttribute('aria-hidden', 'true');
+    arrowEl.style.cssText = 'position: absolute; width: 16px; height: 16px; background: #ffffff; transform: rotate(45deg);';
+    this.tooltipEl.appendChild(arrowEl);
 
-    this.positionTooltip(rect, position);
+    // Use @floating-ui/dom for positioning
+    const placement: Placement = positionPref === 'auto' ? 'bottom' : positionPref;
+
+    this.floatingCleanup = autoUpdate(target as HTMLElement, this.tooltipEl, () => {
+      computePosition(target as HTMLElement, this.tooltipEl!, {
+        placement,
+        middleware: [
+          offset(TOOLTIP_MARGIN + TOOLTIP_ARROW_SIZE),
+          flip(),
+          shift({ padding: 8 }),
+          arrowMiddleware({ element: arrowEl }),
+        ],
+      }).then(({ x, y, placement: finalPlacement, middlewareData }) => {
+        if (!this.tooltipEl) return;
+        Object.assign(this.tooltipEl.style, {
+          left: `${x}px`,
+          top: `${y}px`,
+        });
+
+        // Position arrow
+        const arrowData = middlewareData.arrow;
+        if (arrowData) {
+          const staticSide = { top: 'bottom', right: 'left', bottom: 'top', left: 'right' }[finalPlacement.split('-')[0]!]!;
+          Object.assign(arrowEl.style, {
+            left: arrowData.x != null ? `${arrowData.x}px` : '',
+            top: arrowData.y != null ? `${arrowData.y}px` : '',
+            [staticSide]: '-4px',
+          });
+        }
+
+        this.tooltipEl.setAttribute('data-guidekit-position', finalPlacement);
+      });
+    });
 
     // Animate in
     void this.tooltipEl.offsetHeight;
@@ -774,6 +819,10 @@ export class VisualGuidance {
    * Remove the tooltip element from the DOM.
    */
   private removeTooltip(): void {
+    if (this.floatingCleanup) {
+      this.floatingCleanup();
+      this.floatingCleanup = null;
+    }
     if (this.tooltipEl?.parentNode) {
       this.tooltipEl.parentNode.removeChild(this.tooltipEl);
     }
@@ -787,184 +836,6 @@ export class VisualGuidance {
     if (this.currentTargetElement instanceof HTMLElement) {
       this.currentTargetElement.removeAttribute('aria-describedby');
     }
-  }
-
-  /**
-   * Compute the best auto-position for the tooltip relative to the target rect.
-   * Preference order: bottom, top, right, left.
-   */
-  private computeAutoPosition(rect: DOMRect): TooltipPosition {
-    if (typeof window === 'undefined') return 'bottom';
-
-    const viewportHeight = window.innerHeight;
-    const viewportWidth = window.innerWidth;
-
-    const spaceBelow = viewportHeight - rect.bottom;
-    const spaceAbove = rect.top;
-    const spaceRight = viewportWidth - rect.right;
-    const spaceLeft = rect.left;
-
-    const minSpace = 80; // Minimum space needed for tooltip
-
-    // Prefer bottom
-    if (spaceBelow >= minSpace) return 'bottom';
-    // Then top
-    if (spaceAbove >= minSpace) return 'top';
-    // Then right
-    if (spaceRight >= minSpace) return 'right';
-    // Then left
-    if (spaceLeft >= minSpace) return 'left';
-
-    // Default to bottom even if tight
-    return 'bottom';
-  }
-
-  /**
-   * Position the tooltip element relative to the target rect.
-   */
-  private positionTooltip(rect: DOMRect, position: TooltipPosition): void {
-    if (!this.tooltipEl || typeof window === 'undefined') return;
-
-    const pad = this.spotlightPadding;
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    // We need the tooltip's dimensions. Force layout to measure.
-    this.tooltipEl.style.left = '0px';
-    this.tooltipEl.style.top = '0px';
-    const tooltipRect = this.tooltipEl.getBoundingClientRect();
-    const tw = tooltipRect.width;
-    const th = tooltipRect.height;
-
-    let left = 0;
-    let top = 0;
-
-    switch (position) {
-      case 'bottom':
-        left = rect.left + rect.width / 2 - tw / 2;
-        top = rect.bottom + pad + TOOLTIP_ARROW_SIZE + TOOLTIP_MARGIN;
-        break;
-      case 'top':
-        left = rect.left + rect.width / 2 - tw / 2;
-        top = rect.top - pad - th - TOOLTIP_ARROW_SIZE - TOOLTIP_MARGIN;
-        break;
-      case 'right':
-        left = rect.right + pad + TOOLTIP_ARROW_SIZE + TOOLTIP_MARGIN;
-        top = rect.top + rect.height / 2 - th / 2;
-        break;
-      case 'left':
-        left = rect.left - pad - tw - TOOLTIP_ARROW_SIZE - TOOLTIP_MARGIN;
-        top = rect.top + rect.height / 2 - th / 2;
-        break;
-    }
-
-    // Clamp within viewport
-    left = Math.max(8, Math.min(left, viewportWidth - tw - 8));
-    top = Math.max(8, Math.min(top, viewportHeight - th - 8));
-
-    this.tooltipEl.style.left = `${left}px`;
-    this.tooltipEl.style.top = `${top}px`;
-
-    // Remove any existing arrow pseudo-element styling (via data attribute)
-    this.tooltipEl.setAttribute('data-guidekit-position', position);
-
-    // Apply arrow using a CSS trick with box-shadow on a pseudo :before
-    // Since we can't use CSS stylesheets easily, we inline arrow via border trick
-    this.applyTooltipArrow(position, rect);
-  }
-
-  /**
-   * Apply an arrow on the tooltip pointing toward the target element.
-   * Uses a child div with CSS border triangle technique.
-   */
-  private applyTooltipArrow(position: TooltipPosition, targetRect: DOMRect): void {
-    if (!this.tooltipEl) return;
-
-    // Remove any existing arrow
-    const existingArrow = this.tooltipEl.querySelector('[data-guidekit-arrow]');
-    if (existingArrow) {
-      existingArrow.remove();
-    }
-
-    const arrow = document.createElement('div');
-    arrow.setAttribute('data-guidekit-arrow', 'true');
-    arrow.setAttribute('aria-hidden', 'true');
-
-    const size = TOOLTIP_ARROW_SIZE;
-    const baseStyle = [
-      'position: absolute',
-      'width: 0',
-      'height: 0',
-      'border-style: solid',
-    ];
-
-    switch (position) {
-      case 'bottom':
-        arrow.style.cssText = [
-          ...baseStyle,
-          `border-width: 0 ${size}px ${size}px ${size}px`,
-          `border-color: transparent transparent #ffffff transparent`,
-          `top: -${size}px`,
-          `left: 50%`,
-          `margin-left: -${size}px`,
-        ].join('; ');
-        // Adjust arrow horizontal position to point at target center
-        this.adjustArrowHorizontal(arrow, targetRect, size);
-        break;
-      case 'top':
-        arrow.style.cssText = [
-          ...baseStyle,
-          `border-width: ${size}px ${size}px 0 ${size}px`,
-          `border-color: #ffffff transparent transparent transparent`,
-          `bottom: -${size}px`,
-          `left: 50%`,
-          `margin-left: -${size}px`,
-        ].join('; ');
-        this.adjustArrowHorizontal(arrow, targetRect, size);
-        break;
-      case 'right':
-        arrow.style.cssText = [
-          ...baseStyle,
-          `border-width: ${size}px ${size}px ${size}px 0`,
-          `border-color: transparent #ffffff transparent transparent`,
-          `left: -${size}px`,
-          `top: 50%`,
-          `margin-top: -${size}px`,
-        ].join('; ');
-        break;
-      case 'left':
-        arrow.style.cssText = [
-          ...baseStyle,
-          `border-width: ${size}px 0 ${size}px ${size}px`,
-          `border-color: transparent transparent transparent #ffffff`,
-          `right: -${size}px`,
-          `top: 50%`,
-          `margin-top: -${size}px`,
-        ].join('; ');
-        break;
-    }
-
-    this.tooltipEl.appendChild(arrow);
-  }
-
-  /**
-   * Adjust arrow horizontal position so it points toward the target center
-   * even when the tooltip is clamped to viewport edges.
-   */
-  private adjustArrowHorizontal(arrow: HTMLDivElement, targetRect: DOMRect, size: number): void {
-    if (!this.tooltipEl) return;
-
-    const tooltipRect = this.tooltipEl.getBoundingClientRect();
-    const targetCenter = targetRect.left + targetRect.width / 2;
-    const arrowLeft = targetCenter - tooltipRect.left;
-
-    // Clamp arrow within tooltip bounds
-    const minLeft = size + 4;
-    const maxLeft = tooltipRect.width - size - 4;
-    const clampedLeft = Math.max(minLeft, Math.min(arrowLeft, maxLeft));
-
-    arrow.style.left = `${clampedLeft}px`;
-    arrow.style.marginLeft = `0`;
   }
 
   // -------------------------------------------------------------------------
@@ -1060,10 +931,7 @@ export class VisualGuidance {
       this.positionSpotlight(rect);
     }
 
-    if (this.tooltipEl && this._state.tooltip) {
-      const position = this.tooltipEl.getAttribute('data-guidekit-position') as TooltipPosition | null;
-      this.positionTooltip(rect, position ?? 'bottom');
-    }
+    // Tooltip repositioning is handled automatically by @floating-ui/dom autoUpdate
   }
 
   // -------------------------------------------------------------------------

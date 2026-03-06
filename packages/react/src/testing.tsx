@@ -38,6 +38,10 @@ const DEFAULT_STORE: GuideKitStore = {
     isListening: false,
     isSpeaking: false,
   },
+  streaming: {
+    isStreaming: false,
+    streamingText: '',
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -59,6 +63,10 @@ export class TestStore {
       voice: {
         isListening: false,
         isSpeaking: false,
+      },
+      streaming: {
+        isStreaming: false,
+        streamingText: '',
       },
     };
   }
@@ -127,6 +135,7 @@ export interface MockInitialState {
 /** Mock action implementations to inject into the provider. */
 export interface MockActions {
   sendText?: (text: string) => Promise<string>;
+  sendTextStream?: (text: string) => { stream: AsyncIterable<string>; done: Promise<{ fullText: string; totalTokens: number; toolCallsExecuted: number; rounds: number }> };
   highlight?: (params: {
     sectionId?: string;
     selector?: string;
@@ -225,6 +234,10 @@ export function MockGuideKitProvider({
 
       // Actions
       sendText: actions?.sendText ?? noopAsyncString,
+      sendTextStream: actions?.sendTextStream ?? (() => ({
+        stream: (async function* () { /* empty stream */ })(),
+        done: Promise.resolve({ fullText: '', totalTokens: 0, toolCallsExecuted: 0, rounds: 0 }),
+      })),
       highlight: actions?.highlight ?? noopVoid,
       dismissHighlight: actions?.dismissHighlight ?? noopVoid,
       scrollToSection: actions?.scrollToSection ?? noopVoid,

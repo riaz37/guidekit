@@ -25,7 +25,7 @@ import type {
 const SESSION_STORAGE_KEY = 'guidekit:session';
 const DEFAULT_MAX_TURNS = 20;
 const DEFAULT_MAX_SESSION_SIZE_BYTES = 50_000; // 50 KB
-const DEFAULT_TOKEN_BUDGET = 6_000; // ~1 500 tokens
+const DEFAULT_TOKEN_BUDGET = 4_000; // estimated tokens
 const CONTENT_MAP_TIMEOUT_MS = 2_000;
 const CONTENT_CACHE_TTL_MS = 30_000; // 30 seconds
 
@@ -94,6 +94,26 @@ function hasSessionStorage(): boolean {
   }
 }
 
+/**
+ * Estimate the number of LLM tokens in a string without a full tokeniser.
+ *
+ * - ASCII-heavy text: roughly 4 characters per token.
+ * - CJK characters (Chinese, Japanese, Korean): each ideograph is ~1.5 tokens.
+ *
+ * This avoids pulling in js-tiktoken (3.3 MB) while giving a much better
+ * approximation than raw character count.
+ */
+// eslint-disable-next-line no-irregular-whitespace -- CJK ranges are intentional
+const CJK_RE =
+  /[\u4e00-\u9fff\u3400-\u4dbf\uac00-\ud7af\u3040-\u309f\u30a0-\u30ff]/g;
+
+export function estimateTokens(text: string): number {
+  const cjkMatches = text.match(CJK_RE);
+  const cjkCount = cjkMatches ? cjkMatches.length : 0;
+  const nonCjkCount = text.length - cjkCount;
+  return Math.ceil(cjkCount * 1.5 + nonCjkCount / 4);
+}
+
 /** Truncate a string to a maximum character count, appending an ellipsis if trimmed. */
 function truncate(str: string, max: number): string {
   if (str.length <= max) return str;
@@ -154,7 +174,7 @@ export class ContextManager {
 
   /**
    * Build the full system prompt from the current page model and available
-   * tools. The output is capped at `tokenBudget` characters so it fits
+   * tools. The output is capped at `tokenBudget` estimated tokens so it fits
    * comfortably inside the LLM context window alongside conversation history.
    */
   buildSystemPrompt(pageModel: PageModel, tools: ToolDefinition[]): string {
@@ -166,7 +186,7 @@ export class ContextManager {
     // -- Current Page --------------------------------------------------------
     parts.push(this.buildCurrentPageSection(pageModel));
 
-    // -- Page Sections -------------------------------------------------------
+    // -- Page Sections (with contentMap facts inlined) -----------------------
     parts.push(this.buildPageSectionsSection(pageModel));
 
     // -- Navigation ----------------------------------------------------------
@@ -203,7 +223,7 @@ export class ContextManager {
 
     // Join and enforce budget
     let prompt = parts.join('\n\n');
-    if (prompt.length > this.tokenBudget) {
+    if (estimateTokens(prompt) > this.tokenBudget) {
       prompt = this.trimPromptToBudget(prompt, pageModel, tools);
     }
 
@@ -408,7 +428,19 @@ export class ContextManager {
     const personality =
       this.agent.personality ||
       'You help users understand and navigate the site.';
-    return `# Role\nYou are ${name}, an AI guide embedded on this website.\n${personality}`;
+    const lines = [`# Role`, `You are ${name}, an AI guide embedded on this website.`, personality];
+
+    if (this._userPreference === 'voice') {
+      lines.push(
+        '',
+        '## Voice Mode',
+        'You are in a live voice conversation. The user is speaking to you through a microphone and hearing your replies spoken aloud.',
+        'Keep responses short and conversational — 1-2 sentences. Avoid markdown, bullet lists, or formatting that sounds unnatural when spoken.',
+        'Never say you are text-based or that you cannot hear the user.',
+      );
+    }
+
+    return lines.join('\n');
   }
 
   private buildCurrentPageSection(pageModel: PageModel): string {
@@ -509,15 +541,27 @@ export class ContextManager {
   }
 
   private buildGuidelinesSection(): string {
-    return [
+    const lines = [
       '# Guidelines',
       '- Always reference specific sections by their ID when guiding users',
       '- Use highlight() to point at elements you are discussing',
       '- Use scrollToSection() before highlighting offscreen elements',
       '- Never make up information not present in the page context',
       '- If asked about content you cannot see, use readPageContent to access it',
-      '- Keep responses concise — 2-3 sentences unless the user asks for detail',
-    ].join('\n');
+    ];
+
+    if (this._userPreference === 'voice') {
+      lines.push(
+        '- Keep responses brief and spoken-friendly — 1-2 sentences',
+        '- Do not use markdown formatting, code blocks, or bullet lists in responses',
+      );
+    } else {
+      lines.push(
+        '- Keep responses concise — 2-3 sentences unless the user asks for detail',
+      );
+    }
+
+    return lines.join('\n');
   }
 
   // -------------------------------------------------------------------------
@@ -533,11 +577,11 @@ export class ContextManager {
     pageModel: PageModel,
     tools: ToolDefinition[],
   ): string {
-    // Rebuild with trimming strategies applied in priority order:
-    // 1. Truncate interactive elements list
-    // 2. Truncate navigation list
-    // 3. Truncate forms
-    // 4. Truncate page sections
+    // Priority order for budget allocation:
+    //   system prompt (essential) > page sections > navigation > forms > interactive elements
+    //
+    // Essential parts are always included; optional sections are added in
+    // priority order until the token budget is exhausted.
 
     const essentialParts: string[] = [
       this.buildRoleSection(),
@@ -551,7 +595,7 @@ export class ContextManager {
     }
 
     const essentialLength = essentialParts.reduce(
-      (sum, p) => sum + p.length + 2,
+      (sum, p) => sum + estimateTokens(p) + 2,
       0,
     );
     let remaining = this.tokenBudget - essentialLength;
@@ -560,9 +604,9 @@ export class ContextManager {
 
     // Page sections — highest priority optional section
     const sectionsStr = this.buildPageSectionsSection(pageModel);
-    if (sectionsStr.length <= remaining) {
+    if (estimateTokens(sectionsStr) <= remaining) {
       optionalSections.push(sectionsStr);
-      remaining -= sectionsStr.length + 2;
+      remaining -= estimateTokens(sectionsStr) + 2;
     } else if (remaining > 100) {
       optionalSections.push(truncate(sectionsStr, remaining));
       remaining = 0;
@@ -571,9 +615,9 @@ export class ContextManager {
     // Navigation
     if (remaining > 0 && pageModel.navigation.length > 0) {
       const navStr = this.buildNavigationSection(pageModel);
-      if (navStr.length <= remaining) {
+      if (estimateTokens(navStr) <= remaining) {
         optionalSections.push(navStr);
-        remaining -= navStr.length + 2;
+        remaining -= estimateTokens(navStr) + 2;
       } else if (remaining > 80) {
         optionalSections.push(truncate(navStr, remaining));
         remaining = 0;
@@ -583,9 +627,9 @@ export class ContextManager {
     // Forms
     if (remaining > 0 && pageModel.forms.length > 0) {
       const formsStr = this.buildFormsSection(pageModel);
-      if (formsStr.length <= remaining) {
+      if (estimateTokens(formsStr) <= remaining) {
         optionalSections.push(formsStr);
-        remaining -= formsStr.length + 2;
+        remaining -= estimateTokens(formsStr) + 2;
       } else if (remaining > 80) {
         optionalSections.push(truncate(formsStr, remaining));
         remaining = 0;
@@ -595,7 +639,7 @@ export class ContextManager {
     // Interactive elements
     if (remaining > 0 && pageModel.interactiveElements.length > 0) {
       const ieStr = this.buildInteractiveElementsSection(pageModel);
-      if (ieStr.length <= remaining) {
+      if (estimateTokens(ieStr) <= remaining) {
         optionalSections.push(ieStr);
       } else if (remaining > 80) {
         optionalSections.push(truncate(ieStr, remaining));

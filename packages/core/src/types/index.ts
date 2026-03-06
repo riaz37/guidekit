@@ -125,6 +125,244 @@ export interface PageModel {
 }
 
 // ---------------------------------------------------------------------------
+// Semantic Page Model (extends PageModel with intelligence data)
+// ---------------------------------------------------------------------------
+
+/** A detected UI component on the page. */
+export interface ComponentNode {
+  id: string;
+  type: 'tab-group' | 'modal' | 'accordion' | 'card' | 'form-wizard'
+      | 'data-table' | 'search' | 'breadcrumb' | 'dropdown' | 'unknown';
+  selector: string;
+  label: string;
+  /** Detection confidence score (0-1). */
+  confidence: number;
+  /** Selectors of interactive elements within this component. */
+  interactiveElements: string[];
+  /** Component-specific state (e.g., active tab index, expanded panel). */
+  state?: Record<string, unknown>;
+}
+
+/** Detected multi-step flow state (e.g., checkout step 2 of 4). */
+export interface FlowState {
+  type: 'checkout' | 'signup' | 'onboarding' | 'wizard' | 'survey' | 'custom';
+  currentStep: number;
+  totalSteps: number;
+  stepLabels: string[];
+  completedSteps: number[];
+  /** Selector of the progress indicator element. */
+  progressSelector?: string;
+}
+
+/** An error state detected on the page. */
+export interface PageErrorState {
+  type: 'form-validation' | 'api-error' | 'not-found' | 'permission'
+      | 'toast-error' | 'inline-error' | 'banner-error';
+  message: string;
+  selector: string;
+  severity: 'error' | 'warning' | 'info';
+  /** Related form field selector, if applicable. */
+  relatedField?: string;
+  /** Whether the error is dismissible. */
+  dismissible: boolean;
+}
+
+/** A heading in the document outline. */
+export interface HeadingNode {
+  level: number;
+  text: string;
+  id: string;
+  selector: string;
+  children: HeadingNode[];
+}
+
+/** Validation issue found by the hallucination guard. */
+export interface HallucinationIssue {
+  type: 'element-reference' | 'navigation-reference';
+  claim: string;
+  severity: 'low' | 'medium' | 'high';
+  suggestion: string;
+}
+
+/** Result of hallucination guard validation. */
+export interface HallucinationResult {
+  isValid: boolean;
+  confidence: number;
+  issues: HallucinationIssue[];
+}
+
+/**
+ * Extended page model with semantic intelligence data.
+ * Produced by the SemanticScanner from @guidekit/intelligence.
+ * All new fields are additive — PageModel consumers continue to work.
+ */
+export interface SemanticPageModel extends PageModel {
+  /** Detected UI component patterns (tabs, modals, cards, etc.). */
+  components: ComponentNode[];
+  /** Detected multi-step flow state, or null if no flow detected. */
+  flowState: FlowState | null;
+  /** Active error states visible on the page. */
+  errorStates: PageErrorState[];
+  /** Document heading outline (h1-h6 tree). */
+  headingOutline: HeadingNode[];
+}
+
+// ---------------------------------------------------------------------------
+// Plugin types
+// ---------------------------------------------------------------------------
+
+/** Metadata describing a plugin. */
+export interface PluginMetadata {
+  name: string;
+  version: string;
+  description?: string;
+  dependencies?: string[];
+}
+
+/** Async or sync middleware function. */
+export type MiddlewareFunction<T = Record<string, unknown>> = (
+  ctx: T,
+  next: () => Promise<T>,
+) => Promise<T> | T;
+
+/** Context passed to beforeLLMCall middleware. */
+export interface BeforeLLMCallCtx {
+  systemPrompt: string;
+  userMessage: string;
+  conversationHistory: Array<{ role: string; content: string }>;
+  metadata: Record<string, unknown>;
+}
+
+/** Context passed to afterLLMCall middleware. */
+export interface AfterLLMCallCtx {
+  responseText: string;
+  toolCalls: ToolCall[];
+  usage: { prompt: number; completion: number; total: number } | null;
+  metadata: Record<string, unknown>;
+}
+
+/** Context passed to beforeToolExecution middleware. */
+export interface BeforeToolExecCtx {
+  toolName: string;
+  arguments: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+}
+
+/** Context passed to afterToolExecution middleware. */
+export interface AfterToolExecCtx {
+  toolName: string;
+  arguments: Record<string, unknown>;
+  result: unknown;
+  durationMs: number;
+  metadata: Record<string, unknown>;
+}
+
+/** Context passed to onError middleware. */
+export interface OnErrorCtx {
+  error: Error;
+  phase: 'llm' | 'tool' | 'voice' | 'dom' | 'unknown';
+  metadata: Record<string, unknown>;
+}
+
+/** Hook points a plugin can intercept. */
+export interface PluginHooks {
+  beforeLLMCall?: MiddlewareFunction<BeforeLLMCallCtx>;
+  afterLLMCall?: MiddlewareFunction<AfterLLMCallCtx>;
+  beforeToolExecution?: MiddlewareFunction<BeforeToolExecCtx>;
+  afterToolExecution?: MiddlewareFunction<AfterToolExecCtx>;
+  onError?: MiddlewareFunction<OnErrorCtx>;
+}
+
+/** Scoped API surface available to a plugin during its lifecycle. */
+export interface PluginContext {
+  bus: { on: (event: string, handler: (...args: unknown[]) => void) => () => void };
+  registerTool: (definition: ToolDefinition, handler: (args: Record<string, unknown>) => Promise<unknown>) => void;
+  addContextProvider: (id: string, provider: () => string | Promise<string>) => void;
+  getAgentState: () => AgentState;
+  log: (...args: unknown[]) => void;
+}
+
+/** Full plugin definition returned by definePlugin(). */
+export interface PluginDefinition {
+  readonly metadata: Readonly<PluginMetadata>;
+  readonly hooks: Readonly<PluginHooks>;
+  readonly setup: (ctx: PluginContext) => Promise<(() => void) | void> | ((() => void) | void);
+  readonly __brand: 'GuideKitPlugin';
+}
+
+// ---------------------------------------------------------------------------
+// Knowledge types
+// ---------------------------------------------------------------------------
+
+/** A document in the knowledge base. */
+export interface KnowledgeDocument {
+  id: string;
+  title: string;
+  content: string;
+  metadata?: Record<string, unknown>;
+  chunks?: KnowledgeChunk[];
+}
+
+/** A chunk of a document after splitting. */
+export interface KnowledgeChunk {
+  id: string;
+  documentId: string;
+  content: string;
+  index: number;
+  startOffset: number;
+  endOffset: number;
+  headingContext?: string;
+}
+
+/** A search result with relevance score and source attribution. */
+export interface SearchResult {
+  chunk: KnowledgeChunk;
+  score: number;
+  source: SourceAttribution;
+}
+
+/** Attribution metadata linking a search result to its source document. */
+export interface SourceAttribution {
+  documentId: string;
+  chunkId: string;
+  title: string;
+  relevanceScore: number;
+  excerpt: string;
+}
+
+/** Strategy for splitting documents into chunks. */
+export type ChunkStrategy = 'heading' | 'paragraph' | 'fixed';
+
+/** Options for the document chunker. */
+export interface ChunkerOptions {
+  strategy: ChunkStrategy;
+  chunkSize?: number;
+  overlap?: number;
+}
+
+/** Search engine type. */
+export type SearchEngine = 'bm25' | 'tfidf';
+
+/** Options for the knowledge store. */
+export interface KnowledgeStoreOptions {
+  engine?: SearchEngine;
+  chunker?: ChunkerOptions;
+  maxDocuments?: number;
+  maxTotalChunks?: number;
+  persistConsent?: boolean;
+  dbName?: string;
+  topK?: number;
+}
+
+/** Options for a single search query. */
+export interface KnowledgeSearchOptions {
+  topK?: number;
+  engine?: SearchEngine;
+  documentIds?: string[];
+  minScore?: number;
+}
+
+// ---------------------------------------------------------------------------
 // Agent state (discriminated union)
 // ---------------------------------------------------------------------------
 
@@ -162,6 +400,8 @@ export interface STTTranscriptEvent {
 /** Large language model provider configuration. */
 export type LLMConfig =
   | { provider: 'gemini'; apiKey: string; model?: 'gemini-2.5-flash' | 'gemini-2.5-pro' }
+  | { provider: 'openai'; apiKey: string; model?: string; baseUrl?: string }
+  | { provider: 'anthropic'; apiKey: string; model?: string; maxTokens?: number }
   | { adapter: LLMProviderAdapter };
 
 // ---------------------------------------------------------------------------
@@ -210,6 +450,10 @@ export interface GuideKitTheme {
   primaryColor?: string;
   position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
   borderRadius?: string;
+  /** Color scheme: 'light', 'dark', or 'auto' (respects prefers-color-scheme). Default: 'light'. */
+  colorScheme?: 'light' | 'dark' | 'auto';
+  /** CSS custom property overrides for fine-grained theming. */
+  tokens?: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -407,6 +651,24 @@ export interface CreateSessionTokenOptions {
 }
 
 // ---------------------------------------------------------------------------
+// Streaming types
+// ---------------------------------------------------------------------------
+
+/** Result metadata returned when a streaming response completes. */
+export interface StreamResult {
+  fullText: string;
+  totalTokens: number;
+  toolCallsExecuted: number;
+  rounds: number;
+}
+
+/** Return type of `sendTextStream()`. */
+export interface TextStream {
+  stream: AsyncIterable<string>;
+  done: Promise<StreamResult>;
+}
+
+// ---------------------------------------------------------------------------
 // Store state (useSyncExternalStore)
 // ---------------------------------------------------------------------------
 
@@ -423,4 +685,8 @@ export interface GuideKitStore {
   };
   /** Whether the user has granted privacy consent. Always `true` when `consentRequired` is not enabled. Managed by the React widget layer. */
   hasConsent?: boolean;
+  streaming?: {
+    isStreaming: boolean;
+    streamingText: string;
+  };
 }

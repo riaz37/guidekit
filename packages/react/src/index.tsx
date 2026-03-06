@@ -19,6 +19,8 @@ import type {
   GuideKitStore,
   GuideKitErrorType,
   GuideKitEvent,
+  StreamResult,
+  TextStream,
 } from '@guidekit/core';
 
 import React, {
@@ -47,11 +49,20 @@ const SSR_SNAPSHOT: GuideKitStore = {
 /** Noop subscriber for SSR — never fires, returns a stable unsubscribe. */
 const SSR_SUBSCRIBE = (_listener: () => void): (() => void) => () => {};
 
+/** Stable default streaming state — avoids creating new objects on every render. */
+const SSR_STREAMING = { isStreaming: false, streamingText: '' } as const;
+
 // ---------------------------------------------------------------------------
 // Internal hook: access the core instance from context
 // ---------------------------------------------------------------------------
 
-function useGuideKitCore(): GuideKitCore | null {
+/**
+ * Advanced API — prefer focused hooks (useGuideKitStatus, useGuideKitVoice, etc.).
+ *
+ * Returns the raw GuideKitCore instance, or null before initialisation.
+ * Use only when you need direct core access (e.g. health checks).
+ */
+export function useGuideKitCore(): GuideKitCore | null {
   return useContext(GuideKitContext);
 }
 
@@ -350,6 +361,50 @@ export function useGuideKitContext(): {
 }
 
 // ---------------------------------------------------------------------------
+// Split Hook: useGuideKitStream
+// ---------------------------------------------------------------------------
+
+export function useGuideKitStream(): {
+  isStreaming: boolean;
+  streamingText: string;
+  sendTextStream: (message: string) => { stream: AsyncIterable<string>; done: Promise<StreamResult> };
+} {
+  const core = useGuideKitCore();
+
+  const subscribe = useCallback(
+    (listener: () => void) =>
+      core ? core.subscribe(listener) : SSR_SUBSCRIBE(listener),
+    [core],
+  );
+
+  const getSnapshot = useCallback(
+    () => (core ? core.getSnapshot().streaming ?? SSR_STREAMING : SSR_STREAMING),
+    [core],
+  );
+
+  const streamingSlice = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    () => SSR_STREAMING,
+  );
+
+  const sendTextStream = useCallback(
+    (message: string) => {
+      if (!core) {
+        throw new Error('GuideKit not initialised. Wrap your app in <GuideKitProvider>.');
+      }
+      return core.sendTextStream(message);
+    },
+    [core],
+  );
+
+  return {
+    ...streamingSlice,
+    sendTextStream,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Combined Hook: useGuideKit
 // ---------------------------------------------------------------------------
 
@@ -362,6 +417,9 @@ export function useGuideKit(): {
   startListening: () => void;
   stopListening: () => void;
   sendText: (text: string) => Promise<string>;
+  isStreaming: boolean;
+  streamingText: string;
+  sendTextStream: (message: string) => { stream: AsyncIterable<string>; done: Promise<StreamResult> };
   highlight: (
     sectionId: string,
     options?: { selector?: string; tooltip?: string; position?: string },
@@ -385,12 +443,14 @@ export function useGuideKit(): {
   const voice = useGuideKitVoice();
   const actions = useGuideKitActions();
   const ctx = useGuideKitContext();
+  const streaming = useGuideKitStream();
 
   return {
     ...status,
     ...voice,
     ...actions,
     ...ctx,
+    ...streaming,
   };
 }
 
@@ -1221,14 +1281,28 @@ function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetProps) {
     setIsSending(true);
 
     try {
-      const response = await core.sendText(text);
+      // Create empty assistant message immediately
+      const assistantMsgId = `msg-${++msgIdRef.current}`;
       const assistantMsg: TranscriptMessage = {
-        id: `msg-${++msgIdRef.current}`,
+        id: assistantMsgId,
         role: 'assistant',
-        content: response,
+        content: '',
         timestamp: Date.now(),
       };
       setMessages((prev) => [...prev, assistantMsg]);
+
+      // Stream tokens into the message
+      const { stream, done } = core.sendTextStream(text);
+      done.catch(() => {});
+      for await (const chunk of stream) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsgId
+              ? { ...m, content: m.content + chunk }
+              : m,
+          ),
+        );
+      }
     } catch (err) {
       const errorContent =
         err instanceof Error ? err.message : 'Something went wrong. Please try again.';
@@ -1555,6 +1629,8 @@ function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetProps) {
     <div
       ref={shadowHostRef}
       id="guidekit-widget"
+      role="complementary"
+      aria-label={t('widgetTitle')}
       style={{
         // The host element itself is positioned via :host in Shadow DOM CSS,
         // but we also set fixed positioning here as a fallback.
@@ -1587,4 +1663,6 @@ export type {
   GuideKitStore,
   GuideKitErrorType,
   GuideKitEvent,
+  StreamResult,
+  TextStream,
 };

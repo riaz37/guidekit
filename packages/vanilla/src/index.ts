@@ -380,9 +380,19 @@ class VanillaWidget {
     this.scrollToBottom();
 
     try {
-      const response = await this.core.sendText(text);
+      // Create assistant message element immediately (empty)
       this.dotsEl.style.display = 'none';
-      this.addMessage('assistant', response);
+      const msgEl = this.addMessage('assistant', '');
+
+      // Stream tokens
+      const { stream, done } = this.core.sendTextStream(text);
+      done.catch(() => {});
+      for await (const chunk of stream) {
+        if (msgEl) {
+          msgEl.textContent = (msgEl.textContent ?? '') + chunk;
+          this.scrollToBottom();
+        }
+      }
     } catch (err) {
       this.dotsEl.style.display = 'none';
       const msg = err instanceof Error ? err.message : 'Something went wrong.';
@@ -392,13 +402,14 @@ class VanillaWidget {
     }
   }
 
-  private addMessage(role: 'user' | 'assistant', content: string): void {
+  private addMessage(role: 'user' | 'assistant', content: string): HTMLDivElement {
     const el = document.createElement('div');
     el.className = `gk-msg gk-msg-${role}`;
     el.textContent = content;
     // Insert before the dots element
     this.transcript.insertBefore(el, this.dotsEl);
     this.scrollToBottom();
+    return el;
   }
 
   private scrollToBottom(): void {
@@ -482,6 +493,14 @@ export async function init(options: GuideKitVanillaOptions): Promise<void> {
 export async function sendText(message: string): Promise<string> {
   assertInitialized();
   return _core!.sendText(message);
+}
+
+/**
+ * Send a text message and receive a streaming response.
+ */
+export function sendTextStream(message: string) {
+  if (!_core) throw new Error('[GuideKit] Not initialized. Call init() first.');
+  return _core.sendTextStream(message);
 }
 
 /**
@@ -626,4 +645,6 @@ function assertInitialized(): void {
 // Version
 // ---------------------------------------------------------------------------
 
-export const VERSION = '0.1.0-beta.2';
+declare const __GUIDEKIT_VERSION__: string;
+export const VERSION =
+  typeof __GUIDEKIT_VERSION__ !== 'undefined' ? __GUIDEKIT_VERSION__ : '0.0.0-dev';

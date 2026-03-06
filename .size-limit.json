@@ -36,6 +36,24 @@
     "gzip": true
   },
   {
+    "name": "@guidekit/intelligence (ESM)",
+    "path": "packages/intelligence/dist/index.js",
+    "limit": "15 KB",
+    "gzip": true
+  },
+  {
+    "name": "@guidekit/plugins (ESM)",
+    "path": "packages/plugins/dist/index.js",
+    "limit": "5 KB",
+    "gzip": true
+  },
+  {
+    "name": "@guidekit/knowledge (ESM)",
+    "path": "packages/knowledge/dist/index.js",
+    "limit": "10 KB",
+    "gzip": true
+  },
+  {
     "name": "@guidekit/cli",
     "path": "packages/cli/dist/index.js",
     "limit": "8 KB",

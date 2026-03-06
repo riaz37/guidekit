@@ -90,11 +90,20 @@ vi.mock('./llm/index.js', () => ({
   GeminiAdapter: vi.fn(),
 }));
 
-const mockToolExecutor = {
+const mockToolExecutor: Record<string, ReturnType<typeof vi.fn>> = {
   registerTool: vi.fn(),
   executeWithTools: vi.fn().mockResolvedValue({
     text: 'Agent response',
     totalUsage: { total: 100 },
+  }),
+  executeWithToolsStream: vi.fn(async function* () {
+    yield 'Agent response';
+    return {
+      text: 'Agent response',
+      toolCallsExecuted: [],
+      totalUsage: { prompt: 50, completion: 50, total: 100 },
+      rounds: 1,
+    };
   }),
 };
 
@@ -399,6 +408,19 @@ describe('GuideKitCore.sendText() — onBeforeLLMCall privacy hook', () => {
     vi.clearAllMocks();
   });
 
+  beforeEach(() => {
+    // Re-establish streaming mock after clearAllMocks
+    mockToolExecutor.executeWithToolsStream = vi.fn(async function* () {
+      yield 'Agent response';
+      return {
+        text: 'Agent response',
+        toolCallsExecuted: [],
+        totalUsage: { prompt: 50, completion: 50, total: 100 },
+        rounds: 1,
+      };
+    });
+  });
+
   it('calls the hook before sending to LLM', async () => {
     const hookFn = vi.fn((ctx: BeforeLLMCallContext) => ctx);
 
@@ -455,7 +477,7 @@ describe('GuideKitCore.sendText() — onBeforeLLMCall privacy hook', () => {
     await core.sendText('test');
 
     // The tool executor should have been called with the modified prompt
-    expect(mockToolExecutor.executeWithTools).toHaveBeenCalledWith(
+    expect(mockToolExecutor.executeWithToolsStream).toHaveBeenCalledWith(
       expect.objectContaining({
         systemPrompt: 'MODIFIED PROMPT',
       }),
@@ -478,7 +500,7 @@ describe('GuideKitCore.sendText() — onBeforeLLMCall privacy hook', () => {
 
     await core.sendText('my SSN is 123-45-6789');
 
-    expect(mockToolExecutor.executeWithTools).toHaveBeenCalledWith(
+    expect(mockToolExecutor.executeWithToolsStream).toHaveBeenCalledWith(
       expect.objectContaining({
         userMessage: 'REDACTED',
       }),
@@ -501,7 +523,7 @@ describe('GuideKitCore.sendText() — onBeforeLLMCall privacy hook', () => {
     await expect(core.sendText('my SSN is 123-45-6789')).rejects.toThrow();
 
     // The LLM orchestrator should NOT have been called
-    expect(mockToolExecutor.executeWithTools).not.toHaveBeenCalled();
+    expect(mockToolExecutor.executeWithToolsStream).not.toHaveBeenCalled();
 
     await core.destroy();
   });
@@ -619,7 +641,7 @@ describe('GuideKitCore.sendText() — onBeforeLLMCall privacy hook', () => {
 
     await core.sendText('test');
 
-    expect(mockToolExecutor.executeWithTools).toHaveBeenCalledWith(
+    expect(mockToolExecutor.executeWithToolsStream).toHaveBeenCalledWith(
       expect.objectContaining({
         userMessage: 'scrubbed',
       }),
