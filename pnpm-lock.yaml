@@ -118,6 +118,15 @@ importers:
       '@guidekit/core':
         specifier: workspace:^
         version: link:../../packages/core
+      '@guidekit/intelligence':
+        specifier: workspace:^
+        version: link:../../packages/intelligence
+      '@guidekit/knowledge':
+        specifier: workspace:^
+        version: link:../../packages/knowledge
+      '@guidekit/plugins':
+        specifier: workspace:^
+        version: link:../../packages/plugins
       '@guidekit/react':
         specifier: workspace:^
         version: link:../../packages/react

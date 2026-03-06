@@ -290,8 +290,8 @@ test.describe('Test-App: Tab Navigation', () => {
     await page.click('button:has-text("SDK Debug")');
   });
 
-  test('all 7 tabs are present', async ({ page }) => {
-    for (const tab of ['Status', 'Voice', 'Stream', 'Actions', 'Context', 'Health', 'Events']) {
+  test('all 10 tabs are present', async ({ page }) => {
+    for (const tab of ['Status', 'Voice', 'Stream', 'Actions', 'Context', 'Health', 'Intel', 'Plugins', 'Knowledge', 'Events']) {
       await expect(page.locator(`button:has-text("${tab}")`).first()).toBeVisible({ timeout: 5_000 });
     }
   });
@@ -307,5 +307,140 @@ test.describe('Test-App: Tab Navigation', () => {
     // Switch to Context
     await page.click('button:has-text("Context")');
     await expect(page.locator('text=Set Page Context')).toBeVisible({ timeout: 5_000 });
+  });
+});
+
+test.describe('Test-App: Intelligence Panel', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('button:has-text("SDK Debug")', { timeout: 15_000 });
+    await page.click('button:has-text("SDK Debug")');
+    await page.click('button:has-text("Intel")');
+  });
+
+  test('has Run Scan button', async ({ page }) => {
+    await expect(page.locator('button:has-text("Run Scan")')).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('scanning produces results', async ({ page }) => {
+    await page.click('button:has-text("Run Scan")');
+    // Should show scan results with Components and Headings sections
+    await expect(page.locator('text=Components')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('text=Headings')).toBeVisible();
+  });
+
+  test('has Hallucination Guard section', async ({ page }) => {
+    await expect(page.locator('text=Hallucination Guard')).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('has hallucination check textarea and button', async ({ page }) => {
+    const textarea = page.locator('textarea[placeholder="Enter LLM response text to validate..."]');
+    await expect(textarea).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('button:has-text("Run Hallucination Check")')).toBeVisible();
+  });
+
+  test('running hallucination check shows result', async ({ page }) => {
+    await page.click('button:has-text("Run Hallucination Check")');
+    // Should show Valid or Invalid result with Confidence
+    await expect(page.locator('text=Confidence').first()).toBeVisible({ timeout: 5_000 });
+  });
+});
+
+test.describe('Test-App: Plugins Panel', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('button:has-text("SDK Debug")', { timeout: 15_000 });
+    await page.click('button:has-text("SDK Debug")');
+    await page.click('button:has-text("Plugins")');
+  });
+
+  test('has Create & Install Plugin button', async ({ page }) => {
+    await expect(page.locator('button:has-text("Create & Install Plugin")')).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('installing plugin shows plugin info', async ({ page }) => {
+    await page.click('button:has-text("Create & Install Plugin")');
+    // Should show the installed plugin name and version
+    await expect(page.locator('text=test-analytics').first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('text=v1.0.0').first()).toBeVisible();
+  });
+
+  test('installing plugin shows tool and context provider counts', async ({ page }) => {
+    await page.click('button:has-text("Create & Install Plugin")');
+    // Should show tool count and context providers
+    await expect(page.locator('text=Tools:').first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('text=Context providers:').first()).toBeVisible();
+  });
+
+  test('has Middleware Demo section with Execute Hook button', async ({ page }) => {
+    await expect(page.locator('text=Middleware Demo')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('button:has-text("Execute Hook")')).toBeVisible();
+  });
+
+  test('Destroy button appears after installing plugin', async ({ page }) => {
+    await page.click('button:has-text("Create & Install Plugin")');
+    await expect(page.locator('button:has-text("Destroy")')).toBeVisible({ timeout: 5_000 });
+  });
+});
+
+test.describe('Test-App: Knowledge Panel', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('button:has-text("SDK Debug")', { timeout: 15_000 });
+    await page.click('button:has-text("SDK Debug")');
+    await page.click('button:has-text("Knowledge")');
+  });
+
+  test('has Load Samples button', async ({ page }) => {
+    await expect(page.locator('button:has-text("Load Samples")')).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('has search input', async ({ page }) => {
+    const searchInput = page.locator('input[placeholder="Search query..."]');
+    await expect(searchInput).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('loading samples updates stats', async ({ page }) => {
+    await page.click('button:has-text("Load Samples")');
+    // Stats should show non-zero document and chunk counts
+    await expect(page.locator('text=Documents:')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('text=Chunks:')).toBeVisible();
+    // Button should change to "Loaded" and be disabled
+    await expect(page.locator('button:has-text("Loaded")')).toBeVisible();
+    await expect(page.locator('button:has-text("Loaded")')).toBeDisabled();
+  });
+
+  test('searching after loading samples produces results', async ({ page }) => {
+    // Load sample documents
+    await page.click('button:has-text("Load Samples")');
+    await expect(page.locator('button:has-text("Loaded")')).toBeVisible({ timeout: 5_000 });
+
+    // Search with the default query ("keyboard shortcuts")
+    await page.click('button:has-text("Search")');
+    // Should show results with source titles and scores
+    await expect(page.locator('text=FlowBoard').first()).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('has engine toggle button', async ({ page }) => {
+    await expect(page.locator('button:has-text("Engine:")')).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('has Add Document section', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: 'Add Document' })).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('input[placeholder="Document title..."]')).toBeVisible();
+    await expect(page.locator('textarea[placeholder="Document content..."]')).toBeVisible();
+    await expect(page.locator('button:has-text("Add Document")')).toBeVisible();
+  });
+
+  test('Clear button resets store', async ({ page }) => {
+    // Load samples first
+    await page.click('button:has-text("Load Samples")');
+    await expect(page.locator('button:has-text("Loaded")')).toBeVisible({ timeout: 5_000 });
+
+    // Clear
+    await page.click('button:has-text("Clear")');
+    // Load Samples button should reappear (not disabled)
+    await expect(page.locator('button:has-text("Load Samples")')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('button:has-text("Load Samples")')).toBeEnabled();
   });
 });
