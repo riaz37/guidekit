@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { HeadingExtractor } from './heading-extractor';
 
 // Polyfill CSS.escape for jsdom

@@ -272,41 +272,40 @@ export class PluginRegistry {
   // -----------------------------------------------------------------------
 
   private buildContext(pluginName: string, entry: PluginEntry): PluginContext {
-    const self = this;
     return {
       bus: {
-        on(event: string, handler: (...args: unknown[]) => void): () => void {
-          if (!self.bus) {
+        on: (event: string, handler: (...args: unknown[]) => void): () => void => {
+          if (!this.bus) {
             // no-op unsub if no bus provided
             return () => {};
           }
-          const unsub = self.bus.on(event, handler);
+          const unsub = this.bus.on(event, handler);
           entry.eventUnsubs.push(unsub);
           return unsub;
         },
       },
 
-      registerTool(definition: ToolDefinition, handler: (args: Record<string, unknown>) => Promise<unknown>): void {
-        if (self.tools.has(definition.name)) {
+      registerTool: (definition: ToolDefinition, handler: (args: Record<string, unknown>) => Promise<unknown>): void => {
+        if (this.tools.has(definition.name)) {
           throw new PluginError({
             code: ErrorCodes.PLUGIN_TOOL_CONFLICT,
             message: `Tool "${definition.name}" is already registered by another plugin.`,
             suggestion: 'Use a unique tool name or uninstall the conflicting plugin.',
           });
         }
-        self.tools.set(definition.name, { definition, handler, pluginName });
+        this.tools.set(definition.name, { definition, handler, pluginName });
         entry.registeredTools.push(definition.name);
       },
 
-      addContextProvider(id: string, provider: () => string | Promise<string>): void {
-        self.contexts.set(id, { id, provider, pluginName });
+      addContextProvider: (id: string, provider: () => string | Promise<string>): void => {
+        this.contexts.set(id, { id, provider, pluginName });
         entry.contextProviders.push(id);
       },
 
-      getAgentState: () => self.getAgentState(),
+      getAgentState: () => this.getAgentState(),
 
       log: (...args: unknown[]) => {
-        if (self.debug) {
+        if (this.debug) {
           // eslint-disable-next-line no-console
           console.log(`[guidekit:plugin:${pluginName}]`, ...args);
         }

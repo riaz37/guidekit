@@ -4,28 +4,36 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  createMockEventBus,
+  createMockResourceManager,
+  createMockDOMScanner,
+  createMockContextManager,
+  createMockLLMOrchestrator,
+  createMockToolExecutor,
+  createMockConnectionManager,
+  createMockNavigationController,
+  createMockVisualGuidance,
+  createMockAwarenessSystem,
+  createMockProactiveEngine,
+  createMockRateLimiter,
+  createMockI18n,
+  createMockTokenManager,
+} from './__test-utils__/index.js';
 
 // ---------------------------------------------------------------------------
 // Mock all subsystem imports — must be declared before importing the class
 // under test so Vitest hoists them.
 // ---------------------------------------------------------------------------
 
-const mockEventBus = {
-  on: vi.fn(),
-  off: vi.fn(),
-  emit: vi.fn(),
-  onAny: vi.fn(),
-};
+const mockEventBus = createMockEventBus();
 
 vi.mock('./bus/index.js', () => ({
   EventBus: vi.fn(),
   createEventBus: vi.fn(() => mockEventBus),
 }));
 
-const mockResourceManager = {
-  register: vi.fn(),
-  markReady: vi.fn(),
-};
+const mockResourceManager = createMockResourceManager();
 
 vi.mock('./resources/index.js', () => ({
   ResourceManager: vi.fn(() => mockResourceManager),
@@ -35,98 +43,38 @@ vi.mock('./resources/index.js', () => ({
   },
 }));
 
-const mockDOMScanner = {
-  scan: vi.fn(() => ({
-    url: 'https://example.com',
-    title: 'Test Page',
-    meta: { description: '', h1: 'Test', language: 'en' },
-    sections: [],
-    navigation: [],
-    interactiveElements: [],
-    forms: [],
-    activeOverlays: [],
-    viewport: { width: 1024, height: 768, orientation: 'landscape' as const },
-    allSectionsSummary: [],
-    hash: 'abc123',
-    timestamp: Date.now(),
-    scanMetadata: {
-      totalSectionsFound: 0,
-      sectionsIncluded: 0,
-      totalNodesScanned: 0,
-      scanBudgetExhausted: false,
-    },
-  })),
-  observe: vi.fn(() => vi.fn()),
-};
+const mockDOMScanner = createMockDOMScanner();
 
 vi.mock('./dom/index.js', () => ({
   DOMScanner: vi.fn(() => mockDOMScanner),
 }));
 
-const mockContextManager = {
-  restoreSession: vi.fn(() => null),
-  saveSession: vi.fn(),
-  addTurn: vi.fn(),
-  getHistory: vi.fn(() => []),
-  buildSystemPrompt: vi.fn(() => 'System prompt'),
-  setPageContext: vi.fn(),
-  getContent: vi.fn(),
-  quietMode: false,
-  userPreference: 'text' as const,
-};
+const mockContextManager = createMockContextManager();
 
 vi.mock('./context/index.js', () => ({
   ContextManager: vi.fn(() => mockContextManager),
 }));
 
-const mockLLMSendMessage = vi.fn();
-const mockLLMOrchestrator = {
-  sendMessage: mockLLMSendMessage,
-};
+const mockLLMOrchestrator = createMockLLMOrchestrator();
 
 vi.mock('./llm/index.js', () => ({
   LLMOrchestrator: vi.fn(() => mockLLMOrchestrator),
   GeminiAdapter: vi.fn(),
 }));
 
-const mockToolExecutor: Record<string, ReturnType<typeof vi.fn>> = {
-  registerTool: vi.fn(),
-  executeWithTools: vi.fn().mockResolvedValue({
-    text: 'tool response',
-    toolCallsExecuted: [],
-    totalUsage: { prompt: 10, completion: 20, total: 30 },
-    rounds: 1,
-  }),
-  executeWithToolsStream: vi.fn(async function* () {
-    yield 'tool response';
-    return {
-      text: 'tool response',
-      toolCallsExecuted: [],
-      totalUsage: { prompt: 10, completion: 20, total: 30 },
-      rounds: 1,
-    };
-  }),
-};
+const mockToolExecutor: Record<string, ReturnType<typeof vi.fn>> = createMockToolExecutor();
 
 vi.mock('./llm/tool-executor.js', () => ({
   ToolExecutor: vi.fn(() => mockToolExecutor),
 }));
 
-const mockConnectionManager = {
-  onStateChange: vi.fn(),
-  start: vi.fn(),
-  stop: vi.fn(),
-};
+const mockConnectionManager = createMockConnectionManager();
 
 vi.mock('./connectivity/index.js', () => ({
   ConnectionManager: vi.fn(() => mockConnectionManager),
 }));
 
-const mockNavigationController = {
-  onRouteChange: vi.fn(),
-  start: vi.fn(),
-  stop: vi.fn(),
-};
+const mockNavigationController = createMockNavigationController();
 
 vi.mock('./navigation/index.js', () => ({
   NavigationController: vi.fn(() => mockNavigationController),
@@ -136,63 +84,37 @@ vi.mock('./voice/index.js', () => ({
   VoicePipeline: vi.fn(),
 }));
 
-const mockVisualGuidance = {
-  highlight: vi.fn(),
-  dismissHighlight: vi.fn(),
-  scrollToSection: vi.fn(),
-  scrollToSelector: vi.fn(),
-  startTour: vi.fn(),
-  nextTourStep: vi.fn(),
-  prevTourStep: vi.fn(),
-  stopTour: vi.fn(),
-  destroy: vi.fn(),
-};
+const mockVisualGuidance = createMockVisualGuidance();
 
 vi.mock('./visual/index.js', () => ({
   VisualGuidance: vi.fn(() => mockVisualGuidance),
 }));
 
-const mockAwarenessSystem = {
-  start: vi.fn(),
-  destroy: vi.fn(),
-};
+const mockAwarenessSystem = createMockAwarenessSystem();
 
 vi.mock('./awareness/index.js', () => ({
   AwarenessSystem: vi.fn(() => mockAwarenessSystem),
 }));
 
-const mockProactiveEngine = {
-  start: vi.fn(),
-  destroy: vi.fn(),
-  quietMode: false,
-};
+const mockProactiveEngine = createMockProactiveEngine();
 
 vi.mock('./awareness/proactive.js', () => ({
   ProactiveTriggerEngine: vi.fn(() => mockProactiveEngine),
 }));
 
-const mockRateLimiter = {
-  checkLLMCall: vi.fn(),
-  getState: vi.fn(() => ({})),
-};
+const mockRateLimiter = createMockRateLimiter();
 
 vi.mock('./llm/rate-limiter.js', () => ({
   RateLimiter: vi.fn(() => mockRateLimiter),
 }));
 
-const mockI18n = {
-  t: vi.fn((key: string) => key),
-};
+const mockI18n = createMockI18n();
 
 vi.mock('./i18n/index.js', () => ({
   I18n: vi.fn(() => mockI18n),
 }));
 
-const mockTokenManager = {
-  start: vi.fn().mockResolvedValue(undefined),
-  destroy: vi.fn(),
-  token: 'mock-token',
-};
+const mockTokenManager = createMockTokenManager();
 
 vi.mock('./auth/token-manager.js', () => ({
   TokenManager: vi.fn(() => mockTokenManager),
@@ -618,6 +540,7 @@ describe('GuideKitCore.sendText()', () => {
     });
 
     it('transitions to error state when ToolExecutor throws', async () => {
+      // eslint-disable-next-line require-yield
       mockToolExecutor.executeWithToolsStream = vi.fn(async function* () {
         throw new Error('LLM failure');
       });
@@ -682,6 +605,7 @@ describe('GuideKitCore.sendText()', () => {
     });
 
     it('emits error event when ToolExecutor fails', async () => {
+      // eslint-disable-next-line require-yield
       mockToolExecutor.executeWithToolsStream = vi.fn(async function* () {
         throw new Error('Boom');
       });

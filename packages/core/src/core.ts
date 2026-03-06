@@ -644,15 +644,16 @@ export class GuideKitCore {
     });
 
     // Capture references for the generator closure.
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this;
     const llmOrchestrator = this.llmOrchestrator;
 
     async function* generate(): AsyncGenerator<string> {
       let message = message_;
       let responseText = '';
-      let totalTokens = 0;
+      let totalTokens = 0; // eslint-disable-line no-useless-assignment
       let toolCallsExecuted = 0;
-      let rounds = 0;
+      let rounds = 0; // eslint-disable-line no-useless-assignment
 
       try {
         self._isStreaming = true;
