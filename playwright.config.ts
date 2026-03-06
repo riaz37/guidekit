@@ -23,30 +23,13 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         baseURL: 'http://localhost:3099',
       },
-      testMatch: /^(?!.*test-app).*\.spec\.ts$/,
-    },
-    {
-      name: 'test-app',
-      use: {
-        ...devices['Desktop Chrome'],
-        baseURL: 'http://localhost:3100',
-      },
-      testMatch: /test-app.*\.spec\.ts$/,
     },
   ],
 
-  webServer: [
-    {
-      command: 'pnpm --filter @guidekit/example-nextjs dev',
-      url: 'http://localhost:3099',
-      reuseExistingServer: !process.env.CI,
-      timeout: 120_000,
-    },
-    {
-      command: 'pnpm --filter @guidekit/test-app dev',
-      url: 'http://localhost:3100',
-      reuseExistingServer: !process.env.CI,
-      timeout: 120_000,
-    },
-  ],
+  webServer: {
+    command: 'pnpm --filter @guidekit/example-nextjs dev',
+    url: 'http://localhost:3099',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+  },
 });

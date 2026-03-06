@@ -91,6 +91,7 @@ describe('GuideKitError', () => {
 
 describe('Error subclass name properties', () => {
   const subclasses: Array<{
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Class: new (...args: any[]) => GuideKitError;
     expectedName: string;
     opts: Record<string, unknown>;
@@ -162,6 +163,7 @@ describe('Error subclass name properties', () => {
 
   for (const { Class, expectedName, opts } of subclasses) {
     it(`${expectedName} has correct name property`, () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const err = new Class(opts as any);
       expect(err.name).toBe(expectedName);
     });

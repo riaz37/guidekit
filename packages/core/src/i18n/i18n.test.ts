@@ -168,12 +168,14 @@ describe('I18n', () => {
     });
 
     it('falls back to en for unknown locale', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       i18n.setLocale('xx' as any);
       expect(i18n.currentLocale).toBe('en');
       expect(i18n.t('sendMessage')).toBe('Send message');
     });
 
     it('supports custom string map', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       i18n.setLocale({
         widgetTitle: 'Custom Title',
         sendMessage: 'Custom Send',
@@ -197,6 +199,7 @@ describe('I18n', () => {
 
     it('returns custom for custom string map', () => {
       const custom = new I18n({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         locale: {
           widgetTitle: 'Test',
           sendMessage: 'Go',
@@ -214,6 +217,7 @@ describe('I18n', () => {
   describe('custom string map', () => {
     it('merges partial overrides with English defaults', () => {
       const custom = new I18n({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         locale: {
           widgetTitle: 'MyApp',
           sendMessage: 'Go!',
@@ -335,12 +339,14 @@ describe('I18n', () => {
 
   describe('unknown locale fallback', () => {
     it('falls back to en for unknown explicit locale', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const unknown = new I18n({ locale: 'zz' as any });
       expect(unknown.currentLocale).toBe('en');
       expect(unknown.t('sendMessage')).toBe('Send message');
     });
 
     it('returns English strings for unknown locale', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const unknown = new I18n({ locale: 'kk' as any });
       const strings = unknown.getStrings();
       expect(strings.widgetTitle).toBe('GuideKit');
