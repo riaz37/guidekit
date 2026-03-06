@@ -1,15 +1,13 @@
 # @guidekit/vad
 
-[![npm version](https://img.shields.io/npm/v/@guidekit/vad/beta?style=flat-square)](https://www.npmjs.com/package/@guidekit/vad)
+[![npm version](https://img.shields.io/npm/v/@guidekit/vad?style=flat-square)](https://www.npmjs.com/package/@guidekit/vad)
 
 Voice Activity Detection package for the GuideKit SDK. Wraps the Silero VAD ONNX model to detect when a user is speaking, enabling half-duplex voice interactions with barge-in detection.
-
-> **Beta:** This package is in beta. Install with the `@beta` tag.
 
 ## Installation
 
 ```bash
-npm install @guidekit/vad@beta
+npm install @guidekit/vad
 ```
 
 This package is an optional peer dependency of `@guidekit/core`. It is automatically used when voice mode is enabled.

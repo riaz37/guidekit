@@ -1,7 +1,7 @@
 <p align="center">
-  <img src="https://img.shields.io/npm/v/@guidekit/core/beta?label=core&color=6366f1&style=flat-square" alt="core version" />
-  <img src="https://img.shields.io/npm/v/@guidekit/react/beta?label=react&color=6366f1&style=flat-square" alt="react version" />
-  <img src="https://img.shields.io/npm/v/@guidekit/server/beta?label=server&color=6366f1&style=flat-square" alt="server version" />
+  <img src="https://img.shields.io/npm/v/@guidekit/core?label=core&color=6366f1&style=flat-square" alt="core version" />
+  <img src="https://img.shields.io/npm/v/@guidekit/react?label=react&color=6366f1&style=flat-square" alt="react version" />
+  <img src="https://img.shields.io/npm/v/@guidekit/server?label=server&color=6366f1&style=flat-square" alt="server version" />
   <img src="https://img.shields.io/github/license/riaz37/guidekit?style=flat-square" alt="license" />
   <img src="https://img.shields.io/badge/tests-1242%20passing-brightgreen?style=flat-square" alt="tests" />
   <img src="https://img.shields.io/badge/TypeScript-strict-blue?style=flat-square" alt="typescript" />
@@ -21,8 +21,6 @@
 </p>
 
 ---
-
-> **Beta Notice:** GuideKit is currently in beta (`v0.1.0-beta.1`). The API is stabilizing but may still change between releases. All npm packages are published under the `@beta` dist-tag. Bug reports and feedback are welcome via [GitHub Issues](https://github.com/riaz37/guidekit/issues).
 
 ## Why GuideKit?
 
@@ -63,13 +61,13 @@ Existing solutions fall short:
 ### Install
 
 ```bash
-npm install @guidekit/react@beta @guidekit/server@beta
+npm install @guidekit/react @guidekit/server
 ```
 
 ### 1. Generate a signing secret
 
 ```bash
-npx @guidekit/cli@beta generate-secret
+npx @guidekit/cli generate-secret
 ```
 
 Add it to `.env.local`:
@@ -133,7 +131,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 ### 4. Verify your setup
 
 ```bash
-npx @guidekit/cli@beta doctor
+npx @guidekit/cli doctor
 ```
 
 That's it. A chat widget appears on your site. The agent auto-discovers your pages and can answer questions, spotlight elements, navigate users, and execute custom actions.
@@ -218,7 +216,7 @@ Or use a dynamic function for runtime data:
 Use GuideKit with a script tag — no build tools required:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@guidekit/vanilla@beta/dist/index.global.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@guidekit/vanilla/dist/index.global.js"></script>
 <script>
   GuideKit.init({
     tokenEndpoint: '/api/guidekit/token',
@@ -262,7 +260,7 @@ const token = await createSessionToken({
 Install the VAD package for voice activity detection:
 
 ```bash
-npm install @guidekit/vad@beta
+npm install @guidekit/vad
 ```
 
 Voice features include:

@@ -3,13 +3,13 @@
 ## Installation
 
 ```bash
-npm install @guidekit/core@beta @guidekit/react@beta @guidekit/server@beta
+npm install @guidekit/core @guidekit/react @guidekit/server
 ```
 
 For voice support, also install the VAD package:
 
 ```bash
-npm install @guidekit/vad@beta
+npm install @guidekit/vad
 ```
 
 ## Setup with CLI
@@ -17,7 +17,7 @@ npm install @guidekit/vad@beta
 The fastest way to get started:
 
 ```bash
-npx @guidekit/cli@beta init
+npx @guidekit/cli init
 ```
 
 This scaffolds the token endpoint, provider component, and environment variables for your framework (Next.js App Router, Pages Router, or generic React).
@@ -25,7 +25,7 @@ This scaffolds the token endpoint, provider component, and environment variables
 Then generate a signing secret:
 
 ```bash
-npx @guidekit/cli@beta generate-secret
+npx @guidekit/cli generate-secret
 ```
 
 Add the secret and your API keys to `.env.local`:
@@ -85,7 +85,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 ### 3. Verify Setup
 
 ```bash
-npx @guidekit/cli@beta doctor
+npx @guidekit/cli doctor
 ```
 
 This checks your environment variables, package installations, and provider connectivity.
