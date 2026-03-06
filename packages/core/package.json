@@ -11,6 +11,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./rendering": {
+      "types": "./dist/rendering.d.ts",
+      "import": "./dist/rendering.js",
+      "require": "./dist/rendering.cjs"
     }
   },
   "files": [

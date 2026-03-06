@@ -138,11 +138,11 @@ export type {
   SpotlightState,
 } from './visual/index.js';
 
-// Rendering
-export { MarkdownRenderer, defaultMarkdownRenderer, MARKDOWN_CSS } from './rendering/markdown-renderer.js';
-
-// Theme
-export { ThemeEngine, LIGHT_TOKENS, DARK_TOKENS } from './rendering/theme-engine.js';
+// Rendering & Theme — available via '@guidekit/core/rendering' subpath
+// to keep `marked` out of bundles that don't need it.
+// Re-export types only from main entry for convenience.
+export type { MarkdownRenderer } from './rendering/markdown-renderer.js';
+export type { ThemeEngine } from './rendering/theme-engine.js';
 
 // Connectivity
 export { ConnectionManager } from './connectivity/index.js';
