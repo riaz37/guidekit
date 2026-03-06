@@ -1,11 +1,15 @@
 # @guidekit/react
 
+[![npm version](https://img.shields.io/npm/v/@guidekit/react/beta?style=flat-square)](https://www.npmjs.com/package/@guidekit/react)
+
 React bindings for the GuideKit SDK. Provides the `GuideKitProvider`, split hooks, and a Shadow DOM widget for adding an AI assistant to any React application.
+
+> **Beta:** This package is in beta. Install with the `@beta` tag.
 
 ## Installation
 
 ```bash
-npm install @guidekit/core @guidekit/react
+npm install @guidekit/core@beta @guidekit/react@beta
 ```
 
 ## Quick Start
@@ -71,7 +75,8 @@ import { MockGuideKitProvider, simulateVoiceInput } from '@guidekit/react/testin
 
 ## Documentation
 
-Full documentation: [guidekit.dev/docs](https://guidekit.dev/docs)
+- Full documentation: [guidekit.dev/docs](https://guidekit.dev/docs)
+- [Main README](../../README.md)
 
 ## License
 

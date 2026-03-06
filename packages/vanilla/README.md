@@ -1,13 +1,17 @@
 # @guidekit/vanilla
 
+[![npm version](https://img.shields.io/npm/v/@guidekit/vanilla/beta?style=flat-square)](https://www.npmjs.com/package/@guidekit/vanilla)
+
 Vanilla JavaScript bundle for the GuideKit SDK. Provides a script-tag integration for adding an AI assistant to any web page without React.
+
+> **Beta:** This package is in beta. Install with the `@beta` tag.
 
 ## Installation
 
 ### CDN (IIFE)
 
 ```html
-<script src="https://unpkg.com/@guidekit/vanilla/dist/index.global.js"></script>
+<script src="https://unpkg.com/@guidekit/vanilla@beta/dist/index.global.js"></script>
 <script>
   GuideKit.init({
     tokenEndpoint: '/api/guidekit/token',
@@ -20,7 +24,7 @@ Vanilla JavaScript bundle for the GuideKit SDK. Provides a script-tag integratio
 ### npm
 
 ```bash
-npm install @guidekit/vanilla
+npm install @guidekit/vanilla@beta
 ```
 
 ```javascript
@@ -51,7 +55,8 @@ destroy();
 
 ## Documentation
 
-Full documentation: [guidekit.dev/docs/vanilla](https://guidekit.dev/docs/vanilla)
+- Full documentation: [guidekit.dev/docs/vanilla](https://guidekit.dev/docs/vanilla)
+- [Main README](../../README.md)
 
 ## License
 

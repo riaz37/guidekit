@@ -1,6 +1,24 @@
 {
   "name": "guidekit",
   "private": true,
+  "description": "AI-powered user guidance SDK — DOM intelligence, LLM orchestration, voice, and visual guidance for web apps",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/riaz37/guidekit.git"
+  },
+  "homepage": "https://github.com/riaz37/guidekit#readme",
+  "keywords": [
+    "ai",
+    "sdk",
+    "guidance",
+    "assistant",
+    "llm",
+    "voice",
+    "dom",
+    "react",
+    "typescript"
+  ],
+  "license": "MIT",
   "packageManager": "pnpm@10.25.0",
   "scripts": {
     "build": "turbo build",

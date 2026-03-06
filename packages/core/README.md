@@ -1,11 +1,15 @@
 # @guidekit/core
 
+[![npm version](https://img.shields.io/npm/v/@guidekit/core/beta?style=flat-square)](https://www.npmjs.com/package/@guidekit/core)
+
 Core engine for the GuideKit SDK. Provides DOM intelligence, LLM orchestration, context management, and the typed event system that powers all GuideKit integrations.
+
+> **Beta:** This package is in beta. Install with the `@beta` tag.
 
 ## Installation
 
 ```bash
-npm install @guidekit/core
+npm install @guidekit/core@beta
 ```
 
 ## Overview
@@ -68,7 +72,8 @@ All errors extend `GuideKitError` with structured metadata:
 
 ## Documentation
 
-Full documentation: [guidekit.dev/docs](https://guidekit.dev/docs)
+- Full documentation: [guidekit.dev/docs](https://guidekit.dev/docs)
+- [Main README](../../README.md)
 
 ## License
 

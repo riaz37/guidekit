@@ -1,17 +1,21 @@
 # @guidekit/cli
 
+[![npm version](https://img.shields.io/npm/v/@guidekit/cli/beta?style=flat-square)](https://www.npmjs.com/package/@guidekit/cli)
+
 CLI tools for the GuideKit SDK. Scaffolds projects, diagnoses configuration issues, and generates signing secrets.
+
+> **Beta:** This package is in beta. Install with the `@beta` tag.
 
 ## Installation
 
 ```bash
-npm install -g @guidekit/cli
+npm install -g @guidekit/cli@beta
 ```
 
 Or use directly with `npx`:
 
 ```bash
-npx guidekit <command>
+npx @guidekit/cli@beta <command>
 ```
 
 ## Commands
@@ -53,7 +57,8 @@ Copy the output into your `.env.local` as `GUIDEKIT_SECRET`.
 
 ## Documentation
 
-Full documentation: [guidekit.dev/docs/cli](https://guidekit.dev/docs/cli)
+- Full documentation: [guidekit.dev/docs/cli](https://guidekit.dev/docs/cli)
+- [Main README](../../README.md)
 
 ## License
 

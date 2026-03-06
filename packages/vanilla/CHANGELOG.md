@@ -38,10 +38,6 @@
   - Test infrastructure: extracted shared mock factories, per-glob coverage thresholds
 
 - Updated dependencies
-- Updated dependencies
-- Updated dependencies
-- Updated dependencies
-- Updated dependencies
   - @guidekit/core@0.1.0
 
 ## 0.1.0-beta.2

@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="https://img.shields.io/npm/v/@guidekit/core?label=core&color=6366f1&style=flat-square" alt="core version" />
-  <img src="https://img.shields.io/npm/v/@guidekit/react?label=react&color=6366f1&style=flat-square" alt="react version" />
-  <img src="https://img.shields.io/npm/v/@guidekit/server?label=server&color=6366f1&style=flat-square" alt="server version" />
+  <img src="https://img.shields.io/npm/v/@guidekit/core/beta?label=core&color=6366f1&style=flat-square" alt="core version" />
+  <img src="https://img.shields.io/npm/v/@guidekit/react/beta?label=react&color=6366f1&style=flat-square" alt="react version" />
+  <img src="https://img.shields.io/npm/v/@guidekit/server/beta?label=server&color=6366f1&style=flat-square" alt="server version" />
   <img src="https://img.shields.io/github/license/riaz37/guidekit?style=flat-square" alt="license" />
-  <img src="https://img.shields.io/badge/tests-980%20passing-brightgreen?style=flat-square" alt="tests" />
+  <img src="https://img.shields.io/badge/tests-1242%20passing-brightgreen?style=flat-square" alt="tests" />
   <img src="https://img.shields.io/badge/TypeScript-strict-blue?style=flat-square" alt="typescript" />
 </p>
 
@@ -21,6 +21,8 @@
 </p>
 
 ---
+
+> **Beta Notice:** GuideKit is currently in beta (`v0.1.0-beta.1`). The API is stabilizing but may still change between releases. All npm packages are published under the `@beta` dist-tag. Bug reports and feedback are welcome via [GitHub Issues](https://github.com/riaz37/guidekit/issues).
 
 ## Why GuideKit?
 
@@ -342,7 +344,7 @@ pnpm install        # Install dependencies
 pnpm build          # Build all 8 packages
 pnpm typecheck      # TypeScript strict mode
 pnpm lint           # ESLint
-pnpm test:unit      # 980 unit tests
+pnpm test:unit      # 1242 unit tests
 pnpm test:e2e       # Playwright E2E tests
 pnpm size:check     # Bundle size limits
 ```
@@ -357,17 +359,19 @@ guidekit/
 │   ├── server/     # @guidekit/server — token auth
 │   ├── vanilla/    # @guidekit/vanilla — IIFE bundle
 │   ├── vad/        # @guidekit/vad — Silero VAD
-│   └── cli/        # @guidekit/cli — tooling
+│   ├── cli/        # @guidekit/cli — tooling
+│   ├── intelligence/ # @guidekit/intelligence — semantic analysis
+│   ├── knowledge/   # @guidekit/knowledge — BM25/TF-IDF search
+│   └── plugins/     # @guidekit/plugins — plugin system
 ├── apps/
 │   ├── docs/            # Documentation (Nextra)
-│   ├── example-nextjs/  # Reference Next.js app
-│   └── playground/      # Interactive demo
+│   └── example-nextjs/  # Reference Next.js app
 └── e2e/                 # Playwright E2E tests
 ```
 
 ## Contributing
 
-Contributions are welcome! Please read the [CHANGELOG](./CHANGELOG.md) to understand the current state.
+Contributions are welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 
 ```bash
 # Fork, clone, then:
@@ -379,4 +383,4 @@ pnpm test:unit      # Make sure everything passes
 
 ## License
 
-[MIT](./LICENSE) — Copyright (c) 2025 GuideKit
+[MIT](./LICENSE) — Copyright (c) 2025-present GuideKit

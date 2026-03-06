@@ -1,11 +1,15 @@
 # @guidekit/server
 
+[![npm version](https://img.shields.io/npm/v/@guidekit/server/beta?style=flat-square)](https://www.npmjs.com/package/@guidekit/server)
+
 Server-side utilities for the GuideKit SDK. Provides secure token generation and validation so API keys never reach the browser.
+
+> **Beta:** This package is in beta. Install with the `@beta` tag.
 
 ## Installation
 
 ```bash
-npm install @guidekit/server
+npm install @guidekit/server@beta
 ```
 
 ## Token Generation
@@ -65,7 +69,8 @@ npx guidekit generate-secret
 
 ## Documentation
 
-Full documentation: [guidekit.dev/docs/server](https://guidekit.dev/docs/server)
+- Full documentation: [guidekit.dev/docs/server](https://guidekit.dev/docs/server)
+- [Main README](../../README.md)
 
 ## License
 

@@ -17,8 +17,4 @@
 ### Patch Changes
 
 - Updated dependencies
-- Updated dependencies
-- Updated dependencies
-- Updated dependencies
-- Updated dependencies
   - @guidekit/core@0.1.0
