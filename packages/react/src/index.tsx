@@ -1166,6 +1166,7 @@ function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetProps) {
   const shadowHostRef = useRef<HTMLDivElement | null>(null);
   const shadowRootRef = useRef<ShadowRoot | null>(null);
   const shadowContainerRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const fabRef = useRef<HTMLButtonElement | null>(null);
@@ -1351,6 +1352,11 @@ function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetProps) {
     }
   }, [core, isVoiceActive]);
 
+  const closePanel = useCallback(() => {
+    setIsOpen(false);
+    fabRef.current?.focus();
+  }, []);
+
   // ---- Keyboard handlers ----
 
   const handleKeyDown = useCallback(
@@ -1360,22 +1366,19 @@ function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetProps) {
         handleSend();
       }
       if (e.key === 'Escape') {
-        setIsOpen(false);
-        // Return focus to FAB
-        fabRef.current?.focus();
+        closePanel();
       }
     },
-    [handleSend],
+    [closePanel, handleSend],
   );
 
   const handlePanelKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (e.key === 'Escape') {
-        setIsOpen(false);
-        fabRef.current?.focus();
+        closePanel();
       }
     },
-    [],
+    [closePanel],
   );
 
   // ---- Consent handlers ----
@@ -1482,6 +1485,24 @@ function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetProps) {
     });
   }, []);
 
+  useEffect(() => {
+    const panelEl = panelRef.current;
+    if (!panelEl) return;
+
+    // Native listeners are more reliable than React's synthetic Shadow DOM
+    // path in browser automation, especially for Escape-driven close actions.
+    const handleNativePanelKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closePanel();
+      }
+    };
+
+    panelEl.addEventListener('keydown', handleNativePanelKeyDown);
+    return () => {
+      panelEl.removeEventListener('keydown', handleNativePanelKeyDown);
+    };
+  }, [closePanel]);
+
   // ---- Widget UI tree ----
 
   const widgetUI = (
@@ -1489,6 +1510,7 @@ function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetProps) {
       {/* Panel */}
       <div
         className="gk-panel"
+        ref={panelRef}
         data-open={isOpen ? 'true' : 'false'}
         role="dialog"
         aria-label={t('widgetTitle')}
@@ -1506,10 +1528,7 @@ function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetProps) {
           </div>
           <button
             className="gk-close-btn"
-            onClick={() => {
-              setIsOpen(false);
-              fabRef.current?.focus();
-            }}
+            onClick={closePanel}
             aria-label={t('closePanel')}
             tabIndex={isOpen ? 0 : -1}
           >
