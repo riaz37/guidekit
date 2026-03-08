@@ -1,6 +1,6 @@
 {
   "name": "@guidekit/plugins",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Plugin system for GuideKit SDK",
   "license": "MIT",
   "type": "module",

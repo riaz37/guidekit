@@ -1,5 +1,14 @@
 # @guidekit/example-nextjs
 
+## 0.0.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @guidekit/core@0.2.0
+  - @guidekit/react@0.2.0
+  - @guidekit/server@0.2.0
+
 ## 0.0.1
 
 ### Patch Changes
