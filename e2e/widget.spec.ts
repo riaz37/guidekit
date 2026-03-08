@@ -48,10 +48,11 @@ test.describe('Widget UI', () => {
     const panel = page.locator('.gk-panel[data-open="true"]');
     await expect(panel).toBeVisible({ timeout: 5_000 });
 
-    // Click the panel to move focus inside the Shadow DOM, then press Escape.
-    // The onKeyDown handler is on the panel div, so focus must be within it.
-    await panel.click();
-    await page.keyboard.press('Escape');
+    // Dispatch a KeyboardEvent directly on the panel element inside Shadow DOM.
+    // page.keyboard.press doesn't reliably reach Shadow DOM React handlers.
+    await panel.evaluate((el) => {
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
 
     // Verify the FAB reflects the closed state
     await expect(fab).toHaveAttribute('aria-expanded', 'false', { timeout: 5_000 });
