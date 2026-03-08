@@ -182,7 +182,7 @@ export class EventBus {
       // Snapshot to avoid issues if a handler adds/removes listeners
       const snapshot = exact.slice();
       for (const entry of snapshot) {
-        this.invokeSafe(entry.fn, data, eventKey);
+        this.invokeSafe(entry.fn, eventKey, data, eventKey);
       }
     }
 
@@ -195,7 +195,7 @@ export class EventBus {
       if (wildcardList) {
         const snapshot = wildcardList.slice();
         for (const entry of snapshot) {
-          this.invokeSafe(entry.fn, data, eventKey);
+          this.invokeSafe(entry.fn, eventKey, data, eventKey);
         }
       }
     }
@@ -204,7 +204,7 @@ export class EventBus {
     if (this.anyListeners.length > 0) {
       const snapshot = this.anyListeners.slice();
       for (const fn of snapshot) {
-        this.invokeSafe(fn, data, eventKey);
+        this.invokeSafe(fn, eventKey, data, eventKey);
       }
     }
   }
@@ -263,7 +263,7 @@ export class EventBus {
    * Invoke a handler inside a try/catch so one misbehaving handler never
    * prevents the remaining handlers from executing.
    */
-  private invokeSafe(fn: (...args: any[]) => void, ...args: any[]): void {
+  private invokeSafe(fn: (...args: any[]) => void, sourceEvent?: string, ...args: any[]): void {
     try {
       fn(...args);
     } catch (err) {
@@ -272,6 +272,13 @@ export class EventBus {
         'Handler threw an error:',
         err,
       );
+      // Re-emit to 'error' channel so consumers can observe handler failures,
+      // but only if the failing handler isn't itself an error handler (prevents loops).
+      if (sourceEvent !== 'error') {
+        queueMicrotask(() => {
+          this.emit('error' as any, err as any);
+        });
+      }
     }
   }
 }

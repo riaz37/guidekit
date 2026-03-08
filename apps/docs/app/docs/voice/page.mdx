@@ -36,16 +36,16 @@ Enable voice mode in the provider:
 Subscribe to voice lifecycle events via the `useGuideKitVoice` hook or the EventBus:
 
 ```tsx
-const { isListening, startVoice, stopVoice } = useGuideKitVoice();
+const { isListening, isSpeaking, startListening, stopListening, sendText } = useGuideKitVoice();
 ```
 
 | Event | Description |
 |-------|-------------|
-| `voice:vad_start` | User started speaking |
-| `voice:vad_end` | User stopped speaking |
-| `voice:stt_result` | Transcription received |
-| `voice:tts_start` | TTS playback started |
-| `voice:tts_end` | TTS playback finished |
+| `voice:state-change` | Voice state transition (from/to) |
+| `voice:transcript` | Transcription received (text, isFinal, confidence) |
+| `voice:tts-start` | TTS playback started |
+| `voice:tts-end` | TTS playback finished |
+| `voice:degraded` | Voice degraded to text fallback |
 
 ## Barge-in
 

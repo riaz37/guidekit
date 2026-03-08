@@ -209,7 +209,7 @@ export class WebSpeechTTS {
     };
 
     utterance.onend = () => {
-  
+      clearTimeout(watchdog);
       this.log('Utterance ended');
       // Emit final event to signal completion
       this.emitAudio({
@@ -220,7 +220,7 @@ export class WebSpeechTTS {
     };
 
     utterance.onerror = (event: SpeechSynthesisErrorEvent) => {
-  
+      clearTimeout(watchdog);
       // 'canceled' is not a real error — it occurs when stop() is called
       if (event.error === 'canceled') {
         this.log('Utterance cancelled');
@@ -239,6 +239,15 @@ export class WebSpeechTTS {
         timestamp: Date.now(),
       });
     };
+
+    // Watchdog for Chrome 15s silence bug: if onend doesn't fire within
+    // a generous timeout, force-cancel the stuck utterance
+    const estimatedDurationMs = Math.max(text.length * 80, 5000); // ~80ms per char, min 5s
+    const watchdogMs = estimatedDurationMs + 5000; // add 5s buffer
+    const watchdog = setTimeout(() => {
+      this.log('Watchdog: utterance timed out, force-cancelling');
+      synth.cancel(); // Cancel the stuck utterance — this triggers onerror with 'canceled'
+    }, watchdogMs);
 
     this.log('Speaking:', text.slice(0, 80) + (text.length > 80 ? '...' : ''));
     synth.speak(utterance);

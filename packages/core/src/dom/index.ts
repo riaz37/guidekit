@@ -171,7 +171,7 @@ function buildSelector(el: Element): string {
   // 1. GuideKit target (highest priority)
   const guideKitTarget = el.getAttribute('data-guidekit-target');
   if (guideKitTarget) {
-    return `[data-guidekit-target="${guideKitTarget}"]`;
+    return `[data-guidekit-target="${CSS.escape(guideKitTarget)}"]`;
   }
 
   // 2. ID
@@ -191,13 +191,13 @@ function buildSelector(el: Element): string {
   // 3. data-testid
   const testId = el.getAttribute('data-testid');
   if (testId) {
-    return `[data-testid="${testId}"]`;
+    return `[data-testid="${CSS.escape(testId)}"]`;
   }
 
   // 4. aria-label
   const ariaLabel = el.getAttribute('aria-label');
   if (ariaLabel) {
-    return `[aria-label="${ariaLabel}"]`;
+    return `[aria-label="${CSS.escape(ariaLabel)}"]`;
   }
 
   // 5. Structural path fallback
@@ -225,7 +225,7 @@ function buildStructuralPath(el: Element): string {
       );
       if (siblings.length > 1) {
         const index = siblings.indexOf(current) + 1;
-        parts.unshift(`${tag}:nth-child(${index})`);
+        parts.unshift(`${tag}:nth-of-type(${index})`);
       } else {
         parts.unshift(tag);
       }
@@ -571,6 +571,7 @@ export class DOMScanner {
       clearTimeout(this.circuitBrokenTimer);
       this.circuitBrokenTimer = null;
     }
+    this.visibilityMap.clear();
   }
 
   // -------------------------------------------------------------------------
@@ -966,7 +967,7 @@ export class DOMScanner {
     });
 
     // 2. Common modal patterns: high z-index + fixed/absolute positioning
-    const allElements = this.root.querySelectorAll('*');
+    const allElements = this.root.querySelectorAll('[style*="position"], [style*="z-index"], .modal, .dialog, .drawer, .popover, .dropdown, .overlay, [class*="modal"], [class*="dialog"], [class*="drawer"], [class*="popup"], [class*="overlay"]');
     const seen = new Set<Element>(dialogElements);
 
     allElements.forEach((el) => {

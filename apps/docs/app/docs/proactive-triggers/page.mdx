@@ -57,21 +57,6 @@ The Proactive Trigger Engine observes user behavior through the User Awareness S
 
 Each trigger tracks its own cooldown timer. After a trigger fires, it will not fire again until the cooldown period elapses. Cooldowns are stored in memory and reset on page reload.
 
-## Quiet Mode
-
-Disable all proactive triggers temporarily:
-
-```tsx
-const { setQuietMode } = useGuideKitActions();
-
-// Suppress proactive messages for 10 minutes
-setQuietMode(600000);
-```
-
 ## Events
 
-| Event | Description |
-|-------|-------------|
-| `proactive:triggered` | A trigger condition was met |
-| `proactive:dismissed` | User dismissed a proactive message |
-| `proactive:accepted` | User engaged with a proactive message |
+Proactive triggers emit events through the EventBus. Listen via `core.bus.on('llm:response-start', ...)` to track when proactive messages are sent.

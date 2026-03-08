@@ -10,7 +10,7 @@ npm install @guidekit/server
 
 ## `createSessionToken`
 
-Generates a signed JWT containing encrypted API keys. The client SDK sends this token with every request.
+Generates a signed JWT for client authentication. API keys are stored server-side in a `sessionKeyStore` keyed by the token's `jti` claim — they never leave the server or appear in the JWT payload. The client SDK sends this token with every request.
 
 ```typescript
 import { createSessionToken } from '@guidekit/server';

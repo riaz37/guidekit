@@ -178,10 +178,22 @@ export function useGuideKitStatus(): {
     [core],
   );
 
-  const getSnapshot = useCallback(
-    () => (core ? core.getSnapshot().status : SSR_SNAPSHOT.status),
-    [core],
-  );
+  const prevStatusRef = useRef(SSR_SNAPSHOT.status);
+  const getSnapshot = useCallback(() => {
+    if (!core) return SSR_SNAPSHOT.status;
+    const next = core.getSnapshot().status;
+    const prev = prevStatusRef.current;
+    // Shallow compare to avoid unnecessary re-renders
+    if (
+      prev.isReady === next.isReady &&
+      prev.agentState?.status === next.agentState?.status &&
+      prev.error === next.error
+    ) {
+      return prev;
+    }
+    prevStatusRef.current = next;
+    return next;
+  }, [core]);
 
   return useSyncExternalStore(subscribe, getSnapshot, () => SSR_SNAPSHOT.status);
 }
@@ -1181,6 +1193,8 @@ function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetProps) {
     const host = shadowHostRef.current;
     if (!host || shadowRootRef.current) return;
 
+    if (host.shadowRoot) { shadowRootRef.current = host.shadowRoot; return; }
+
     const shadow = host.attachShadow({ mode: 'open' });
     shadowRootRef.current = shadow;
 
@@ -1387,6 +1401,19 @@ function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetProps) {
       if (e.key === 'Escape') {
         setShowConsentDialog(false);
         fabRef.current?.focus();
+      }
+      if (e.key === 'Tab') {
+        const focusable = (e.currentTarget as HTMLElement).querySelectorAll('button');
+        if (focusable.length === 0) return;
+        const first = focusable[0] as HTMLElement;
+        const last = focusable[focusable.length - 1] as HTMLElement;
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     },
     [],

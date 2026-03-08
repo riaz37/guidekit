@@ -269,13 +269,17 @@ export class SileroVAD {
     };
 
     const results = await this._session.run(feeds);
+    inputTensor.dispose();
+    srTensor.dispose();
 
     // Update LSTM state for the next frame (dispose the old tensor to free memory).
     const oldState = this._state;
     this._state = results['stateN'] as ort.Tensor;
     oldState?.dispose();
 
-    const probability = (results['output'] as ort.Tensor).data[0] as number;
+    const outputTensor = results['output'] as ort.Tensor;
+    const probability = outputTensor.data[0] as number;
+    outputTensor.dispose();
     return probability;
   }
 

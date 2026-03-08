@@ -1,6 +1,6 @@
 {
   "name": "@guidekit/intelligence",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Semantic page intelligence engine for GuideKit SDK",
   "license": "MIT",
   "type": "module",

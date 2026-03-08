@@ -318,96 +318,114 @@ export class WebSocketManager {
 
     this._socket = ws;
 
-    // ── Connection timeout ──────────────────────────────────────────
-    this._connectTimer = setTimeout(() => {
-      if (ws.readyState === WebSocket.CONNECTING) {
-        this._log('Connection timed out');
-        // Force-close the socket; the close handler will trigger reconnection.
-        ws.close();
-      }
-    }, this._connectTimeoutMs);
+    return new Promise<void>((resolve, reject) => {
+      let settled = false;
 
-    // ── Socket event handlers ───────────────────────────────────────
-    const onOpen = () => {
-      this._clearConnectTimer();
-      this._reconnectAttempts = 0;
-      this._setState('connected');
-      this._log('Connected');
-
-      // Notify listeners
-      for (const cb of this._onOpenCallbacks) {
-        try {
-          cb();
-        } catch {
-          // Swallow listener errors
+      // ── Connection timeout ──────────────────────────────────────────
+      this._connectTimer = setTimeout(() => {
+        if (ws.readyState === WebSocket.CONNECTING) {
+          this._log('Connection timed out');
+          ws.close();
+          if (!settled) {
+            settled = true;
+            reject(new Error(`WebSocket connection timed out after ${this._connectTimeoutMs}ms`));
+          }
         }
-      }
+      }, this._connectTimeoutMs);
 
-      // Flush queued messages
-      this._flushQueue();
-    };
+      // ── Socket event handlers ───────────────────────────────────────
+      const onOpen = () => {
+        this._clearConnectTimer();
+        this._reconnectAttempts = 0;
+        this._setState('connected');
+        this._log('Connected');
 
-    const onClose = (event: CloseEvent) => {
-      this._clearConnectTimer();
-      this._log(`Socket closed — code=${event.code} reason="${event.reason}"`);
-
-      // Notify close listeners
-      for (const cb of this._onCloseCallbacks) {
-        try {
-          cb(event.code, event.reason);
-        } catch {
-          // Swallow listener errors
+        // Notify listeners
+        for (const cb of this._onOpenCallbacks) {
+          try {
+            cb();
+          } catch {
+            // Swallow listener errors
+          }
         }
-      }
 
-      // Clean up this socket reference if it is the current one
-      if (this._socket === ws) {
-        this._socket = null;
-      }
+        // Flush queued messages
+        this._flushQueue();
 
-      // Only attempt reconnection if the manager hasn't been destroyed or
-      // intentionally closed (state would be 'disconnected' in that case).
-      if (
-        !this._destroyed &&
-        this._state !== 'disconnected' &&
-        this._state !== 'suspended' &&
-        this._state !== 'failed'
-      ) {
-        this._setState('disconnected');
-        this._handleConnectionFailure();
-      }
-    };
-
-    const onError = (event: Event) => {
-      this._log('Socket error');
-      for (const cb of this._onErrorCallbacks) {
-        try {
-          cb(event);
-        } catch {
-          // Swallow listener errors
+        if (!settled) {
+          settled = true;
+          resolve();
         }
-      }
-      // The `close` event will follow the `error` event, so reconnection
-      // logic is handled there.
-    };
+      };
 
-    const onMessage = (event: MessageEvent) => {
-      for (const cb of this._onMessageCallbacks) {
-        try {
-          cb(event);
-        } catch {
-          // Swallow listener errors
+      const onClose = (event: CloseEvent) => {
+        this._clearConnectTimer();
+        this._log(`Socket closed — code=${event.code} reason="${event.reason}"`);
+
+        // Notify close listeners
+        for (const cb of this._onCloseCallbacks) {
+          try {
+            cb(event.code, event.reason);
+          } catch {
+            // Swallow listener errors
+          }
         }
-      }
-    };
 
-    ws.addEventListener('open', onOpen);
-    ws.addEventListener('close', onClose);
-    ws.addEventListener('error', onError);
-    ws.addEventListener('message', onMessage);
+        // Clean up this socket reference if it is the current one
+        if (this._socket === ws) {
+          this._socket = null;
+        }
 
-    // Store references for later removal
-    this._listenerRefs.set(ws, { onOpen, onClose, onError, onMessage });
+        // Only attempt reconnection if the manager hasn't been destroyed or
+        // intentionally closed (state would be 'disconnected' in that case).
+        if (
+          !this._destroyed &&
+          this._state !== 'disconnected' &&
+          this._state !== 'suspended' &&
+          this._state !== 'failed'
+        ) {
+          this._setState('disconnected');
+          this._handleConnectionFailure();
+        }
+
+        // Reject the connect promise if it hasn't been resolved yet
+        if (!settled) {
+          settled = true;
+          reject(new Error(`WebSocket closed before opening — code=${event.code}`));
+        }
+      };
+
+      const onError = (event: Event) => {
+        this._log('Socket error');
+        for (const cb of this._onErrorCallbacks) {
+          try {
+            cb(event);
+          } catch {
+            // Swallow listener errors
+          }
+        }
+        // The `close` event will follow the `error` event, so reconnection
+        // logic is handled there.
+      };
+
+      const onMessage = (event: MessageEvent) => {
+        for (const cb of this._onMessageCallbacks) {
+          try {
+            cb(event);
+          } catch {
+            // Swallow listener errors
+          }
+        }
+      };
+
+      ws.addEventListener('open', onOpen);
+      ws.addEventListener('close', onClose);
+      ws.addEventListener('error', onError);
+      ws.addEventListener('message', onMessage);
+
+      // Store references for later removal
+      this._listenerRefs.set(ws, { onOpen, onClose, onError, onMessage });
+    });
   }
 
   private _detachSocketListeners(ws: WebSocket): void {
@@ -450,7 +468,9 @@ export class WebSocketManager {
       if (this._destroyed || this._state === 'suspended' || this._state === 'failed') return;
 
       this._setState('connecting');
-      await this._attemptConnection();
+      await this._attemptConnection().catch((err) => {
+        this._log('Reconnection attempt failed: ' + (err?.message ?? err));
+      });
     }, delay);
   }
 

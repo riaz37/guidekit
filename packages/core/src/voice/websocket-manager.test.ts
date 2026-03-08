@@ -115,6 +115,14 @@ function lastSocket(): MockWebSocket {
   return inst[inst.length - 1]!;
 }
 
+/** Helper: start connect, advance microtask, open socket, await resolution. */
+async function connectAndOpen(mgr: WebSocketManager): Promise<void> {
+  const p = mgr.connect();
+  await vi.advanceTimersByTimeAsync(0);
+  lastSocket().simulateOpen();
+  await p;
+}
+
 /** Create a manager with sensible test defaults. */
 function createManager(overrides: Partial<Parameters<typeof WebSocketManager['prototype']['connect']> extends never[]
   ? Record<string, never>
@@ -142,6 +150,7 @@ describe('WebSocketManager', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.useRealTimers();
     removeMockWebSocket();
     MockWebSocket.instances = [];
@@ -178,8 +187,7 @@ describe('WebSocketManager', () => {
 
   it('close() transitions to "disconnected"', async () => {
     const mgr = createManager();
-    await mgr.connect();
-    lastSocket().simulateOpen();
+    await connectAndOpen(mgr);
 
     expect(mgr.state).toBe('connected');
 
@@ -191,8 +199,7 @@ describe('WebSocketManager', () => {
 
   it('send() when connected sends data immediately', async () => {
     const mgr = createManager();
-    await mgr.connect();
-    lastSocket().simulateOpen();
+    await connectAndOpen(mgr);
 
     mgr.send('hello');
     expect(lastSocket().sent).toContain('hello');
@@ -224,13 +231,16 @@ describe('WebSocketManager', () => {
 
   it('send() when failed throws error', async () => {
     const mgr = createManager({ maxReconnectAttempts: 0 });
-    await mgr.connect();
+    const connectPromise = mgr.connect();
+    // Attach catch before advancing timers to avoid unhandled rejection
+    const safePromise = connectPromise.catch(() => {});
     await vi.advanceTimersByTimeAsync(0);
 
     // Force a close that triggers reconnection logic — but with 0 max attempts
     // it should immediately go to 'failed'
     lastSocket().simulateClose(1006, 'abnormal');
     await vi.advanceTimersByTimeAsync(0);
+    await safePromise;
 
     expect(mgr.state).toBe('failed');
     expect(() => mgr.send('test')).toThrow(/FAILED/);
@@ -240,8 +250,7 @@ describe('WebSocketManager', () => {
 
   it('send() when suspended throws error', async () => {
     const mgr = createManager();
-    await mgr.connect();
-    lastSocket().simulateOpen();
+    await connectAndOpen(mgr);
     mgr.suspend();
 
     expect(mgr.state).toBe('suspended');
@@ -252,10 +261,8 @@ describe('WebSocketManager', () => {
 
   it('queue flushes on reconnection', async () => {
     const mgr = createManager();
-    await mgr.connect();
-    await vi.advanceTimersByTimeAsync(0);
+    await connectAndOpen(mgr);
     const sock1 = lastSocket();
-    sock1.simulateOpen();
 
     // Queue a message while disconnecting
     // Simulate a server-side close (triggers reconnection)
@@ -283,7 +290,7 @@ describe('WebSocketManager', () => {
 
   it('queue drops oldest when exceeding 50 messages', async () => {
     const mgr = createManager();
-    await mgr.connect();
+    const connectPromise = mgr.connect();
     await vi.advanceTimersByTimeAsync(0);
 
     // State is 'connecting' since we haven't simulated open.
@@ -298,7 +305,7 @@ describe('WebSocketManager', () => {
 
     // Now open — the flush should have dropped the oldest 2 messages
     lastSocket().simulateOpen();
-    await vi.advanceTimersByTimeAsync(0);
+    await connectPromise;
 
     const sent = lastSocket().sent;
     // msg-0 and msg-1 should have been dropped; msg-2 should be the first
@@ -316,13 +323,16 @@ describe('WebSocketManager', () => {
     const states: WSState[] = [];
     mgr.onStateChange((s) => states.push(s));
 
-    await mgr.connect();
+    const connectPromise = mgr.connect();
+    // Attach catch before advancing timers to avoid unhandled rejection
+    const safePromise = connectPromise.catch(() => {});
     await vi.advanceTimersByTimeAsync(0);
 
     expect(mgr.state).toBe('connecting');
 
     // Advance past the timeout without opening the socket
     await vi.advanceTimersByTimeAsync(600);
+    await safePromise;
 
     // The timeout handler calls ws.close() which triggers the close event,
     // which in turn triggers the reconnection logic.
@@ -342,7 +352,9 @@ describe('WebSocketManager', () => {
       maxDelay: 10000,
     });
 
-    await mgr.connect();
+    const connectPromise = mgr.connect();
+    // Attach catch before advancing timers to avoid unhandled rejection
+    const safePromise = connectPromise.catch(() => {});
     await vi.advanceTimersByTimeAsync(0);
     const sock1 = lastSocket();
     const instanceCountBefore = MockWebSocket.instances.length;
@@ -350,6 +362,7 @@ describe('WebSocketManager', () => {
     // Close the connection to trigger reconnection
     sock1.simulateClose(1006, 'abnormal');
     await vi.advanceTimersByTimeAsync(0);
+    await safePromise;
 
     // First reconnect: delay = 100 * 2^0 * 1.0 = 100ms
     expect(mgr.state).toBe('reconnecting');
@@ -358,8 +371,6 @@ describe('WebSocketManager', () => {
 
     // A new socket should have been created
     expect(MockWebSocket.instances.length).toBeGreaterThan(instanceCountBefore);
-
-    vi.restoreAllMocks();
   });
 
   // ── Max reconnect attempts → FAILED state ──────────────────────────
@@ -369,7 +380,9 @@ describe('WebSocketManager', () => {
     const states: WSState[] = [];
     mgr.onStateChange((s) => states.push(s));
 
-    await mgr.connect();
+    const connectPromise = mgr.connect();
+    // Attach catch before advancing timers to avoid unhandled rejection
+    const safePromise = connectPromise.catch(() => {});
     await vi.advanceTimersByTimeAsync(0);
 
     // Simulate repeated failures
@@ -379,6 +392,7 @@ describe('WebSocketManager', () => {
       // Advance past backoff delay to trigger next reconnection
       await vi.advanceTimersByTimeAsync(60_000);
     }
+    await safePromise;
 
     expect(mgr.state).toBe('failed');
     expect(states).toContain('failed');
@@ -388,10 +402,7 @@ describe('WebSocketManager', () => {
 
   it('suspend() stops reconnection attempts', async () => {
     const mgr = createManager({ maxReconnectAttempts: 5 });
-    await mgr.connect();
-    await vi.advanceTimersByTimeAsync(0);
-
-    lastSocket().simulateOpen();
+    await connectAndOpen(mgr);
     expect(mgr.state).toBe('connected');
 
     // Suspend while connected
@@ -408,9 +419,7 @@ describe('WebSocketManager', () => {
 
   it('resume() from suspended triggers reconnection', async () => {
     const mgr = createManager();
-    await mgr.connect();
-    await vi.advanceTimersByTimeAsync(0);
-    lastSocket().simulateOpen();
+    await connectAndOpen(mgr);
 
     mgr.suspend();
     expect(mgr.state).toBe('suspended');
@@ -442,9 +451,7 @@ describe('WebSocketManager', () => {
     mgr.onMessage(messageCb);
     mgr.onError(errorCb);
 
-    await mgr.connect();
-    await vi.advanceTimersByTimeAsync(0);
-    lastSocket().simulateOpen();
+    await connectAndOpen(mgr);
 
     mgr.destroy();
 
@@ -462,9 +469,7 @@ describe('WebSocketManager', () => {
     const openCb = vi.fn();
     mgr.onOpen(openCb);
 
-    await mgr.connect();
-    await vi.advanceTimersByTimeAsync(0);
-    lastSocket().simulateOpen();
+    await connectAndOpen(mgr);
 
     expect(openCb).toHaveBeenCalledOnce();
   });
@@ -476,9 +481,7 @@ describe('WebSocketManager', () => {
     const closeCb = vi.fn();
     mgr.onClose(closeCb);
 
-    await mgr.connect();
-    await vi.advanceTimersByTimeAsync(0);
-    lastSocket().simulateOpen();
+    await connectAndOpen(mgr);
     lastSocket().simulateClose(1000, 'normal');
 
     expect(closeCb).toHaveBeenCalledWith(1000, 'normal');
@@ -491,9 +494,7 @@ describe('WebSocketManager', () => {
     const msgCb = vi.fn();
     mgr.onMessage(msgCb);
 
-    await mgr.connect();
-    await vi.advanceTimersByTimeAsync(0);
-    lastSocket().simulateOpen();
+    await connectAndOpen(mgr);
     lastSocket().simulateMessage('hello');
 
     expect(msgCb).toHaveBeenCalledOnce();
@@ -507,7 +508,7 @@ describe('WebSocketManager', () => {
     const errorCb = vi.fn();
     mgr.onError(errorCb);
 
-    await mgr.connect();
+    const connectPromise = mgr.connect();
     await vi.advanceTimersByTimeAsync(0);
     lastSocket().simulateError();
 
@@ -521,9 +522,7 @@ describe('WebSocketManager', () => {
     const stateChanges: [WSState, WSState][] = [];
     mgr.onStateChange((state, prev) => stateChanges.push([state, prev]));
 
-    await mgr.connect();
-    await vi.advanceTimersByTimeAsync(0);
-    lastSocket().simulateOpen();
+    await connectAndOpen(mgr);
 
     expect(stateChanges).toEqual([
       ['connecting', 'disconnected'],
@@ -557,9 +556,7 @@ describe('WebSocketManager', () => {
     unsubClose();
     unsubError();
 
-    await mgr.connect();
-    await vi.advanceTimersByTimeAsync(0);
-    lastSocket().simulateOpen();
+    await connectAndOpen(mgr);
     lastSocket().simulateMessage('test');
     lastSocket().simulateError();
     lastSocket().simulateClose();
@@ -580,11 +577,13 @@ describe('WebSocketManager', () => {
       url: async () => 'wss://dynamic.example.com/ws',
     });
 
-    await mgr.connect();
+    const connectPromise = mgr.connect();
     await vi.advanceTimersByTimeAsync(0);
 
     const sock = lastSocket();
     expect(sock.url).toBe('wss://dynamic.example.com/ws');
+    sock.simulateOpen();
+    await connectPromise;
   });
 
   // ── Protocols are passed to WebSocket constructor ──────────────────
@@ -592,28 +591,31 @@ describe('WebSocketManager', () => {
   it('passes protocols to WebSocket constructor', async () => {
     const mgr = createManager({ protocols: ['graphql-ws'] });
 
-    await mgr.connect();
+    const connectPromise = mgr.connect();
     await vi.advanceTimersByTimeAsync(0);
 
     const sock = lastSocket();
     expect(sock.protocols).toEqual(['graphql-ws']);
+    sock.simulateOpen();
+    await connectPromise;
   });
 
   // ── Idempotent connect() ───────────────────────────────────────────
 
   it('connect() is a no-op if already connected or connecting', async () => {
     const mgr = createManager();
-    await mgr.connect();
+    const connectPromise = mgr.connect();
     await vi.advanceTimersByTimeAsync(0);
 
     const countBefore = MockWebSocket.instances.length;
 
-    // Call connect again while connecting
+    // Call connect again while connecting — should be a no-op
     await mgr.connect();
     expect(MockWebSocket.instances.length).toBe(countBefore);
 
     // Open the connection
     lastSocket().simulateOpen();
+    await connectPromise;
     expect(mgr.state).toBe('connected');
 
     // Call connect again while connected
@@ -625,9 +627,7 @@ describe('WebSocketManager', () => {
 
   it('resume() is a no-op if not in suspended state', async () => {
     const mgr = createManager();
-    await mgr.connect();
-    await vi.advanceTimersByTimeAsync(0);
-    lastSocket().simulateOpen();
+    await connectAndOpen(mgr);
 
     const stateChanges: WSState[] = [];
     mgr.onStateChange((s) => stateChanges.push(s));
@@ -641,7 +641,9 @@ describe('WebSocketManager', () => {
   it('connect() from FAILED state resets attempt counter', async () => {
     const mgr = createManager({ maxReconnectAttempts: 1 });
 
-    await mgr.connect();
+    const connectPromise = mgr.connect();
+    // Attach catch before advancing timers to avoid unhandled rejection
+    const safePromise = connectPromise.catch(() => {});
     await vi.advanceTimersByTimeAsync(0);
 
     // Simulate repeated failures to reach FAILED
@@ -649,15 +651,17 @@ describe('WebSocketManager', () => {
     await vi.advanceTimersByTimeAsync(60_000);
     lastSocket().simulateClose(1006, 'abnormal');
     await vi.advanceTimersByTimeAsync(60_000);
+    await safePromise;
 
     expect(mgr.state).toBe('failed');
 
     // Now calling connect() should work and reset attempts
-    await mgr.connect();
+    const connectPromise2 = mgr.connect();
     await vi.advanceTimersByTimeAsync(0);
 
     expect(mgr.state).toBe('connecting');
     lastSocket().simulateOpen();
+    await connectPromise2;
     expect(mgr.state).toBe('connected');
   });
 });

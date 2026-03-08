@@ -2,39 +2,50 @@
 
 GuideKit provides multiple mechanisms to protect user privacy and control what data reaches external LLM providers.
 
-## `onBeforeLLMCall` Hook
+## EventBus Privacy Hook
 
-Intercept and modify every payload before it is sent to the LLM. Use this to redact PII, filter content, or block requests entirely.
+Intercept LLM payloads via the EventBus `llm:response-start` event. Use this to redact PII, log requests, or implement custom filtering.
 
 ```tsx
-<GuideKitProvider
-  tokenEndpoint="/api/guidekit/token"
-  agent={{ name: 'Guide' }}
-  options={{
-    privacy: {
-      onBeforeLLMCall: (payload) => {
-        // Redact email addresses
-        payload.messages = payload.messages.map((msg) => ({
-          ...msg,
-          content: msg.content.replace(
-            /[\w.-]+@[\w.-]+\.\w+/g,
-            '[REDACTED_EMAIL]'
-          ),
-        }));
+import { useGuideKitCore } from '@guidekit/react';
+import { useEffect } from 'react';
 
-        // Return null to block the request entirely
-        // return null;
+function PrivacyGuard() {
+  const core = useGuideKitCore();
 
-        return payload;
-      },
-    },
-  }}
->
-  {children}
-</GuideKitProvider>
+  useEffect(() => {
+    if (!core) return;
+
+    const unsub = core.bus.on('llm:response-start', (event) => {
+      console.log('LLM request started:', event.conversationId);
+    });
+
+    return unsub;
+  }, [core]);
+
+  return null;
+}
 ```
 
-If `onBeforeLLMCall` returns `null`, the request is cancelled and the SDK emits a `PRIVACY_HOOK_CANCELLED` error.
+For content filtering, use the `setPageContext` hook to control what page data is sent to the LLM:
+
+```tsx
+import { useGuideKitContext } from '@guidekit/react';
+
+function FilteredPage() {
+  const { setPageContext } = useGuideKitContext();
+
+  useEffect(() => {
+    // Only send non-sensitive context to the LLM
+    setPageContext({
+      pageName: 'Settings',
+      // Omit sensitive fields like passwords, tokens, etc.
+    });
+  }, [setPageContext]);
+
+  return <SettingsPage />;
+}
+```
 
 ## `data-guidekit-ignore`
 
@@ -54,7 +65,7 @@ Use this for:
 
 ## Token-based Authentication
 
-API keys never reach the browser. The `@guidekit/server` package generates short-lived JWTs that the client SDK uses to authenticate. Keys are encrypted within the token payload and decrypted server-side by the provider adapters.
+API keys never reach the browser. The `@guidekit/server` package generates short-lived JWTs that the client SDK uses to authenticate. API keys are stored server-side in a `sessionKeyStore` keyed by the token's `jti` claim and are never included in the JWT payload.
 
 ## Security Deny-list
 

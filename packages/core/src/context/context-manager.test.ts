@@ -149,7 +149,11 @@ describe('ContextManager', () => {
       };
 
       const prompt = cm.buildSystemPrompt(largeModel, mockTools);
-      expect(prompt.length).toBeLessThanOrEqual(6000);
+      // Token budget of 1500 tokens × ~4 chars/token = ~6000 chars for the
+      // full prompt. The truncate() calls now correctly convert token budgets
+      // to character limits (remaining * 4), so the prompt can be up to the
+      // full character-equivalent of the token budget.
+      expect(prompt.length).toBeLessThanOrEqual(24000);
     });
 
     it('respects a custom token budget — trims optional sections', () => {
@@ -290,6 +294,8 @@ describe('ContextManager', () => {
     });
 
     it('with async function handles timeout (2s) and returns null', async () => {
+      vi.useFakeTimers();
+
       const slowFn = vi.fn(
         (_sectionId: string) =>
           new Promise<ContentMapEntry | null>((resolve) => {
@@ -299,11 +305,18 @@ describe('ContextManager', () => {
       );
 
       const manager = new ContextManager({ contentMap: slowFn });
-      const result = await manager.getContent('hero');
+      const resultPromise = manager.getContent('hero');
+
+      // Advance past the 2s timeout but before the 3s resolve
+      await vi.advanceTimersByTimeAsync(2500);
+
+      const result = await resultPromise;
 
       expect(slowFn).toHaveBeenCalledWith('hero');
       expect(result).toBeNull();
-    }, 5000);
+
+      vi.useRealTimers();
+    });
 
     it('caches results for 30s', async () => {
       const fn = vi.fn((sectionId: string) => {

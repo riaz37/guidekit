@@ -24,6 +24,16 @@ const DANGEROUS_ELEMENTS = new Set(['script', 'iframe', 'object', 'embed', 'form
 const DANGEROUS_ATTR_RE = /^on/i;
 const DANGEROUS_HREF_RE = /^\s*(javascript|data):/i;
 
+/** Escape HTML special characters to prevent injection in rendered output. */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /** Convert a heading string into a URL-safe slug for anchor linking. */
 function slugify(text: string): string {
   return text
@@ -81,25 +91,30 @@ function createRenderer(): RendererObject {
 
     link({ href, title, tokens }: Tokens.Link): string {
       const text = this.parser.parseInline(tokens);
-      const titleAttr = title ? ` title="${title}"` : '';
+      // Strip dangerous protocols
+      if (DANGEROUS_HREF_RE.test(href)) {
+        return `<span>${text}</span>`;
+      }
+      const safeHref = escapeHtml(href);
+      const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
       const isExternal = /^https?:\/\//.test(href);
       const externalAttrs = isExternal ? ' target="_blank" rel="noopener noreferrer"' : '';
-      return `<a href="${href}"${titleAttr}${externalAttrs}>${text}</a>`;
+      return `<a href="${safeHref}"${titleAttr}${externalAttrs}>${text}</a>`;
     },
 
     code({ text, lang }: Tokens.Code): string {
-      const langClass = lang ? ` class="language-${lang}"` : '';
-      const escaped = text.replace(/"/g, '&quot;');
+      const safeLang = lang ? ` class="language-${escapeHtml(lang)}"` : '';
+      const safeText = escapeHtml(text);
       return (
         `<div class="gk-code-block">` +
-        `<button class="gk-copy-btn" data-code="${escaped}">Copy</button>` +
-        `<pre><code${langClass}>${text}</code></pre>` +
+        `<button class="gk-copy-btn" data-code="${safeText}">Copy</button>` +
+        `<pre><code${safeLang}>${safeText}</code></pre>` +
         `</div>\n`
       );
     },
 
     codespan({ text }: Tokens.Codespan): string {
-      return `<code class="gk-inline-code">${text}</code>`;
+      return `<code class="gk-inline-code">${escapeHtml(text)}</code>`;
     },
   };
 }

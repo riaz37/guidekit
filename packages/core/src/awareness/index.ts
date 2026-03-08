@@ -134,6 +134,10 @@ export class AwarenessSystem {
 
   private lastMouseMoveAt = 0;
 
+  // ---- Bus subscription cleanup ------------------------------------------
+
+  private _scanCompleteUnsub: (() => void) | null = null;
+
   // -----------------------------------------------------------------------
   // Constructor
   // -----------------------------------------------------------------------
@@ -182,6 +186,11 @@ export class AwarenessSystem {
     // -- IntersectionObserver for sections ---------------------------------
     this.initSectionObserver();
 
+    // -- Re-observe sections on DOM scan completion (SPA navigation) -------
+    this._scanCompleteUnsub = this.bus.on('dom:scan-complete', () => {
+      this.refreshSections();
+    });
+
     // -- Idle timer --------------------------------------------------------
     this.scheduleIdleTimer();
 
@@ -205,6 +214,12 @@ export class AwarenessSystem {
     if (this.sectionObserver) {
       this.sectionObserver.disconnect();
       this.sectionObserver = null;
+    }
+
+    // Unsubscribe from bus events.
+    if (this._scanCompleteUnsub) {
+      this._scanCompleteUnsub();
+      this._scanCompleteUnsub = null;
     }
 
     // Clear timers.
@@ -482,6 +497,14 @@ export class AwarenessSystem {
     this.observeSections();
   }
 
+  /** Re-observe sections. Call after DOM changes (e.g., SPA navigation). */
+  refreshSections(): void {
+    if (!this.sectionObserver) return;
+    this.visibleSections.clear();
+    this.sectionObserver.disconnect();
+    this.observeSections();
+  }
+
   /**
    * Query the DOM for observable sections and start observing them.
    */
@@ -533,11 +556,23 @@ export class AwarenessSystem {
    */
   private buildSelector(el: Element): string {
     // Prefer id.
-    if (el.id) return `#${el.id}`;
+    if (el.id) {
+      try {
+        return `#${CSS.escape(el.id)}`;
+      } catch {
+        return `#${el.id}`;
+      }
+    }
 
     // data-guidekit-target
     const target = el.getAttribute('data-guidekit-target');
-    if (target) return `[data-guidekit-target="${target}"]`;
+    if (target) {
+      try {
+        return `[data-guidekit-target="${CSS.escape(target)}"]`;
+      } catch {
+        return `[data-guidekit-target="${target}"]`;
+      }
+    }
 
     // Construct a tag.class selector.
     const tag = el.tagName.toLowerCase();

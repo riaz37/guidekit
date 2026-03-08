@@ -11,7 +11,7 @@ const { mockRelease, mockDispose, mockRun, mockSessionCreate } = vi.hoisted(() =
   const mockDispose = vi.fn();
   const mockRelease = vi.fn().mockResolvedValue(undefined);
   const mockRun = vi.fn().mockResolvedValue({
-    output: { data: [0.1] },
+    output: { data: [0.1], dispose: mockDispose },
     stateN: { data: new Float32Array(256).fill(0), dispose: mockDispose },
   });
   const mockSessionCreate = vi.fn().mockResolvedValue({
@@ -191,7 +191,7 @@ beforeEach(() => {
 
   // Reset default mock responses
   mockRun.mockResolvedValue({
-    output: { data: [0.1] },
+    output: { data: [0.1], dispose: mockDispose },
     stateN: { data: new Float32Array(256).fill(0), dispose: mockDispose },
   });
 
@@ -386,7 +386,7 @@ describe('SileroVAD', () => {
 
     it('should return probability and update LSTM state', async () => {
       mockRun.mockResolvedValueOnce({
-        output: { data: [0.85] },
+        output: { data: [0.85], dispose: mockDispose },
         stateN: { data: new Float32Array(256).fill(0.1), dispose: mockDispose },
       });
 
@@ -396,7 +396,7 @@ describe('SileroVAD', () => {
 
       // Calling again should use the updated state (stateN from previous call)
       mockRun.mockResolvedValueOnce({
-        output: { data: [0.9] },
+        output: { data: [0.9], dispose: mockDispose },
         stateN: { data: new Float32Array(256).fill(0.2), dispose: mockDispose },
       });
       const prob2 = await vad.processFrame(makeFrame());
@@ -431,7 +431,7 @@ describe('SileroVAD', () => {
       // Return high probability for each call
       for (let i = 0; i < 9; i++) {
         mockRun.mockResolvedValueOnce({
-          output: { data: [0.8] },
+          output: { data: [0.8], dispose: mockDispose },
           stateN: { data: new Float32Array(256).fill(0), dispose: mockDispose },
         });
       }
@@ -459,7 +459,7 @@ describe('SileroVAD', () => {
       // Return high probability for 10 frames (= minSpeechFrames)
       for (let i = 0; i < 10; i++) {
         mockRun.mockResolvedValueOnce({
-          output: { data: [0.8] },
+          output: { data: [0.8], dispose: mockDispose },
           stateN: { data: new Float32Array(256).fill(0), dispose: mockDispose },
         });
       }
@@ -497,7 +497,7 @@ describe('SileroVAD', () => {
       // Send 15 silence frames (1 less than silenceFrames=16)
       for (let i = 0; i < 15; i++) {
         mockRun.mockResolvedValueOnce({
-          output: { data: [0.1] },
+          output: { data: [0.1], dispose: mockDispose },
           stateN: { data: new Float32Array(256).fill(0), dispose: mockDispose },
         });
       }
@@ -530,7 +530,7 @@ describe('SileroVAD', () => {
       // Send 16 silence frames (= silenceFrames)
       for (let i = 0; i < 16; i++) {
         mockRun.mockResolvedValueOnce({
-          output: { data: [0.1] },
+          output: { data: [0.1], dispose: mockDispose },
           stateN: { data: new Float32Array(256).fill(0), dispose: mockDispose },
         });
       }

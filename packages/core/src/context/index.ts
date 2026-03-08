@@ -608,7 +608,7 @@ export class ContextManager {
       optionalSections.push(sectionsStr);
       remaining -= estimateTokens(sectionsStr) + 2;
     } else if (remaining > 100) {
-      optionalSections.push(truncate(sectionsStr, remaining));
+      optionalSections.push(truncate(sectionsStr, remaining * 3));
       remaining = 0;
     }
 
@@ -619,7 +619,7 @@ export class ContextManager {
         optionalSections.push(navStr);
         remaining -= estimateTokens(navStr) + 2;
       } else if (remaining > 80) {
-        optionalSections.push(truncate(navStr, remaining));
+        optionalSections.push(truncate(navStr, remaining * 3));
         remaining = 0;
       }
     }
@@ -631,7 +631,7 @@ export class ContextManager {
         optionalSections.push(formsStr);
         remaining -= estimateTokens(formsStr) + 2;
       } else if (remaining > 80) {
-        optionalSections.push(truncate(formsStr, remaining));
+        optionalSections.push(truncate(formsStr, remaining * 3));
         remaining = 0;
       }
     }
@@ -642,7 +642,7 @@ export class ContextManager {
       if (estimateTokens(ieStr) <= remaining) {
         optionalSections.push(ieStr);
       } else if (remaining > 80) {
-        optionalSections.push(truncate(ieStr, remaining));
+        optionalSections.push(truncate(ieStr, remaining * 3));
       }
     }
 

@@ -16,6 +16,7 @@ const mockEventBus = {
   off: vi.fn(),
   emit: vi.fn(),
   onAny: vi.fn(),
+  removeAll: vi.fn(),
 };
 
 vi.mock('./bus/index.js', () => ({
@@ -26,6 +27,7 @@ vi.mock('./bus/index.js', () => ({
 const mockResourceManager = {
   register: vi.fn(),
   markReady: vi.fn(),
+  destroy: vi.fn(() => Promise.resolve()),
 };
 
 vi.mock('./resources/index.js', () => ({
@@ -629,7 +631,7 @@ describe('GuideKitCore.sendText() — onBeforeLLMCall privacy hook', () => {
   it('supports async hook functions', async () => {
     const hookFn = vi.fn(async (ctx: BeforeLLMCallContext) => {
       // Simulate async PII check
-      await new Promise((r) => setTimeout(r, 1));
+      await Promise.resolve();
       return { ...ctx, userMessage: 'scrubbed' };
     });
 

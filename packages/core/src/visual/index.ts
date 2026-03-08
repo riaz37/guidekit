@@ -589,7 +589,7 @@ export class VisualGuidance {
         );
         if (siblings.length > 1) {
           const index = siblings.indexOf(current) + 1;
-          parts.unshift(`${tag}:nth-child(${index})`);
+          parts.unshift(`${tag}:nth-of-type(${index})`);
         } else {
           parts.unshift(tag);
         }
@@ -736,8 +736,8 @@ export class VisualGuidance {
         'position: fixed',
         `z-index: ${TOOLTIP_Z_INDEX}`,
         'pointer-events: none',
-        'background: #ffffff',
-        'color: #1a1a2e',
+        'background: var(--gk-bg, #ffffff)',
+        'color: var(--gk-text-color, #1a1a2e)',
         'padding: 10px 14px',
         'border-radius: 8px',
         'font-size: 14px',
@@ -773,7 +773,7 @@ export class VisualGuidance {
     const arrowEl = document.createElement('div');
     arrowEl.setAttribute('data-guidekit-arrow', 'true');
     arrowEl.setAttribute('aria-hidden', 'true');
-    arrowEl.style.cssText = 'position: absolute; width: 16px; height: 16px; background: #ffffff; transform: rotate(45deg);';
+    arrowEl.style.cssText = 'position: absolute; width: 16px; height: 16px; background: var(--gk-bg, #ffffff); transform: rotate(45deg);';
     this.tooltipEl.appendChild(arrowEl);
 
     // Use @floating-ui/dom for positioning

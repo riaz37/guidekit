@@ -262,9 +262,8 @@ export class GeminiAdapter implements LLMProviderAdapter {
    * Returns the raw `ReadableStream` for the response body together with
    * the raw Response object.
    *
-   * Note: The Gemini API key is passed as a URL query parameter (`key=`).
-   * This is inherent to the Gemini REST SSE endpoint design; the key is
-   * transmitted over HTTPS so it remains encrypted in transit. (H3)
+   * Note: The Gemini API key is passed via the `x-goog-api-key` HTTP header.
+   * This avoids exposing the key in server logs and browser history. (H3)
    */
   async streamRequest(params: {
     systemPrompt: string;
@@ -283,7 +282,7 @@ export class GeminiAdapter implements LLMProviderAdapter {
       ? [...contentsArray, { role: 'user', parts: [{ text: params.userMessage }] }]
       : contentsArray;
 
-    const url = `${GEMINI_BASE_URL}/${this.model}:streamGenerateContent?alt=sse&key=${this.apiKey}`;
+    const url = `${GEMINI_BASE_URL}/${this.model}:streamGenerateContent?alt=sse`;
 
     const body: Record<string, unknown> = {
       systemInstruction: {
@@ -321,7 +320,10 @@ export class GeminiAdapter implements LLMProviderAdapter {
     try {
       response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': this.apiKey,
+        },
         body: JSON.stringify(body),
         signal: controller.signal,
       });

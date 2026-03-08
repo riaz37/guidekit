@@ -26,6 +26,10 @@ import type { LLMOrchestrator } from './index.js';
 export interface ToolHandler {
   name: string;
   execute: (args: Record<string, unknown>) => Promise<unknown>;
+  /** JSON Schema-style parameter definitions. Used for argument validation. */
+  parameters?: Record<string, { type?: string; required?: boolean }>;
+  /** Per-tool timeout in milliseconds. Overrides the executor's default. */
+  timeoutMs?: number;
 }
 
 /** Options for configuring the ToolExecutor. */
@@ -40,6 +44,8 @@ export interface ToolExecutorOptions {
   onToolResult?: (name: string, result: unknown, durationMs: number) => void;
   /** Called when a tool execution fails. */
   onToolError?: (name: string, error: Error) => void;
+  /** Default per-tool timeout in milliseconds. Default: 10000. */
+  toolTimeoutMs?: number;
 }
 
 /** A single executed tool call with its outcome. */
@@ -118,6 +124,7 @@ type InternalTurn = ConversationTurn | AssistantToolCallTurn | ToolResultTurn;
 export class ToolExecutor {
   private readonly maxRounds: number;
   private readonly debugEnabled: boolean;
+  private readonly defaultToolTimeoutMs?: number;
   private readonly handlers = new Map<string, ToolHandler>();
 
   // Callbacks
@@ -128,6 +135,7 @@ export class ToolExecutor {
   constructor(options?: ToolExecutorOptions) {
     this.maxRounds = options?.maxRounds ?? 5;
     this.debugEnabled = options?.debug ?? false;
+    this.defaultToolTimeoutMs = options?.toolTimeoutMs;
     this.onToolCallCb = options?.onToolCall;
     this.onToolResultCb = options?.onToolResult;
     this.onToolErrorCb = options?.onToolError;
@@ -533,10 +541,26 @@ export class ToolExecutor {
 
     this.onToolCallCb?.(toolCall.name, toolCall.arguments);
 
+    // W5-04: Validate required parameters if the handler declares a schema
+    if (handler.parameters) {
+      const validationError = this.validateArgs(toolCall.name, toolCall.arguments, handler.parameters);
+      if (validationError) {
+        return { result: undefined, error: validationError, durationMs: 0 };
+      }
+    }
+
     const startTime = performance.now();
+    const timeoutMs = handler.timeoutMs ?? this.defaultToolTimeoutMs ?? 10_000;
 
     try {
-      const result = await handler.execute(toolCall.arguments);
+      // W5-03: Per-tool execution timeout
+      let timeoutId: ReturnType<typeof setTimeout>;
+      const result = await Promise.race([
+        handler.execute(toolCall.arguments).finally(() => clearTimeout(timeoutId)),
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error(`Tool "${toolCall.name}" timed out after ${timeoutMs}ms`)), timeoutMs);
+        }),
+      ]);
       const durationMs = Math.round(performance.now() - startTime);
 
       this.onToolResultCb?.(toolCall.name, result, durationMs);
@@ -556,6 +580,35 @@ export class ToolExecutor {
 
       return { result: undefined, error: error.message, durationMs };
     }
+  }
+
+  // -----------------------------------------------------------------------
+  // Private: validate tool arguments
+  // -----------------------------------------------------------------------
+
+  /** Validate tool arguments against the handler's parameter schema. */
+  private validateArgs(
+    toolName: string,
+    args: Record<string, unknown>,
+    parameters: Record<string, { type?: string; required?: boolean }>,
+  ): string | null {
+    for (const [paramName, schema] of Object.entries(parameters)) {
+      const value = args[paramName];
+      if (schema.required && (value === undefined || value === null)) {
+        const msg = `Tool "${toolName}": missing required parameter "${paramName}"`;
+        this.log(msg);
+        return msg;
+      }
+      if (value !== undefined && value !== null && schema.type) {
+        const actualType = typeof value;
+        if (actualType !== schema.type) {
+          const msg = `Tool "${toolName}": parameter "${paramName}" expected ${schema.type}, got ${actualType}`;
+          this.log(msg);
+          return msg;
+        }
+      }
+    }
+    return null;
   }
 
   // -----------------------------------------------------------------------

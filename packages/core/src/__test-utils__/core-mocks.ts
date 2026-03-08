@@ -65,6 +65,7 @@ export function createMockEventBus() {
     off: vi.fn(),
     emit: vi.fn(),
     onAny: vi.fn(),
+    removeAll: vi.fn(),
   };
 }
 
@@ -72,6 +73,7 @@ export function createMockResourceManager() {
   return {
     register: vi.fn(),
     markReady: vi.fn(),
+    destroy: vi.fn(() => Promise.resolve()),
   };
 }
 

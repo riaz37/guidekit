@@ -39,14 +39,14 @@ import {
 } from '@guidekit/react';
 
 function MyComponent() {
-  const { status, isReady } = useGuideKitStatus();
-  const { sendText, reset } = useGuideKitActions();
-  const { isListening, startVoice, stopVoice } = useGuideKitVoice();
-  const { transcript, messages } = useGuideKitContext();
+  const { isReady, agentState } = useGuideKitStatus();
+  const { isListening, startListening, stopListening, sendText } = useGuideKitVoice();
+  const { highlight, scrollToSection, startTour, navigate } = useGuideKitActions();
+  const { setPageContext, registerAction } = useGuideKitContext();
 
   return (
     <div>
-      <p>Status: {status}</p>
+      <p>Status: {agentState.status}</p>
       <button onClick={() => sendText('Help me')}>Ask</button>
     </div>
   );

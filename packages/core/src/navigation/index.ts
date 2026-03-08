@@ -111,6 +111,10 @@ export class NavigationController {
         if (this.debug) console.warn(LOG_PREFIX, 'Blocked cross-origin navigation to', href);
         return false;
       }
+      if (!['http:', 'https:'].includes(target.protocol)) {
+        if (this.debug) console.debug(LOG_PREFIX, 'Blocked navigation to non-http protocol');
+        return false;
+      }
       href = target.href;
     } catch {
       if (this.debug) console.warn(LOG_PREFIX, 'Invalid URL:', href);
@@ -120,6 +124,7 @@ export class NavigationController {
     // Use developer-provided router if available
     if (this.router) {
       await this.router.push(href);
+      this.handleRouteChange(href);
       return true;
     }
 

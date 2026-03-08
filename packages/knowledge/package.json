@@ -1,6 +1,6 @@
 {
   "name": "@guidekit/knowledge",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Knowledge base with BM25/TF-IDF search for GuideKit SDK",
   "license": "MIT",
   "type": "module",

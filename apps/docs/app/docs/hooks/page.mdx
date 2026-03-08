@@ -169,6 +169,39 @@ useEffect(() => {
 }, [user, cart, setPageContext]);
 ```
 
+## useGuideKitStream
+
+Subscribes to the streaming text slice. Use for displaying real-time LLM output.
+
+```tsx
+const { isStreaming, streamingText, sendTextStream } = useGuideKitStream();
+```
+
+**Re-renders:** Only when streaming state or text changes.
+
+### Example
+
+```tsx
+function StreamingChat() {
+  const { isStreaming, streamingText, sendTextStream } = useGuideKitStream();
+  const [input, setInput] = useState('');
+
+  const handleSend = () => {
+    if (!input.trim()) return;
+    const { stream, done } = sendTextStream(input);
+    setInput('');
+  };
+
+  return (
+    <div>
+      <input value={input} onChange={(e) => setInput(e.target.value)} />
+      <button onClick={handleSend} disabled={isStreaming}>Send</button>
+      {isStreaming && <p>{streamingText}</p>}
+    </div>
+  );
+}
+```
+
 ## useGuideKit (Combined)
 
 Subscribes to all store slices. Use only for prototyping — prefer focused hooks in production.
@@ -179,6 +212,7 @@ const {
   isListening, isSpeaking, startListening, stopListening, sendText,
   highlight, dismissHighlight, scrollToSection, startTour, navigate,
   setPageContext, registerAction,
+  isStreaming, streamingText, sendTextStream,
 } = useGuideKit();
 ```
 
@@ -189,5 +223,6 @@ const {
 | `useGuideKitStatus` | Status, agentState, or error changes |
 | `useGuideKitVoice` | Voice state (isListening, isSpeaking) changes |
 | `useGuideKitActions` | Never (stable refs) |
+| `useGuideKitStream` | Streaming state or text changes |
 | `useGuideKitContext` | Never (stable refs) |
 | `useGuideKit` | Any slice changes |

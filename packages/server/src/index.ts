@@ -54,17 +54,54 @@ interface ProviderKeys {
 }
 
 /**
- * In-memory store mapping sessionId -> provider API keys.
+ * In-memory store mapping sessionId -> provider API keys with TTL.
  * Provider keys are NEVER placed in the JWT; they stay server-side only.
  */
-const sessionKeyStore = new Map<string, ProviderKeys>();
+interface SessionEntry {
+  keys: ProviderKeys;
+  expiresAt: number; // Unix timestamp in seconds
+}
+
+const sessionKeyStore = new Map<string, SessionEntry>();
+
+/** Timestamp (ms) of the last lazy eviction sweep. */
+let lastEvictionTime = 0;
+
+/** Minimum interval (ms) between eviction sweeps. */
+const EVICTION_INTERVAL_MS = 60_000;
+
+/**
+ * Lazily evict expired entries (at most once per EVICTION_INTERVAL_MS).
+ */
+function evictExpiredSessions(): void {
+  const now = Date.now();
+  if (now - lastEvictionTime < EVICTION_INTERVAL_MS) return;
+  lastEvictionTime = now;
+
+  const nowSec = Math.floor(now / 1000);
+  for (const [id, entry] of sessionKeyStore) {
+    if (entry.expiresAt <= nowSec) {
+      sessionKeyStore.delete(id);
+    }
+  }
+}
 
 /**
  * Retrieve provider API keys associated with a session.
- * Returns `undefined` if the session is not found.
+ * Returns `undefined` if the session is not found or has expired.
  */
 export function getSessionKeys(sessionId: string): ProviderKeys | undefined {
-  return sessionKeyStore.get(sessionId);
+  evictExpiredSessions();
+  const entry = sessionKeyStore.get(sessionId);
+  if (!entry) return undefined;
+
+  // Auto-evict if expired
+  if (entry.expiresAt <= Math.floor(Date.now() / 1000)) {
+    sessionKeyStore.delete(sessionId);
+    return undefined;
+  }
+
+  return entry.keys;
 }
 
 /**
@@ -261,7 +298,8 @@ export async function createSessionToken(
   if (llmApiKey) providerKeys.llmApiKey = llmApiKey;
 
   if (Object.keys(providerKeys).length > 0) {
-    sessionKeyStore.set(sessionId, providerKeys);
+    evictExpiredSessions();
+    sessionKeyStore.set(sessionId, { keys: providerKeys, expiresAt });
   }
 
   return {

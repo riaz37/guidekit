@@ -76,9 +76,9 @@ export class ResourceManager {
    * @throws If the manager has already been torn down.
    */
   register(resource: Resource): void {
-    if (this._state === 'torn_down') {
+    if (this._state === 'torn_down' || this._state === 'tearing_down') {
       throw new Error(
-        `${LOG_PREFIX} Cannot register resource "${resource.name}" — manager is torn down`,
+        `${LOG_PREFIX} Cannot register resource "${resource.name}" — manager is ${this._state}`,
       );
     }
 

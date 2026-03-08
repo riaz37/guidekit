@@ -162,6 +162,7 @@ export class GuideKitCore {
   private _streamingText = '';
   private _instanceAbortController = new AbortController();
   private _initPromise: Promise<void> | null = null;
+  private _busUnsubs: Array<() => void> = [];
 
   // ---- Store for useSyncExternalStore -------------------------------------
 
@@ -228,25 +229,29 @@ export class GuideKitCore {
 
     // Wire up error handler
     if (options.onError) {
-      this.bus.on('error', (err) => {
-        if (err instanceof GuideKitError) {
-          options.onError!(err);
-        }
-      });
+      this._busUnsubs.push(
+        this.bus.on('error', (err) => {
+          if (err instanceof GuideKitError) {
+            options.onError!(err);
+          }
+        }),
+      );
     }
 
     // Wire up event forwarding
     if (options.onEvent) {
-      this.bus.onAny((data, eventName) => {
-        options.onEvent!({
-          type: eventName,
-          data:
-            typeof data === 'object' && data !== null
-              ? (data as Record<string, unknown>)
-              : {},
-          timestamp: Date.now(),
-        });
-      });
+      this._busUnsubs.push(
+        this.bus.onAny((data, eventName) => {
+          options.onEvent!({
+            type: eventName,
+            data:
+              typeof data === 'object' && data !== null
+                ? (data as Record<string, unknown>)
+                : {},
+            timestamp: Date.now(),
+          });
+        }),
+      );
     }
   }
 
@@ -269,6 +274,11 @@ export class GuideKitCore {
   }
 
   private async _doInit(): Promise<void> {
+    // Reset abort controller if it was previously aborted (e.g. after destroy())
+    if (this._instanceAbortController.signal.aborted) {
+      this._instanceAbortController = new AbortController();
+    }
+
     // Validate LLM config
     const llmConfig = this._options.llm;
     if (!llmConfig && !this._options.tokenEndpoint) {
@@ -1087,8 +1097,15 @@ export class GuideKitCore {
   // -------------------------------------------------------------------------
 
   async destroy(): Promise<void> {
+    // Clean up EventBus subscriptions
+    for (const unsub of this._busUnsubs) unsub();
+    this._busUnsubs = [];
+    this.bus.removeAll();
+
     this._instanceAbortController.abort();
+    this._initPromise = null;
     this.contextManager.saveSession();
+    await this.resourceManager.destroy();
     SingletonGuard.release(this.instanceId);
     this._isReady = false;
     this.notifyStoreListeners();

@@ -196,6 +196,7 @@ class MockAudioContext {
 
   createMediaStreamSource() { return new MockMediaStreamAudioSourceNode(); }
   createScriptProcessor() { return new MockScriptProcessorNode(); }
+  createGain() { return { gain: { value: 0 }, connect() {} }; }
   createBufferSource() { return new MockAudioBufferSourceNode(); }
   createBuffer() { return new MockAudioBuffer(); }
   decodeAudioData(

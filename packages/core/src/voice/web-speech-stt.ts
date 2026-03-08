@@ -230,11 +230,15 @@ export class WebSpeechSTT {
         wasConnected
       ) {
         this.log('Auto-restarting continuous recognition');
-        try {
-          this.recognition?.start();
-        } catch {
-          this.log('Failed to auto-restart recognition');
-        }
+        setTimeout(() => {
+          if (this._intentionalStop || this._suspended) return;
+          if (!this.recognition) return;
+          try {
+            this.recognition.start();
+          } catch (err) {
+            console.warn(LOG_PREFIX, 'Auto-restart failed:', err);
+          }
+        }, 100);
       }
     };
 

@@ -705,9 +705,23 @@ export class VoicePipeline {
   // PRIVATE: State machine
   // ════════════════════════════════════════════════════════════════════
 
+  private static readonly VALID_TRANSITIONS: Record<VoiceState, ReadonlySet<VoiceState>> = {
+    idle: new Set<VoiceState>(['listening', 'speaking', 'error']),
+    listening: new Set<VoiceState>(['processing', 'speaking', 'idle', 'error']),
+    processing: new Set<VoiceState>(['speaking', 'idle', 'error']),
+    speaking: new Set<VoiceState>(['idle', 'listening', 'error']),
+    error: new Set<VoiceState>(['listening', 'idle']),
+  };
+
   private _setState(next: VoiceState): void {
     const prev = this._state;
     if (prev === next) return;
+
+    const allowed = VoicePipeline.VALID_TRANSITIONS[prev];
+    if (!allowed || !allowed.has(next)) {
+      this._log(`Invalid state transition: ${prev} -> ${next} — ignoring`);
+      return;
+    }
 
     this._state = next;
     this._log(`State: ${prev} -> ${next}`);
@@ -787,8 +801,12 @@ export class VoicePipeline {
     };
 
     this._micSourceNode.connect(this._captureProcessor);
-    // ScriptProcessorNode requires connection to destination to fire events
-    this._captureProcessor.connect(this._audioContext.destination);
+    // Connect through a silent GainNode to prevent mic audio from playing through speakers
+    // (ScriptProcessorNode requires a destination connection to fire onaudioprocess events)
+    const silentGain = this._audioContext.createGain();
+    silentGain.gain.value = 0;
+    this._captureProcessor.connect(silentGain);
+    silentGain.connect(this._audioContext.destination);
     this._log('Mic capture pipeline set up');
   }
 

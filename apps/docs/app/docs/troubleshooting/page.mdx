@@ -1,0 +1,161 @@
+# Troubleshooting
+
+Common issues and solutions when working with GuideKit.
+
+## Setup Issues
+
+### Missing API Key
+
+**Symptom:** `GuideKitError: LLM_API_KEY_MISSING` on initialization.
+
+**Fix:** Ensure you pass a valid API key to your provider configuration:
+
+```tsx
+<GuideKitProvider
+  llm={{ provider: 'gemini', apiKey: process.env.NEXT_PUBLIC_GEMINI_KEY! }}
+>
+```
+
+For production, use the [Server SDK](/docs/server) to keep API keys server-side.
+
+### Wrong Provider Configuration
+
+**Symptom:** `GuideKitError: LLM_PROVIDER_INVALID` or unexpected model responses.
+
+**Fix:** Check that the `type` field matches your API key provider:
+
+```tsx
+// Gemini
+llm={{ provider: 'gemini', apiKey: '...' }}
+
+// OpenAI
+llm={{ provider: 'openai', apiKey: '...' }}
+
+// Anthropic
+llm={{ provider: 'anthropic', apiKey: '...' }}
+```
+
+### SDK Not Initializing
+
+**Symptom:** `isReady` stays `false`, no errors visible.
+
+**Fix:**
+1. Ensure `<GuideKitProvider>` wraps your app at the top level.
+2. Check browser console for errors — enable debug mode for detailed logs:
+
+```tsx
+<GuideKitProvider debug={true} llm={{ provider: '...', apiKey: '...' }}>
+```
+
+3. Verify you are not rendering on the server without SSR guards.
+
+## Voice Mode Issues
+
+### Microphone Permission Denied
+
+**Symptom:** `GuideKitError: PERMISSION_DENIED` when starting voice.
+
+**Fix:**
+1. Ensure your site is served over HTTPS (microphone access requires a secure context).
+2. Check browser settings to confirm the microphone permission is not blocked for your domain.
+3. Call `startListening()` in response to a user gesture (click, tap) — browsers block mic access without user interaction.
+
+### Browser Compatibility
+
+Voice features require:
+- **Chrome 89+** / **Edge 89+** — full support (Web Speech API + AudioContext)
+- **Safari 15.4+** — supported with `webkitAudioContext` fallback
+- **Firefox 100+** — Web Speech API support varies; Deepgram STT recommended
+
+If voice is unavailable, use the `checkCapabilities()` method to detect support:
+
+```tsx
+const caps = await core.checkCapabilities();
+if (caps.mic.status === 'unavailable') {
+  // Hide voice UI
+}
+```
+
+### Echo Detection / Feedback Loop
+
+**Symptom:** The assistant hears its own TTS output and responds to it.
+
+**Fix:** GuideKit includes built-in echo detection (60% word overlap within a 3-second window). If you experience echo issues:
+1. Use headphones during testing.
+2. Ensure TTS playback volume is not excessively high.
+3. The half-duplex state machine prevents listening while speaking — verify your state transitions are correct.
+
+## Bundle Size Issues
+
+### Bundle Larger Than Expected
+
+**Symptom:** Production bundle exceeds expected size limits.
+
+**Fix:**
+1. Use subpath imports to enable tree-shaking:
+
+```tsx
+// Preferred — only imports what you need
+import { GuideKitProvider } from '@guidekit/react';
+import { createGuideKit } from '@guidekit/core';
+
+// Avoid — may pull in unnecessary code
+import * as GuideKit from '@guidekit/core';
+```
+
+2. If you do not use voice features, avoid importing from `@guidekit/vad`.
+
+3. Verify tree-shaking is working with your bundler. All GuideKit packages set `sideEffects: false`.
+
+4. Run the size check to see current bundle sizes:
+
+```bash
+pnpm size:check
+```
+
+**Expected gzip sizes:** core 65KB, react 8KB, server 2KB, vanilla 92KB, cli 5KB.
+
+### Rendering Subpath Not Tree-Shaken
+
+If you only use the core SDK without visual guidance, import from the base path:
+
+```tsx
+import { createGuideKit } from '@guidekit/core';
+```
+
+Visual/rendering exports live under `@guidekit/core/rendering` to keep the vanilla bundle smaller.
+
+## Error Codes
+
+GuideKit uses structured error codes for all failures. Each `GuideKitError` includes:
+- `code` — a machine-readable error code
+- `message` — a human-readable description
+- `recoverable` — whether the error can be retried
+- `suggestion` — a recommended fix
+
+See the full [Error Codes Reference](/docs/error-codes) for a complete list.
+
+## Debug Mode
+
+Enable debug mode for verbose console output:
+
+```tsx
+<GuideKitProvider debug={true} llm={{ provider: '...', apiKey: '...' }}>
+```
+
+This logs:
+- EventBus events and handler execution
+- LLM request/response cycles and tool calls
+- DOM scanning and section detection
+- Voice state machine transitions
+- Resource manager lifecycle events
+
+For programmatic access, subscribe to the `error` event on the EventBus:
+
+```tsx
+const core = createGuideKit({ debug: true, provider: { ... } });
+core.bus.on('error', (err) => {
+  // Send to your error tracking service
+  myErrorTracker.capture(err);
+});
+```

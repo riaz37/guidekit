@@ -66,7 +66,7 @@ describe('ResourceManager', () => {
 
     expect(() =>
       manager.register({ name: 'late', cleanup: vi.fn() }),
-    ).toThrow(/torn down/);
+    ).toThrow(/torn_down/);
   });
 
   // ---- Unregistration -----------------------------------------------------
