@@ -48,8 +48,9 @@ test.describe('Widget UI', () => {
     const panel = page.locator('.gk-panel[data-open="true"]');
     await expect(panel).toBeVisible({ timeout: 5_000 });
 
-    // Press Escape via the keyboard — works even if no element inside
-    // Shadow DOM has focus (the handler listens on the panel container).
+    // Click the panel to move focus inside the Shadow DOM, then press Escape.
+    // The onKeyDown handler is on the panel div, so focus must be within it.
+    await panel.click();
     await page.keyboard.press('Escape');
 
     // Verify the FAB reflects the closed state
