@@ -508,7 +508,7 @@ describe('WebSocketManager', () => {
     const errorCb = vi.fn();
     mgr.onError(errorCb);
 
-    const connectPromise = mgr.connect();
+    void mgr.connect();
     await vi.advanceTimersByTimeAsync(0);
     lastSocket().simulateError();
 
