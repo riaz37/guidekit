@@ -39,6 +39,8 @@ jobs:
         run: npx playwright install --with-deps
 
       - name: E2E tests
+        env:
+          GUIDEKIT_SECRET: guidekit-example-e2e-secret-32-chars
         run: npx playwright test
 
       - name: Dependency audit
