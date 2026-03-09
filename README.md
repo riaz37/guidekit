@@ -47,14 +47,19 @@ Existing solutions fall short:
 
 ## Packages
 
-| Package | Description | Size (gz) |
-|---------|-------------|-----------|
-| [`@guidekit/core`](./packages/core) | Core engine — DOM intelligence, LLM orchestration, context management | 64.93 KB |
-| [`@guidekit/react`](./packages/react) | React bindings — Provider, hooks, Shadow DOM widget | 7.73 KB |
-| [`@guidekit/server`](./packages/server) | Server utilities — token generation, session management | 1.81 KB |
-| [`@guidekit/vanilla`](./packages/vanilla) | Vanilla JS — IIFE bundle for non-React apps | 92.36 KB |
-| [`@guidekit/vad`](./packages/vad) | Voice Activity Detection — Silero ONNX model | 22.8 KB |
-| [`@guidekit/cli`](./packages/cli) | CLI — `init`, `doctor`, `generate-secret` | 4.83 KB |
+| Package | Version | Role | Audience | Status |
+|---------|---------|------|----------|--------|
+| [`@guidekit/core`](./packages/core) | `0.2.0` | DOM intelligence, orchestration, context, rendering primitives | Every app integration | Core |
+| [`@guidekit/react`](./packages/react) | `0.2.0` | Provider, hooks, Shadow DOM widget | React / Next.js apps | Core |
+| [`@guidekit/server`](./packages/server) | `0.2.0` | Token generation, auth middleware, session helpers | Server runtimes backing GuideKit clients | Core |
+| [`@guidekit/vanilla`](./packages/vanilla) | `0.1.1` | Script-tag and framework-agnostic browser integration | Non-React apps and simple embeds | Stable optional |
+| [`@guidekit/vad`](./packages/vad) | `0.1.1` | Voice activity detection model and helpers | Voice-enabled experiences | Optional voice |
+| [`@guidekit/cli`](./packages/cli) | `0.1.1` | `init`, `doctor`, `generate-secret` | Local setup, contributor diagnostics, CI parity checks | Optional DX |
+| [`@guidekit/intelligence`](./packages/intelligence) | `0.1.1` | Semantic page intelligence engine | Advanced understanding and ranking pipelines | Advanced optional |
+| [`@guidekit/knowledge`](./packages/knowledge) | `0.1.1` | Knowledge retrieval with BM25 / TF-IDF search | Retrieval-augmented guidance | Advanced optional |
+| [`@guidekit/plugins`](./packages/plugins) | `0.1.1` | Plugin system and extension hooks | Custom platform extensions and partner integrations | Advanced optional |
+
+Version numbers do not move in lockstep. `0.2.0` packages are the default integration path today; `0.1.1` packages are stable optional surfaces or advanced building blocks that can evolve on their own cadence.
 
 ## Quick Start
 

@@ -17,6 +17,7 @@ import {
 import type { GuideKitErrorType, MockActions } from './testing.js';
 
 import {
+  GuideKitProvider,
   useGuideKitStatus,
   useGuideKitVoice,
   useGuideKitActions,
@@ -452,6 +453,30 @@ describe('GuideKitProvider', () => {
     return initPromise.catch(() => {}).then(() => {
       expect(onError).toHaveBeenCalledWith(initError);
     });
+  });
+
+  it('applies theme.zIndex to the widget host', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = ReactDOMClient.createRoot(container);
+
+    flushSync(() => {
+      root.render(
+        React.createElement(
+          GuideKitProvider,
+          {
+            tokenEndpoint: '/api/guidekit/token',
+            onError: () => {},
+            theme: { zIndex: 1234 },
+          },
+          React.createElement('span', null, 'mounted'),
+        ),
+      );
+    });
+
+    const widgetHost = container.querySelector('#guidekit-widget') as HTMLDivElement | null;
+    expect(widgetHost).toBeTruthy();
+    expect(widgetHost?.style.zIndex).toBe('1234');
   });
 });
 

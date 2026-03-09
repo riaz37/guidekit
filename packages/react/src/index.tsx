@@ -501,7 +501,7 @@ const WIDGET_STYLES = /* css */ `
     all: initial;
     font-family: var(--gk-font);
     position: fixed;
-    z-index: 2147483647;
+    z-index: var(--gk-z-index, 2147483647);
     bottom: 24px;
     right: 24px;
   }
@@ -1132,6 +1132,7 @@ interface WidgetProps {
     primaryColor?: string;
     position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
     borderRadius?: string;
+    zIndex?: number | string;
   };
   consentRequired?: boolean;
   instanceId?: string;
@@ -1230,6 +1231,11 @@ function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetProps) {
     }
     if (theme?.borderRadius) {
       host.style.setProperty('--gk-radius', theme.borderRadius);
+    }
+    if (theme?.zIndex !== undefined) {
+      host.style.setProperty('--gk-z-index', String(theme.zIndex));
+    } else {
+      host.style.removeProperty('--gk-z-index');
     }
 
     // Position
@@ -1681,7 +1687,7 @@ function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetProps) {
         // The host element itself is positioned via :host in Shadow DOM CSS,
         // but we also set fixed positioning here as a fallback.
         position: 'fixed',
-        zIndex: 2147483647,
+        zIndex: theme?.zIndex ?? 2147483647,
         bottom: '24px',
         right: '24px',
         // Ensure the host doesn't interfere with page layout

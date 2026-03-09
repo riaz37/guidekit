@@ -1113,6 +1113,90 @@ describe('doctor — summary output', () => {
     const output = allOutput();
     expect(output).toContain('warning');
   });
+
+  it('shows GuideKit repo parity checks when running inside the monorepo', async () => {
+    mockExistsSync.mockImplementation((p) => {
+      const s = String(p);
+      return [
+        path.join('/project', 'package.json'),
+        path.join('/project', '.env.local'),
+        path.join('/project', '.gitignore'),
+        path.join('/project', 'apps', 'example-nextjs', 'app', 'api', 'guidekit', 'token', 'route.ts'),
+        path.join('/project', '.github', 'workflows', 'nightly.yml'),
+        path.join('/project', '.github', 'workflows', 'ci.yml'),
+        path.join('/project', 'playwright.config.ts'),
+      ].includes(s);
+    });
+    mockReadFileSync.mockImplementation((p) => {
+      const s = String(p);
+      if (s.endsWith('.gitignore')) return '.env\nnode_modules\n';
+      if (s.endsWith(path.join('api', 'guidekit', 'token', 'route.ts'))) {
+        return "export async function POST(){ const secret = process.env.GUIDEKIT_SECRET; return secret ? Response.json({ ok: true }) : Response.json({ ok: false }); }";
+      }
+      if (s.endsWith('nightly.yml')) {
+        return "name: Nightly\n- name: Dependency audit\n  run: pnpm audit --prod\n- name: E2E tests\n  env:\n    GUIDEKIT_SECRET: guidekit-example-e2e-secret-32-chars\n";
+      }
+      if (s.endsWith('ci.yml')) {
+        return "on:\n  pull_request:\n    branches: [main]\njobs:\n  e2e:\n    name: E2E Tests\n";
+      }
+      if (s.endsWith('playwright.config.ts')) {
+        return "const E2E_GUIDEKIT_SECRET = process.env.GUIDEKIT_SECRET ?? 'guidekit-example-e2e-secret-32-chars';\nconst cfg = { webServer: { env: { GUIDEKIT_SECRET: E2E_GUIDEKIT_SECRET } } };";
+      }
+      return JSON.stringify({
+        dependencies: {
+          '@guidekit/core': '^1.0.0',
+          '@guidekit/react': '^1.0.0',
+          '@guidekit/server': '^1.0.0',
+        },
+      });
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+    process.env.GUIDEKIT_SECRET = 'a'.repeat(32);
+    process.env.LLM_API_KEY = 'AIabcdefghijklmnopqrstuvwxyz';
+
+    const { runDoctor } = await import('./commands/doctor.js');
+    await runDoctor();
+    const output = allOutput();
+    expect(output).toContain('GuideKit Repo Parity');
+    expect(output).toContain('Hosted E2E signal');
+    expect(output).toContain('Nightly dependency audit gate');
+  });
+
+  it('warns when hosted E2E signal is missing for pull requests', async () => {
+    mockExistsSync.mockImplementation((p) => {
+      const s = String(p);
+      return [
+        path.join('/project', 'package.json'),
+        path.join('/project', 'apps', 'example-nextjs', 'app', 'api', 'guidekit', 'token', 'route.ts'),
+        path.join('/project', '.github', 'workflows', 'nightly.yml'),
+        path.join('/project', '.github', 'workflows', 'ci.yml'),
+        path.join('/project', 'playwright.config.ts'),
+      ].includes(s);
+    });
+    mockReadFileSync.mockImplementation((p) => {
+      const s = String(p);
+      if (s.endsWith(path.join('api', 'guidekit', 'token', 'route.ts'))) {
+        return "export async function POST(){ const secret = process.env.GUIDEKIT_SECRET; return secret ? Response.json({ ok: true }) : Response.json({ ok: false }); }";
+      }
+      if (s.endsWith('nightly.yml')) {
+        return "run: pnpm audit --prod || true\nenv:\n  GUIDEKIT_SECRET: guidekit-example-e2e-secret-32-chars\n";
+      }
+      if (s.endsWith('ci.yml')) {
+        return "jobs:\n  e2e:\n    name: E2E Tests\n    if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n";
+      }
+      if (s.endsWith('playwright.config.ts')) {
+        return "const E2E_GUIDEKIT_SECRET = process.env.GUIDEKIT_SECRET ?? 'guidekit-example-e2e-secret-32-chars';\nconst cfg = { webServer: { env: { GUIDEKIT_SECRET: E2E_GUIDEKIT_SECRET } } };";
+      }
+      return JSON.stringify({ dependencies: {} });
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+
+    const { runDoctor } = await import('./commands/doctor.js');
+    await runDoctor();
+    const output = allOutput();
+    expect(output).toContain('Pull requests do not currently get a hosted E2E signal');
+    expect(output).toContain('Nightly is not enforcing the production dependency audit exit code');
+  });
 });
 
 // ---------------------------------------------------------------------------
