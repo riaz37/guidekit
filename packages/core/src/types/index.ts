@@ -450,6 +450,8 @@ export interface GuideKitTheme {
   primaryColor?: string;
   position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
   borderRadius?: string;
+  /** Widget host z-index. Defaults to 2147483647 when omitted. */
+  zIndex?: number | string;
   /** Color scheme: 'light', 'dark', or 'auto' (respects prefers-color-scheme). Default: 'light'. */
   colorScheme?: 'light' | 'dark' | 'auto';
   /** CSS custom property overrides for fine-grained theming. */
