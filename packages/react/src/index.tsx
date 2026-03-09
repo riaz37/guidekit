@@ -1132,6 +1132,7 @@ interface WidgetProps {
     primaryColor?: string;
     position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
     borderRadius?: string;
+    zIndex?: number | string;
   };
   consentRequired?: boolean;
   instanceId?: string;

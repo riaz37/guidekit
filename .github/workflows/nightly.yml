@@ -44,7 +44,7 @@ jobs:
         run: npx playwright test
 
       - name: Dependency audit
-        run: pnpm audit --prod || true
+        run: pnpm audit --prod
 
       - name: Upload test results
         if: failure()

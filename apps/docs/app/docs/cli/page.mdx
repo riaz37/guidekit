@@ -35,7 +35,7 @@ npx guidekit init
 
 ### `guidekit doctor`
 
-Validates your setup — checks environment variables, packages, and provider connectivity.
+Validates your setup — checks environment variables, packages, provider connectivity, and, when run inside the GuideKit monorepo, CI/local parity for the example app and release-confidence workflows.
 
 ```bash
 npx guidekit doctor
@@ -49,6 +49,7 @@ npx guidekit doctor
 - `STT_API_KEY` and `TTS_API_KEY` (optional, for voice)
 - `@guidekit/core`, `@guidekit/react`, `@guidekit/server` are installed
 - Connectivity to Google AI, Deepgram, and ElevenLabs APIs
+- In the GuideKit monorepo, example-app token-route parity, hosted PR E2E coverage, and the Nightly dependency-audit gate
 
 **Example output:**
 ```

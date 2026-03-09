@@ -164,6 +164,72 @@ async function checkProviderConnectivity(
   }
 }
 
+function checkGuideKitRepoParity(root: string): CheckResult[] {
+  const tokenRoutePath = path.join(root, 'apps', 'example-nextjs', 'app', 'api', 'guidekit', 'token', 'route.ts');
+  const nightlyWorkflowPath = path.join(root, '.github', 'workflows', 'nightly.yml');
+  const ciWorkflowPath = path.join(root, '.github', 'workflows', 'ci.yml');
+  const playwrightConfigPath = path.join(root, 'playwright.config.ts');
+
+  if (
+    !fileExists(tokenRoutePath) ||
+    !fileExists(nightlyWorkflowPath) ||
+    !fileExists(ciWorkflowPath) ||
+    !fileExists(playwrightConfigPath)
+  ) {
+    return [];
+  }
+
+  const tokenRoute = readFile(tokenRoutePath);
+  const nightlyWorkflow = readFile(nightlyWorkflowPath);
+  const ciWorkflow = readFile(ciWorkflowPath);
+  const playwrightConfig = readFile(playwrightConfigPath);
+
+  const routeRequiresSecret = tokenRoute.includes('process.env.GUIDEKIT_SECRET');
+  const nightlySeedsSecret =
+    nightlyWorkflow.includes('GUIDEKIT_SECRET: guidekit-example-e2e-secret-32-chars');
+  const playwrightSeedsSecret =
+    playwrightConfig.includes('const E2E_GUIDEKIT_SECRET') &&
+    playwrightConfig.includes('GUIDEKIT_SECRET: E2E_GUIDEKIT_SECRET');
+  const ciRunsE2EOnPullRequests =
+    ciWorkflow.includes('pull_request:') &&
+    ciWorkflow.includes('name: E2E Tests') &&
+    !ciWorkflow.includes("if: github.event_name == 'push' && github.ref == 'refs/heads/main'");
+  const nightlyAuditBlocks =
+    nightlyWorkflow.includes('pnpm audit --prod') &&
+    !nightlyWorkflow.includes('pnpm audit --prod || true');
+
+  const parityIssues: string[] = [];
+  if (!routeRequiresSecret) parityIssues.push('token route no longer enforces GUIDEKIT_SECRET');
+  if (!nightlySeedsSecret) parityIssues.push('Nightly does not seed a deterministic test secret');
+  if (!playwrightSeedsSecret) parityIssues.push('Playwright webServer does not seed a deterministic test secret');
+
+  const results: CheckResult[] = [
+    {
+      name: 'GuideKit repo parity',
+      status: parityIssues.length === 0 ? 'ok' : 'warn',
+      message: parityIssues.length === 0
+        ? 'Example token route and automated E2E secret seeding are aligned for local and CI parity.'
+        : `Repo parity gaps: ${parityIssues.join('; ')}`,
+    },
+    {
+      name: 'Hosted E2E signal',
+      status: ciRunsE2EOnPullRequests ? 'ok' : 'warn',
+      message: ciRunsE2EOnPullRequests
+        ? 'Pull requests receive a hosted E2E signal before release-confidence fixes are merged.'
+        : 'Pull requests do not currently get a hosted E2E signal.',
+    },
+    {
+      name: 'Nightly dependency audit gate',
+      status: nightlyAuditBlocks ? 'ok' : 'warn',
+      message: nightlyAuditBlocks
+        ? 'Nightly fails when production dependency advisories are detected.'
+        : 'Nightly is not enforcing the production dependency audit exit code.',
+    },
+  ];
+
+  return results;
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -196,6 +262,12 @@ export async function runDoctor(): Promise<void> {
   results.push(await checkProviderConnectivity('Google AI', 'https://generativelanguage.googleapis.com'));
   results.push(await checkProviderConnectivity('Deepgram', 'https://api.deepgram.com'));
   results.push(await checkProviderConnectivity('ElevenLabs', 'https://api.elevenlabs.io'));
+
+  const repoParityChecks = checkGuideKitRepoParity(root);
+  if (repoParityChecks.length > 0) {
+    log(`${c.bold}GuideKit Repo Parity${c.reset}`);
+    results.push(...repoParityChecks);
+  }
 
   // Print results
   log('');
