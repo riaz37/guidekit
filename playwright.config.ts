@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const E2E_GUIDEKIT_SECRET =
+  process.env.GUIDEKIT_SECRET ?? 'guidekit-example-e2e-secret-32-chars';
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -28,6 +31,10 @@ export default defineConfig({
 
   webServer: {
     command: 'pnpm --filter @guidekit/example-nextjs dev',
+    env: {
+      ...process.env,
+      GUIDEKIT_SECRET: E2E_GUIDEKIT_SECRET,
+    },
     url: 'http://localhost:3099',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
