@@ -34,12 +34,10 @@ Use this skill when working in the GuideKit monorepo or helping users integrate 
 ## Commands
 
 ```bash
-pnpm skills:sync     # Wire skills for agent discovery
-pnpm dev             # Docs + example app
-pnpm build           # All packages
-pnpm check           # build + typecheck + lint + test
-pnpm test:e2e        # Playwright agent flows
-pnpm stats           # LOC / facade size report
+pnpm changeset
+pnpm changeset version
+pnpm publish:packages:dry-run
+pnpm publish:packages   # local fallback; prefer GitHub Actions
 ```
 
 ## Reference docs

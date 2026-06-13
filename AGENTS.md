@@ -74,6 +74,7 @@ pnpm skills:sync          # Link skills/guidekit for Codex/Cursor discovery
 pnpm dev                  # Start docs + example apps
 pnpm build                # Build all packages
 pnpm check                # Full CI parity (build, typecheck, lint, test)
+pnpm publish:packages:dry-run  # Dry-run npm publish locally
 pnpm stats                # Package LOC + core facade size
 pnpm llms:generate        # Regenerate llms.txt agent index
 pnpm changeset            # Version bump for published packages

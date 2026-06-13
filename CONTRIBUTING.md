@@ -110,6 +110,46 @@ pnpm changeset
 
 Select the affected packages and describe the change. The changeset file will be committed with your PR.
 
+## Publishing
+
+Version bumps use Changesets. Publishing follows the RemotionUI pattern: **GitHub Actions for real releases**, local script for dry-runs.
+
+### Release workflow
+
+1. Create a changeset and merge to `main`:
+
+```bash
+pnpm changeset
+pnpm changeset version   # bumps package.json + CHANGELOGs
+git add -A && git commit -m "chore: version packages"
+git push origin main
+```
+
+2. **Publish to npm** via GitHub Actions:
+
+   - Go to **Actions → Publish Packages → Run workflow**
+   - Run with `dry_run: true` first to verify tarballs
+   - Run again with `dry_run: false` to publish
+   - Requires `NPM_TOKEN` in the `npm-publish` environment secret
+
+3. **Create a GitHub Release** (optional, tag only):
+
+```bash
+git tag v0.3.0
+git push origin v0.3.0
+```
+
+Tag push triggers `.github/workflows/release.yml` (GitHub Release notes only — no npm upload).
+
+### Local publish (fallback)
+
+```bash
+pnpm publish:packages:dry-run   # verify without upload
+pnpm publish:packages           # requires NPM_TOKEN in .env or ~/.npmrc
+```
+
+Do not use `--provenance` locally; CI handles provenance via OIDC.
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the [MIT License](./LICENSE).
