@@ -16,7 +16,6 @@ import { ConfigurationError, ErrorCodes } from '../errors/index.js';
 import { createPlatformExtensions } from '../pipeline/extensions.js';
 import type { PlatformExtensionResult } from '../pipeline/extensions.js';
 import type {
-  GuideKitCoreOptions,
   LLMConfig,
   STTConfig,
   TTSConfig,
@@ -28,6 +27,7 @@ import type { EventBus } from '../bus/index.js';
 import type { ContextManager } from '../context/index.js';
 import type { ResourceManager } from '../resources/index.js';
 import { registerBuiltinTools, type BuiltinToolsHost } from './builtin-tools.js';
+import type { GuideKitCoreOptions } from './options.js';
 
 export interface RuntimeInitHost extends BuiltinToolsHost {
   instanceId: string;

@@ -35,7 +35,11 @@ export class ProxyLLMAdapter implements LLMProviderAdapter {
     this.getToken = options.getToken;
     this.provider = options.provider;
     this.model = options.model;
-    this.inner = options.inner ?? new GeminiAdapter({ apiKey: 'proxy', model: options.model });
+    const geminiModel =
+      options.model === 'gemini-2.5-pro' ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
+    this.inner =
+      options.inner ??
+      new GeminiAdapter({ apiKey: 'proxy', provider: 'gemini', model: geminiModel });
   }
 
   formatTools(tools: ToolDefinition[]): unknown {
