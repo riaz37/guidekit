@@ -80,6 +80,15 @@ for pkg in "${PACKAGES[@]}"; do
   version="$(node -p "require('$pkg_dir/package.json').version")"
   echo ""
   echo "-> $name@$version"
+
+  if [ "$DRY_RUN" = false ]; then
+    published="$(npm view "${name}@${version}" version 2>/dev/null || true)"
+    if [ "$published" = "$version" ]; then
+      echo "   skip (already published)"
+      continue
+    fi
+  fi
+
   (cd "$pkg_dir" && npm publish "${PUBLISH_FLAGS[@]}")
 done
 
