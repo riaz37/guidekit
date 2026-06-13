@@ -20,10 +20,6 @@ jobs:
     environment: npm-publish
     permissions:
       contents: read
-      id-token: write
-    env:
-      NPM_CONFIG_PROVENANCE: true
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -65,7 +61,7 @@ jobs:
 
       - name: Publish packages
         if: ${{ !inputs.dry_run }}
-        run: pnpm -r --filter './packages/*' publish --access public --provenance --no-git-checks
+        run: pnpm -r --filter './packages/*' publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
