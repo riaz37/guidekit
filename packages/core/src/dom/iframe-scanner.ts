@@ -31,7 +31,7 @@ export function scanSameOriginIframes(
   for (const iframe of iframes) {
     if (!(iframe instanceof HTMLIFrameElement)) continue;
 
-    let doc: Document | null = null;
+    let doc: Document | null;
     try {
       doc = iframe.contentDocument;
     } catch {

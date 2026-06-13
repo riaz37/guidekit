@@ -313,19 +313,18 @@ async function* streamLLMChunks(
   llmOrchestrator: LLMOrchestrator,
 ): AsyncGenerator<string | PipelineContext> {
   let responseText = '';
-  let totalTokens = 0;
-  let toolCallsExecuted = 0;
-  let rounds = 0;
-
-  let systemPrompt = ctx.systemPrompt;
-  let userMessage = ctx.userMessage;
+  let totalTokens: number;
+  let toolCallsExecuted: number;
+  let rounds: number;
 
   const cognitive = ctx.metadata.cognitive as
     | { systemPromptAddition?: string; maxToolRounds?: number }
     | undefined;
-  if (cognitive?.systemPromptAddition) {
-    systemPrompt = `${systemPrompt}\n\n${cognitive.systemPromptAddition}`;
-  }
+
+  const systemPrompt = cognitive?.systemPromptAddition
+    ? `${ctx.systemPrompt}\n\n${cognitive.systemPromptAddition}`
+    : ctx.systemPrompt;
+  const userMessage = ctx.userMessage;
 
   const maxToolRounds = cognitive?.maxToolRounds;
 
@@ -377,6 +376,7 @@ async function* streamLLMChunks(
 
     const result = streamResult.value;
     totalTokens = result.usage.total;
+    toolCallsExecuted = 0;
     rounds = 1;
   }
 

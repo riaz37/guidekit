@@ -20,6 +20,7 @@ jobs:
     environment: npm-publish
     permissions:
       contents: read
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,31 +38,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build all packages
-        run: pnpm build
-
-      - name: TypeScript check
-        run: pnpm typecheck
-
-      - name: Unit tests
-        run: pnpm test:unit
-
-      - name: Verify no workspace:* references remain
-        run: |
-          if grep -r '"workspace:\*"' packages/*/package.json; then
-            echo "ERROR: workspace:* found — use workspace:^ instead"
-            exit 1
-          fi
-
-      - name: Publish packages (dry run)
-        if: inputs.dry_run
-        run: pnpm -r --filter './packages/*' publish --access public --no-git-checks --dry-run
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       - name: Publish packages
-        if: ${{ !inputs.dry_run }}
-        run: pnpm -r --filter './packages/*' publish --access public --no-git-checks
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            bash scripts/publish-packages.sh --dry-run
+          else
+            bash scripts/publish-packages.sh
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

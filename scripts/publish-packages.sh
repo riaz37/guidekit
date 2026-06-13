@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publish all @guidekit/* packages to npm (RemotionUI-style local release script).
+# Publish all @guidekit/* packages to npm in dependency order.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -10,35 +10,41 @@ for arg in "$@"; do
     --dry-run) DRY_RUN=true ;;
     -h|--help)
       echo "Usage: bash scripts/publish-packages.sh [--dry-run]"
-      echo ""
-      echo "Builds all packages and publishes @guidekit/* to npm."
-      echo "Prefer GitHub Actions (Publish Packages workflow) for regular releases."
       exit 0
       ;;
     *)
-      echo "Unknown argument: $arg" >&2
+      echo "Error: unknown argument: $arg" >&2
       exit 1
       ;;
   esac
 done
 
 if [ -f "$ROOT/.env" ]; then
-  echo "Loading NPM_TOKEN from .env (legacy local fallback)."
-  echo "Prefer GitHub Actions Trusted Publishing with npm OIDC for releases."
   set -a
   # shellcheck source=/dev/null
   source "$ROOT/.env"
   set +a
 fi
 
-if [ -z "${NPM_TOKEN:-}" ]; then
-  echo "NPM_TOKEN is not set; using the current npm CLI authentication (~/.npmrc)."
-  echo "Prefer GitHub Actions for regular releases."
-else
+if [ -n "${NPM_TOKEN:-}" ]; then
   export NODE_AUTH_TOKEN="${NODE_AUTH_TOKEN:-$NPM_TOKEN}"
 fi
 
+if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+  echo "Error: NODE_AUTH_TOKEN or NPM_TOKEN is required." >&2
+  echo "Create an npm Automation token with Read and Write access to @guidekit." >&2
+  exit 1
+fi
+
 cd "$ROOT"
+
+echo "==> Verify npm publish access"
+if ! (cd "$ROOT/packages/core" && npm publish --dry-run --access public --no-git-checks >/dev/null 2>&1); then
+  echo "Error: NPM token cannot publish to @guidekit." >&2
+  echo "Create an Automation token with Read and Write permissions for @guidekit:" >&2
+  echo "  https://www.npmjs.com/settings/~tokens" >&2
+  exit 1
+fi
 
 echo "==> Build"
 pnpm build
@@ -50,25 +56,38 @@ echo "==> Unit tests"
 pnpm test:unit
 
 if grep -r '"workspace:\*"' packages/*/package.json >/dev/null 2>&1; then
-  echo "ERROR: workspace:* found — use workspace:^ instead" >&2
+  echo "Error: workspace:* found — use workspace:^ instead" >&2
   exit 1
 fi
+
+# Dependency-friendly publish order (RemotionUI-style: one package at a time)
+PACKAGES=(core server react cli vanilla vad intelligence knowledge plugins)
 
 PUBLISH_FLAGS=(--access public --no-git-checks)
 if [ "$DRY_RUN" = true ]; then
   PUBLISH_FLAGS+=(--dry-run)
-  echo "==> Dry-run publish (no upload)"
+  echo "==> Dry-run publish"
 else
   echo "==> Publish @guidekit/* packages"
 fi
 
-pnpm -r --filter './packages/*' publish "${PUBLISH_FLAGS[@]}"
+for pkg in "${PACKAGES[@]}"; do
+  pkg_dir="$ROOT/packages/$pkg"
+  if [ ! -f "$pkg_dir/package.json" ]; then
+    continue
+  fi
+  name="$(node -p "require('$pkg_dir/package.json').name")"
+  version="$(node -p "require('$pkg_dir/package.json').version")"
+  echo ""
+  echo "-> $name@$version"
+  (cd "$pkg_dir" && npm publish "${PUBLISH_FLAGS[@]}")
+done
 
 if [ "$DRY_RUN" = false ]; then
   echo ""
-  echo "Published versions:"
-  for pkg in core react server cli vanilla vad intelligence knowledge plugins; do
-    version="$(node -p "require('./packages/$pkg/package.json').version")"
-    echo "  @guidekit/$pkg@$version  https://www.npmjs.com/package/@guidekit/$pkg"
+  echo "Published:"
+  for pkg in "${PACKAGES[@]}"; do
+    version="$(node -p "require('./packages/$pkg/package.json').version" 2>/dev/null || echo '?')"
+    echo "  @guidekit/$pkg@$version"
   done
 fi
