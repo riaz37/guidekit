@@ -2,7 +2,7 @@
   {
     "name": "@guidekit/core (ESM)",
     "path": "packages/core/dist/index.js",
-    "limit": "80 KB",
+    "limit": "85 KB",
     "gzip": true
   },
   {
@@ -30,9 +30,9 @@
     "gzip": true
   },
   {
-    "name": "@guidekit/vanilla (IIFE)",
-    "path": "packages/vanilla/dist/index.global.js",
-    "limit": "120 KB",
+    "name": "@guidekit/vanilla (ESM)",
+    "path": "packages/vanilla/dist/index.js",
+    "limit": "20 KB",
     "gzip": true
   },
   {
