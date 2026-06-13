@@ -364,7 +364,11 @@ pnpm lint           # ESLint
 pnpm test:unit      # 1242 unit tests
 pnpm test:e2e       # Playwright E2E tests
 pnpm size:check     # Bundle size limits
+pnpm check          # Full CI parity (build + typecheck + lint + test)
+pnpm skills:sync    # Link agent skills for Codex/Cursor
 ```
+
+AI agents and contributors: see [AGENTS.md](./AGENTS.md) and [llms.txt](./llms.txt).
 
 ### Project Structure
 
@@ -383,6 +387,8 @@ guidekit/
 ├── apps/
 │   ├── docs/            # Documentation (Nextra)
 │   └── example-nextjs/  # Reference Next.js app
+├── scripts/             # Repo maintenance (check, stats, llms.txt)
+├── skills/              # Agent skills (guidekit)
 └── e2e/                 # Playwright E2E tests
 ```
 

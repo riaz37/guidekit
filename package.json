@@ -32,7 +32,11 @@
     "test:e2e": "playwright test",
     "size": "size-limit",
     "size:check": "size-limit --limit",
-    "release": "pnpm changeset version && pnpm install && pnpm build && pnpm changeset publish"
+    "release": "pnpm changeset version && pnpm install && pnpm build && pnpm changeset publish",
+    "skills:sync": "bash scripts/setup-codex-skills.sh",
+    "check": "bash scripts/ci-check.sh",
+    "stats": "node scripts/package-stats.mjs",
+    "llms:generate": "node scripts/generate-llms-txt.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.0",

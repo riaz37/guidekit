@@ -62,6 +62,18 @@ apps/
   docs/         - Documentation site (Nextra)
   example-nextjs/ - Reference Next.js app
 e2e/            - Playwright E2E tests
+scripts/        - Repo maintenance (check, stats, llms.txt)
+skills/         - Agent skills (see AGENTS.md)
+```
+
+## AI / Agent Contributors
+
+If you are an AI agent or using Codex/Cursor agent mode, start with [AGENTS.md](./AGENTS.md).
+
+```bash
+pnpm skills:sync    # Link skills/guidekit for agent discovery
+pnpm check          # Full validation suite
+pnpm stats          # Package LOC + core facade size
 ```
 
 ## Code Style
