@@ -458,3 +458,28 @@ describe('token payload integrity', () => {
     expect(result.expiresIn).toBe(900);
   });
 });
+
+// ---------------------------------------------------------------------------
+// createGuideKitHandler
+// ---------------------------------------------------------------------------
+
+describe('createGuideKitHandler()', () => {
+  it('health route returns ok', async () => {
+    const { createGuideKitHandler } = await import('./handler.js');
+    const handler = createGuideKitHandler({ signingSecret: TEST_SECRET });
+    const res = await handler(new Request('http://localhost/health'), 'health');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe('ok');
+  });
+
+  it('llm route rejects missing auth', async () => {
+    const { createGuideKitHandler } = await import('./handler.js');
+    const handler = createGuideKitHandler({ signingSecret: TEST_SECRET });
+    const res = await handler(
+      new Request('http://localhost/llm', { method: 'POST', body: '{}' }),
+      'llm',
+    );
+    expect(res.status).toBe(401);
+  });
+});

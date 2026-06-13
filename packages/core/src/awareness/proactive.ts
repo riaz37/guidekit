@@ -41,7 +41,9 @@ export type ProactiveTriggerType =
   | 'dwell-commentary'
   | 'navigation-commentary'
   | 'frustration'
-  | 'form-abandonment';
+  | 'form-abandonment'
+  | 'error-detected'
+  | 'flow-stuck';
 
 export interface ProactiveTrigger {
   type: ProactiveTriggerType;
@@ -361,6 +363,47 @@ export class ProactiveTriggerEngine {
    */
   private handleDomRouteChange(from: string, to: string): void {
     this.handleNavigation(from, to);
+  }
+
+  // ---- Semantic triggers (intelligence package) ----------------------------
+
+  /** Evaluate semantic page model for error/flow proactive triggers. */
+  evaluateSemanticPage(model: {
+    errorStates?: Array<{ message: string; selector: string }>;
+    flowState?: { currentStep: number; totalSteps: number } | null;
+  }): void {
+    if (model.errorStates?.length) {
+      const key = 'semantic-error';
+      if (!this.isCooldownActive(key, NAVIGATION_COOLDOWN_MS)) {
+        const err = model.errorStates[0]!;
+        this.fireTrigger(
+          {
+            type: 'error-detected',
+            selector: err.selector,
+            message: `An error is visible: "${err.message}". Offer help resolving it.`,
+          },
+          key,
+        );
+      }
+    }
+
+    if (
+      model.flowState &&
+      model.flowState.totalSteps > 1 &&
+      model.flowState.currentStep > 0 &&
+      model.flowState.currentStep < model.flowState.totalSteps - 1
+    ) {
+      const key = 'flow-stuck';
+      if (!this.isCooldownActive(key, NAVIGATION_COOLDOWN_MS * 2)) {
+        this.fireTrigger(
+          {
+            type: 'flow-stuck',
+            message: `User is on step ${model.flowState.currentStep + 1} of ${model.flowState.totalSteps}. Offer guidance for this step.`,
+          },
+          key,
+        );
+      }
+    }
   }
 
   // ---- Trigger dispatch ----------------------------------------------------

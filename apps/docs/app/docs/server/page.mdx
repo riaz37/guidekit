@@ -1,6 +1,6 @@
 # Server SDK
 
-The `@guidekit/server` package provides server-side utilities for secure token generation and validation.
+The `@guidekit/server` package provides server-side token generation, LLM/STT/TTS proxy routes, and session key storage. **API keys never appear in JWT payloads or client bundles.**
 
 ## Installation
 
@@ -8,88 +8,90 @@ The `@guidekit/server` package provides server-side utilities for secure token g
 npm install @guidekit/server
 ```
 
-## `createSessionToken`
-
-Generates a signed JWT for client authentication. API keys are stored server-side in a `sessionKeyStore` keyed by the token's `jti` claim — they never leave the server or appear in the JWT payload. The client SDK sends this token with every request.
+## Quick setup (Next.js App Router)
 
 ```typescript
-import { createSessionToken } from '@guidekit/server';
+// app/api/guidekit/token/route.ts
+import { createNextAppRouterRoutes } from '@guidekit/server/next';
 
-export async function POST() {
-  const token = await createSessionToken({
-    signingSecret: process.env.GUIDEKIT_SECRET!,
+const routes = createNextAppRouterRoutes({
+  signingSecret: process.env.GUIDEKIT_SECRET!,
+  createTokenOptions: () => ({
     llmApiKey: process.env.LLM_API_KEY!,
     sttApiKey: process.env.STT_API_KEY,
     ttsApiKey: process.env.TTS_API_KEY,
     expiresIn: '15m',
-  });
-
-  return Response.json(token);
-}
-```
-
-### Options
-
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `signingSecret` | `string` | Yes | Secret used to sign the JWT |
-| `llmApiKey` | `string` | No | LLM provider API key |
-| `sttApiKey` | `string` | No | STT provider API key (for speech-to-text) |
-| `ttsApiKey` | `string` | No | TTS provider API key (for text-to-speech) |
-| `expiresIn` | `string` | No | Token lifetime (default: `'15m'`) |
-| `metadata` | `object` | No | Custom claims to include in the token |
-
-## `validateSessionToken`
-
-Verifies and decodes a token. Useful for custom middleware or edge functions.
-
-```typescript
-import { validateSessionToken } from '@guidekit/server';
-
-const result = await validateSessionToken(
-  request.headers.get('Authorization')?.replace('Bearer ', '')!,
-  process.env.GUIDEKIT_SECRET!,
-);
-
-if (!result.valid) {
-  return new Response('Unauthorized', { status: 401 });
-}
-```
-
-## Secret Rotation
-
-To rotate your signing secret without downtime:
-
-1. Generate a new secret: `npx guidekit generate-secret`
-2. Set `GUIDEKIT_SECRET_NEW` in your environment
-3. Update your token endpoint to sign with the new secret
-4. Wait for all existing tokens to expire (default 15 minutes)
-5. Remove the old secret and rename `GUIDEKIT_SECRET_NEW` to `GUIDEKIT_SECRET`
-
-## Framework Examples
-
-### Next.js App Router
-
-```typescript
-// app/api/guidekit/token/route.ts
-import { createSessionToken } from '@guidekit/server';
-
-export async function POST() {
-  const token = await createSessionToken({ /* ... */ });
-  return Response.json(token);
-}
-```
-
-### Express
-
-```typescript
-import express from 'express';
-import { createSessionToken } from '@guidekit/server';
-
-const app = express();
-
-app.post('/api/guidekit/token', async (req, res) => {
-  const token = await createSessionToken({ /* ... */ });
-  res.json(token);
+  }),
 });
+
+export const POST = routes.POST_token;
+
+// app/api/guidekit/llm/route.ts
+export const POST = routes.POST_llm;
+
+// app/api/guidekit/health/route.ts
+export const GET = routes.GET_health;
 ```
+
+## Client configuration (zero browser keys)
+
+```tsx
+<GuideKitProvider
+  tokenEndpoint="/api/guidekit/token"
+  proxy={{ llm: '/api/guidekit/llm', health: '/api/guidekit/health' }}
+  llm={{ provider: 'gemini', model: 'gemini-2.5-flash' }}
+/>
+```
+
+## Session storage
+
+Provider keys are stored server-side keyed by **`sessionId`** (not `jti`). The JWT contains `sessionId`, permissions, and expiry — never API keys.
+
+```typescript
+import { InMemorySessionStore, getSessionKeys } from '@guidekit/server';
+
+// Default in-memory store (single instance)
+const keys = getSessionKeys('my-session-id');
+
+// Production: Redis adapter
+import { RedisSessionStore } from '@guidekit/server/redis';
+```
+
+## Proxy routes
+
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/token` | POST | Mint session JWT + store provider keys |
+| `/llm` | POST | Stream LLM requests with server-side key |
+| `/stt` | POST | Mint STT credentials for voice |
+| `/tts` | POST | Mint TTS credentials for voice |
+| `/health` | GET | Health check |
+
+All proxy routes require `Authorization: Bearer <session-token>` except `/token`.
+
+## Rate limiting
+
+`createGuideKitHandler` applies a sliding-window rate limiter per session ID and IP (default: 60 req/min).
+
+## `createSessionToken`
+
+```typescript
+import { createSessionToken } from '@guidekit/server';
+
+const result = await createSessionToken({
+  signingSecret: process.env.GUIDEKIT_SECRET!,
+  sessionId: 'optional-custom-id',
+  llmApiKey: process.env.LLM_API_KEY!,
+  expiresIn: '15m',
+  allowedOrigins: ['https://yourapp.com'],
+});
+
+// result.token — send to client
+// result.expiresIn — seconds
+```
+
+## Secret rotation
+
+1. Generate: `npx @guidekit/cli generate-secret`
+2. Sign with `[newSecret, oldSecret]` array during rotation window
+3. Validate accepts either secret until old tokens expire

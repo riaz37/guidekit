@@ -79,7 +79,7 @@ export class GeminiAdapter implements LLMProviderAdapter {
   private _lastUsage: TokenUsage = emptyUsage();
 
   constructor(config: Extract<LLMConfig, { provider: 'gemini' }>) {
-    this.apiKey = config.apiKey;
+    this.apiKey = config.apiKey ?? '';
     this.model = config.model ?? DEFAULT_GEMINI_MODEL;
   }
 
@@ -866,14 +866,33 @@ export class LLMOrchestrator {
       return config.adapter;
     }
 
-    // Built-in providers.
+    // Built-in providers require apiKey (proxy mode uses ProxyLLMAdapter instead).
+    if (!config.apiKey) {
+      throw new Error(
+        'LLM apiKey is required for direct provider adapters. Use proxy mode for production.',
+      );
+    }
     switch (config.provider) {
       case 'gemini':
-        return new GeminiAdapter(config);
+        return new GeminiAdapter({
+          provider: 'gemini',
+          apiKey: config.apiKey,
+          model: config.model,
+        });
       case 'openai':
-        return new OpenAIAdapter(config);
+        return new OpenAIAdapter({
+          provider: 'openai',
+          apiKey: config.apiKey,
+          model: config.model,
+          baseUrl: config.baseUrl,
+        });
       case 'anthropic':
-        return new AnthropicAdapter(config);
+        return new AnthropicAdapter({
+          provider: 'anthropic',
+          apiKey: config.apiKey,
+          model: config.model,
+          maxTokens: config.maxTokens,
+        });
       default:
         throw new Error(
           `LLM provider "${(config as { provider: string }).provider}" is not yet supported. ` +

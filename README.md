@@ -82,24 +82,36 @@ GUIDEKIT_SECRET=your-generated-secret
 LLM_API_KEY=your-llm-api-key
 ```
 
-### 2. Create a token endpoint (Next.js App Router)
+### 2. Create server routes (Next.js App Router)
 
 ```typescript
 // app/api/guidekit/token/route.ts
-import { createSessionToken } from '@guidekit/server';
+import { createNextAppRouterRoutes } from '@guidekit/server/next';
 
-export async function POST() {
-  const token = await createSessionToken({
-    signingSecret: process.env.GUIDEKIT_SECRET!,
+const routes = createNextAppRouterRoutes({
+  signingSecret: process.env.GUIDEKIT_SECRET!,
+  createTokenOptions: () => ({
     llmApiKey: process.env.LLM_API_KEY!,
     expiresIn: '15m',
     allowedOrigins: ['https://yourapp.com'],
-  });
-  return Response.json(token);
-}
+  }),
+});
+
+export const POST = routes.POST_token;
 ```
 
-### 3. Wrap your app in the Provider
+```typescript
+// app/api/guidekit/llm/route.ts
+import { createNextAppRouterRoutes } from '@guidekit/server/next';
+
+const routes = createNextAppRouterRoutes({
+  signingSecret: process.env.GUIDEKIT_SECRET!,
+});
+
+export const POST = routes.POST_llm;
+```
+
+### 3. Wrap your app in the Provider (proxy mode — no client API keys)
 
 ```tsx
 // app/providers.tsx
@@ -111,6 +123,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <GuideKitProvider
       tokenEndpoint="/api/guidekit/token"
+      proxy={{ llm: '/api/guidekit/llm', health: '/api/guidekit/health' }}
+      llm={{ provider: 'gemini', model: 'gemini-2.5-flash' }}
       agent={{ name: 'Guide', greeting: 'Hi! How can I help you today?' }}
       options={{ mode: 'text', debug: process.env.NODE_ENV === 'development' }}
     >

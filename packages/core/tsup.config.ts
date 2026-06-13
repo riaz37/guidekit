@@ -1,7 +1,8 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/rendering.ts'],
+  entry: ['src/index.ts', 'src/rendering.ts', 'src/cognitive/index.ts', 'src/telemetry/index.ts'],
+  external: ['@guidekit/intelligence', '@guidekit/knowledge', '@guidekit/plugins', 'js-tiktoken'],
   format: ['esm', 'cjs'],
   dts: true,
   splitting: true,

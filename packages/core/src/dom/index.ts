@@ -23,6 +23,8 @@ import type {
   OverlayElement,
   ScanMetadata,
 } from '../types/index.js';
+import { collectShadowInteractiveElements } from './shadow-scanner.js';
+import { scanSameOriginIframes } from './iframe-scanner.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -388,16 +390,29 @@ export class DOMScanner {
     // Phase 2: Extract page data
     const sections = this.extractSections(candidateSections);
     const navigation = this.extractNavigation();
-    const interactiveElements = this.extractInteractiveElements();
+    let interactiveElements = this.extractInteractiveElements();
     const forms = this.extractForms();
     const activeOverlays = this.extractOverlays();
     const meta = this.extractMeta();
+
+    // Shadow DOM + same-origin iframe depth
+    let iframeScan = { sections: [] as PageSection[], iframeCount: 0, crossOriginIframes: [] as import('./iframe-scanner.js').CrossOriginIframeMeta[] };
+    if (this.root) {
+      const shadowEls = collectShadowInteractiveElements(this.root);
+      interactiveElements = [...interactiveElements, ...shadowEls];
+      iframeScan = scanSameOriginIframes(this.root);
+      if (iframeScan.sections.length > 0) {
+        sections.push(...iframeScan.sections);
+      }
+    }
 
     const scanMetadata: ScanMetadata = {
       totalSectionsFound: candidateSections.length,
       sectionsIncluded: sections.length,
       totalNodesScanned: nodesScanned,
       scanBudgetExhausted: budgetExhausted,
+      crossOriginIframes:
+        iframeScan.crossOriginIframes.length > 0 ? iframeScan.crossOriginIframes : undefined,
     };
 
     const model: PageModel = {

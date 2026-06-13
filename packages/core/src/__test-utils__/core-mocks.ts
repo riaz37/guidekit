@@ -91,6 +91,8 @@ export function createMockContextManager() {
     addTurn: vi.fn(),
     getHistory: vi.fn(() => []),
     buildSystemPrompt: vi.fn(() => 'System prompt'),
+    initTokenBudget: vi.fn().mockResolvedValue(undefined),
+    countTokens: vi.fn((text: string) => Math.ceil(text.length / 4)),
     setPageContext: vi.fn(),
     getContent: vi.fn(),
     quietMode: false,

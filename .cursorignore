@@ -1,0 +1,31 @@
+# Dependencies & package store (huge — not useful for search/index)
+node_modules/
+.pnpm-store/
+
+# Build & framework output
+dist/
+.next/
+out/
+build/
+.turbo/
+
+# Test artifacts
+coverage/
+test-results/
+playwright-report/
+blob-report/
+e2e-results/
+**/.vite/
+
+# Local env & caches
+.env
+.env.*
+.eslintcache
+.cache/
+*.log
+
+# OS
+.DS_Store
+
+# Local agent/tooling (not source)
+.carl/

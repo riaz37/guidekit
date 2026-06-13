@@ -1,0 +1,54 @@
+# Platform Mode
+
+GuideKit **Platform Mode** wires the optional intelligence, knowledge, and plugins packages into the v2 pipeline — semantic page enrichment, RAG retrieval, plugin hooks, and hallucination validation.
+
+## Minimal vs Platform Mode
+
+| Mode | Packages | Use case |
+|------|----------|----------|
+| **Minimal** | `@guidekit/core`, `@guidekit/react`, `@guidekit/server` | Chat widget with DOM scan + tools |
+| **Platform** | + `@guidekit/intelligence`, `@guidekit/knowledge`, `@guidekit/plugins` | Production agent with semantic model, RAG, extensions |
+
+## Enable Platform Mode
+
+```tsx
+import { GuideKitProvider } from '@guidekit/react';
+import { definePlugin } from '@guidekit/plugins';
+
+const docs = [
+  { id: '1', title: 'Billing', content: 'Manage billing in Settings > Billing.', tags: ['billing'] },
+];
+
+const myPlugin = definePlugin({
+  name: 'my-plugin',
+  version: '1.0.0',
+  setup: () => {},
+});
+
+<GuideKitProvider
+  tokenEndpoint="/api/guidekit/token"
+  proxy={{ llm: '/api/guidekit/llm', health: '/api/guidekit/health' }}
+  llm={{ provider: 'gemini', model: 'gemini-2.5-flash' }}
+  intelligence
+  knowledge={{ documents: docs, engine: 'bm25', topK: 5 }}
+  plugins={[myPlugin]}
+  hallucinationGuard
+>
+  {children}
+</GuideKitProvider>
+```
+
+## Pipeline stages
+
+1. **scan** — DOM page model
+2. **enrich** — `SemanticScanner` → `SemanticPageModel`
+3. **retrieve** — BM25/TF-IDF knowledge search
+4. **context** — System prompt with semantic sections + RAG
+5. **cognize** — Query complexity routing (`@guidekit/core/cognitive`)
+6. **llm** — Proxy-backed streaming
+7. **validate** — Hallucination guard confidence
+8. **render** — Store + events
+
+## Reference integration
+
+See [`apps/example-nextjs`](https://github.com/riaz37/guidekit/tree/main/apps/example-nextjs) for the canonical Platform Mode demo with zero client API keys.

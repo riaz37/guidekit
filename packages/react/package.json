@@ -17,6 +17,11 @@
       "import": "./dist/devtools.js",
       "require": "./dist/devtools.cjs"
     },
+    "./widget": {
+      "types": "./dist/widget.d.ts",
+      "import": "./dist/widget.js",
+      "require": "./dist/widget.cjs"
+    },
     "./testing": {
       "types": "./dist/testing.d.ts",
       "import": "./dist/testing.js",

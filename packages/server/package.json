@@ -11,6 +11,16 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./next": {
+      "types": "./dist/adapters/next.d.ts",
+      "import": "./dist/adapters/next.js",
+      "require": "./dist/adapters/next.cjs"
+    },
+    "./redis": {
+      "types": "./dist/redis-session-store.d.ts",
+      "import": "./dist/redis-session-store.js",
+      "require": "./dist/redis-session-store.cjs"
     }
   },
   "files": [

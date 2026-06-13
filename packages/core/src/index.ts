@@ -11,6 +11,39 @@ export type {
   BeforeLLMCallContext,
 } from './core.js';
 
+// Pipeline orchestrator (v2 message flow)
+export { PipelineOrchestrator, PIPELINE_STAGES } from './pipeline/index.js';
+export { createPlatformExtensions } from './pipeline/extensions.js';
+export type {
+  PipelineContext,
+  PipelineDependencies,
+  PipelineStage,
+  PipelineStageHooks,
+} from './pipeline/index.js';
+export type {
+  PlatformExtensionOptions,
+  PlatformExtensionResult,
+} from './pipeline/extensions.js';
+
+// Cognitive layer (optional subpath)
+export { QueryRouter, CognitiveEngine, ModelRouter } from './cognitive/index.js';
+export type {
+  QueryComplexity,
+  CognitiveResult,
+  CognitiveStep,
+  ModelTier,
+  ModelRouterOptions,
+} from './cognitive/index.js';
+
+// Telemetry (optional subpath)
+export { PipelineTelemetry } from './telemetry/index.js';
+export type { TelemetrySpan } from './telemetry/index.js';
+
+// Context engine
+export { TokenBudgetManager, heuristicCount } from './context/token-budget.js';
+export { TieredMemory } from './context/memory.js';
+export type { TokenBudgetOptions, CompressionResult } from './context/token-budget.js';
+
 // EventBus
 export { EventBus, createEventBus } from './bus/index.js';
 export type { EventMap } from './bus/index.js';
@@ -101,6 +134,7 @@ export type {
   SearchEngine,
   KnowledgeStoreOptions,
   KnowledgeSearchOptions,
+  GuideKitProxyConfig,
 } from './types/index.js';
 
 // Resources

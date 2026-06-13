@@ -32,6 +32,13 @@ export interface ScanMetadata {
   sectionsIncluded: number;
   totalNodesScanned: number;
   scanBudgetExhausted: boolean;
+  /** Cross-origin iframes (metadata only — content not accessible). */
+  crossOriginIframes?: Array<{
+    index: number;
+    src: string | null;
+    title: string | null;
+    sandbox: string | null;
+  }>;
 }
 
 /** A scored, labelled section of the current page. */
@@ -397,11 +404,39 @@ export interface STTTranscriptEvent {
   timestamp: number;
 }
 
+/** Server proxy endpoints — use with tokenEndpoint for production (no client API keys). */
+export interface GuideKitProxyConfig {
+  /** LLM streaming proxy URL */
+  llm: string;
+  stt?: string;
+  tts?: string;
+  health?: string;
+}
+
 /** Large language model provider configuration. */
 export type LLMConfig =
-  | { provider: 'gemini'; apiKey: string; model?: 'gemini-2.5-flash' | 'gemini-2.5-pro' }
-  | { provider: 'openai'; apiKey: string; model?: string; baseUrl?: string }
-  | { provider: 'anthropic'; apiKey: string; model?: string; maxTokens?: number }
+  | {
+      provider: 'gemini';
+      /**
+       * @deprecated Use `proxy.llm` + `tokenEndpoint` in production. Client API keys are dev-only.
+       */
+      apiKey?: string;
+      model?: 'gemini-2.5-flash' | 'gemini-2.5-pro';
+    }
+  | {
+      provider: 'openai';
+      /** @deprecated Use server proxy in production. */
+      apiKey?: string;
+      model?: string;
+      baseUrl?: string;
+    }
+  | {
+      provider: 'anthropic';
+      /** @deprecated Use server proxy in production. */
+      apiKey?: string;
+      model?: string;
+      maxTokens?: number;
+    }
   | { adapter: LLMProviderAdapter };
 
 // ---------------------------------------------------------------------------
@@ -539,6 +574,20 @@ export interface GuideKitProviderProps {
     userMessage: string;
     conversationHistory: Array<{ role: string; content: string }>;
   }) => { systemPrompt: string; userMessage: string; conversationHistory: Array<{ role: string; content: string }> } | Promise<{ systemPrompt: string; userMessage: string; conversationHistory: Array<{ role: string; content: string }> }>;
+  /** Server proxy routes (production — no client API keys). */
+  proxy?: GuideKitProxyConfig;
+  /** Enable semantic page intelligence (@guidekit/intelligence). */
+  intelligence?: boolean | { enabled?: boolean; options?: Record<string, unknown> };
+  /** Knowledge base for RAG (@guidekit/knowledge). */
+  knowledge?: {
+    documents?: KnowledgeDocument[];
+    engine?: 'bm25' | 'tfidf';
+    topK?: number;
+  };
+  /** Plugin definitions (@guidekit/plugins). */
+  plugins?: PluginDefinition[];
+  /** Run hallucination guard on responses (requires intelligence). Default: true when intelligence enabled. */
+  hallucinationGuard?: boolean;
   children?: unknown;
 }
 
@@ -662,6 +711,10 @@ export interface StreamResult {
   totalTokens: number;
   toolCallsExecuted: number;
   rounds: number;
+  /** Response confidence (0-1) from hallucination guard / cognitive engine. */
+  confidence?: number;
+  /** Source attributions from knowledge retrieval. */
+  sources?: string[];
 }
 
 /** Return type of `sendTextStream()`. */

@@ -1,6 +1,14 @@
 import { defineConfig } from 'vitest/config';
+import path from 'node:path';
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@guidekit/intelligence': path.resolve(__dirname, 'packages/intelligence/src/index.ts'),
+      '@guidekit/knowledge': path.resolve(__dirname, 'packages/knowledge/src/index.ts'),
+      '@guidekit/plugins': path.resolve(__dirname, 'packages/plugins/src/index.ts'),
+    },
+  },
   test: {
     globals: true,
     environment: 'jsdom',

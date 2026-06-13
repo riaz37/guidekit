@@ -364,8 +364,10 @@ export class ToolExecutor {
     userMessage: string;
     tools: ToolDefinition[];
     signal?: AbortSignal;
+    maxRounds?: number;
   }): AsyncGenerator<string, ToolExecutionResult> {
     const { llm, systemPrompt, userMessage, tools, signal } = params;
+    const roundLimit = params.maxRounds ?? this.maxRounds;
 
     // Accumulate results across rounds.
     const allToolCalls: ToolCallRecord[] = [];
@@ -383,7 +385,7 @@ export class ToolExecutor {
     // is conveyed through the tool result turns appended to the history.
     let currentUserMessage = userMessage;
 
-    while (rounds < this.maxRounds) {
+    while (rounds < roundLimit) {
       // Check for abort before each round.
       if (signal?.aborted) {
         this.log('Aborted before round ' + (rounds + 1));
@@ -499,9 +501,9 @@ export class ToolExecutor {
       }
     }
 
-    if (rounds >= this.maxRounds) {
+    if (rounds >= roundLimit) {
       this.log(
-        `Max rounds (${this.maxRounds}) reached in stream. Returning current text.`,
+        `Max rounds (${roundLimit}) reached in stream. Returning current text.`,
       );
     }
 

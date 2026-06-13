@@ -39,6 +39,10 @@ jobs:
       - name: Unit tests
         run: pnpm test:unit
 
+      - name: npm audit (high+)
+        run: pnpm audit --audit-level high
+        continue-on-error: true
+
       - name: Bundle size check
         run: pnpm size:check
 

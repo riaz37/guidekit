@@ -9,6 +9,7 @@
 
 import type {
   PageModel,
+  SemanticPageModel,
   ConversationTurn,
   ContentMapInput,
   ContentMap,
@@ -17,6 +18,8 @@ import type {
   ToolDefinition,
   SessionState,
 } from '../types/index.js';
+import { TieredMemory } from './memory.js';
+import { TokenBudgetManager, type TokenizerProvider } from './token-budget.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -32,6 +35,18 @@ const CONTENT_CACHE_TTL_MS = 30_000; // 30 seconds
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** Check whether a page model includes semantic intelligence fields. */
+function isSemanticPageModel(
+  model: PageModel | SemanticPageModel,
+): model is SemanticPageModel {
+  return (
+    'components' in model ||
+    'headingOutline' in model ||
+    'errorStates' in model ||
+    'flowState' in model
+  );
+}
 
 /** Measure byte-length of a string in UTF-8. */
 function byteLength(str: string): number {
@@ -139,6 +154,8 @@ export interface ContextManagerOptions {
   maxTurns?: number;
   maxSessionSizeBytes?: number;
   tokenBudget?: number;
+  /** Tokenizer for budget enforcement. Default: heuristic (CJK-aware). */
+  tokenizerProvider?: TokenizerProvider;
   debug?: boolean;
 }
 
@@ -152,6 +169,9 @@ export class ContextManager {
 
   private history: ConversationTurn[] = [];
   private contentCache: Map<string, CachedContent> = new Map();
+  private readonly tieredMemory: TieredMemory;
+  private readonly tokenBudgetManager: TokenBudgetManager;
+  private tokenBudgetReady = false;
 
   // Session preferences (persisted across navigations)
   private _userPreference: 'voice' | 'text' = 'text';
@@ -166,6 +186,23 @@ export class ContextManager {
       options?.maxSessionSizeBytes ?? DEFAULT_MAX_SESSION_SIZE_BYTES;
     this.tokenBudget = options?.tokenBudget ?? DEFAULT_TOKEN_BUDGET;
     this.debug = options?.debug ?? false;
+    this.tieredMemory = new TieredMemory({ maxWorkingTurns: this.maxTurns, maxSessionTurns: 50 });
+    this.tokenBudgetManager = new TokenBudgetManager({
+      maxTokens: this.tokenBudget,
+      provider: options?.tokenizerProvider ?? 'heuristic',
+    });
+  }
+
+  /** Initialize optional js-tiktoken encoder (async). */
+  async initTokenBudget(): Promise<void> {
+    if (this.tokenBudgetReady) return;
+    await this.tokenBudgetManager.init();
+    this.tokenBudgetReady = true;
+  }
+
+  /** Count tokens using TokenBudgetManager (CJK-aware heuristic fallback). */
+  countTokens(text: string): number {
+    return this.tokenBudgetManager.count(text);
   }
 
   // -------------------------------------------------------------------------
@@ -177,7 +214,7 @@ export class ContextManager {
    * tools. The output is capped at `tokenBudget` estimated tokens so it fits
    * comfortably inside the LLM context window alongside conversation history.
    */
-  buildSystemPrompt(pageModel: PageModel, tools: ToolDefinition[]): string {
+  buildSystemPrompt(pageModel: PageModel | SemanticPageModel, tools: ToolDefinition[]): string {
     const parts: string[] = [];
 
     // -- Role ----------------------------------------------------------------
@@ -185,6 +222,12 @@ export class ContextManager {
 
     // -- Current Page --------------------------------------------------------
     parts.push(this.buildCurrentPageSection(pageModel));
+
+    // -- Semantic intelligence (when available) --------------------------------
+    if (isSemanticPageModel(pageModel)) {
+      const semantic = this.buildSemanticSections(pageModel);
+      if (semantic) parts.push(semantic);
+    }
 
     // -- Page Sections (with contentMap facts inlined) -----------------------
     parts.push(this.buildPageSectionsSection(pageModel));
@@ -221,10 +264,17 @@ export class ContextManager {
     // -- Guidelines ----------------------------------------------------------
     parts.push(this.buildGuidelinesSection());
 
-    // Join and enforce budget
-    let prompt = parts.join('\n\n');
-    if (estimateTokens(prompt) > this.tokenBudget) {
-      prompt = this.trimPromptToBudget(prompt, pageModel, tools);
+    // Join and enforce budget via TokenBudgetManager
+    const sections = parts.filter(Boolean);
+    let prompt = sections.join('\n\n');
+    if (this.countTokens(prompt) > this.tokenBudget) {
+      const compressed = this.tokenBudgetManager.compress(prompt, sections);
+      prompt = compressed.text;
+      if (this.debug && compressed.strategy !== 'none') {
+        this.log(
+          `Prompt compressed (${compressed.strategy}): ${compressed.tokensBefore} → ${compressed.tokensAfter} tokens`,
+        );
+      }
     }
 
     return prompt;
@@ -236,8 +286,12 @@ export class ContextManager {
 
   /** Append a turn to the conversation history, enforcing size constraints. */
   addTurn(turn: ConversationTurn): void {
-    this.history.push(turn);
+    this.tieredMemory.addTurn(turn);
+    this.history = this.tieredMemory.getWorkingMemory();
     this.enforceHistoryLimits();
+    if (this.history.length !== this.tieredMemory.getWorkingMemory().length) {
+      this.tieredMemory.loadWorking(this.history);
+    }
   }
 
   /** Return a copy of the current conversation history. */
@@ -384,8 +438,9 @@ export class ContextManager {
         return null;
       }
 
-      // Restore conversation history
+      // Restore conversation history into tiered memory
       this.history = state.conversationHistory;
+      this.tieredMemory.loadWorking(this.history);
       this.enforceHistoryLimits();
 
       // Restore preferences
@@ -540,6 +595,45 @@ export class ContextManager {
     return lines.join('\n');
   }
 
+  private buildSemanticSections(model: SemanticPageModel): string {
+    const sections: string[] = [];
+
+    if (model.headingOutline.length > 0) {
+      const lines = ['# Page Outline'];
+      for (const node of model.headingOutline.slice(0, 20)) {
+        const indent = '  '.repeat(Math.max(0, node.level - 1));
+        lines.push(`${indent}- ${node.text}`);
+      }
+      sections.push(lines.join('\n'));
+    }
+
+    if (model.components.length > 0) {
+      const lines = ['# UI Components'];
+      for (const comp of model.components.slice(0, 15)) {
+        lines.push(`- ${comp.type}: ${comp.label ?? comp.selector}`);
+      }
+      sections.push(lines.join('\n'));
+    }
+
+    if (model.errorStates.length > 0) {
+      const lines = ['# Active Errors'];
+      for (const err of model.errorStates.slice(0, 10)) {
+        lines.push(`- ${err.message}${err.relatedField ? ` (${err.relatedField})` : ''}`);
+      }
+      sections.push(lines.join('\n'));
+    }
+
+    if (model.flowState) {
+      const flow = model.flowState;
+      const stepLabel = flow.stepLabels[flow.currentStep] ?? `step ${flow.currentStep + 1}`;
+      sections.push(
+        `# Flow State\n- ${flow.type}: ${stepLabel} (${flow.currentStep + 1} of ${flow.totalSteps})`,
+      );
+    }
+
+    return sections.join('\n\n');
+  }
+
   private buildGuidelinesSection(): string {
     const lines = [
       '# Guidelines',
@@ -562,100 +656,6 @@ export class ContextManager {
     }
 
     return lines.join('\n');
-  }
-
-  // -------------------------------------------------------------------------
-  // Private — prompt trimming
-  // -------------------------------------------------------------------------
-
-  /**
-   * When the assembled prompt exceeds the budget, progressively trim
-   * lower-priority sections to fit.
-   */
-  private trimPromptToBudget(
-    _fullPrompt: string,
-    pageModel: PageModel,
-    tools: ToolDefinition[],
-  ): string {
-    // Priority order for budget allocation:
-    //   system prompt (essential) > page sections > navigation > forms > interactive elements
-    //
-    // Essential parts are always included; optional sections are added in
-    // priority order until the token budget is exhausted.
-
-    const essentialParts: string[] = [
-      this.buildRoleSection(),
-      this.buildCurrentPageSection(pageModel),
-      this.buildViewportSection(pageModel),
-      this.buildGuidelinesSection(),
-    ];
-
-    if (tools.length > 0) {
-      essentialParts.push(this.buildToolsSection(tools));
-    }
-
-    const essentialLength = essentialParts.reduce(
-      (sum, p) => sum + estimateTokens(p) + 2,
-      0,
-    );
-    let remaining = this.tokenBudget - essentialLength;
-
-    const optionalSections: string[] = [];
-
-    // Page sections — highest priority optional section
-    const sectionsStr = this.buildPageSectionsSection(pageModel);
-    if (estimateTokens(sectionsStr) <= remaining) {
-      optionalSections.push(sectionsStr);
-      remaining -= estimateTokens(sectionsStr) + 2;
-    } else if (remaining > 100) {
-      optionalSections.push(truncate(sectionsStr, remaining * 3));
-      remaining = 0;
-    }
-
-    // Navigation
-    if (remaining > 0 && pageModel.navigation.length > 0) {
-      const navStr = this.buildNavigationSection(pageModel);
-      if (estimateTokens(navStr) <= remaining) {
-        optionalSections.push(navStr);
-        remaining -= estimateTokens(navStr) + 2;
-      } else if (remaining > 80) {
-        optionalSections.push(truncate(navStr, remaining * 3));
-        remaining = 0;
-      }
-    }
-
-    // Forms
-    if (remaining > 0 && pageModel.forms.length > 0) {
-      const formsStr = this.buildFormsSection(pageModel);
-      if (estimateTokens(formsStr) <= remaining) {
-        optionalSections.push(formsStr);
-        remaining -= estimateTokens(formsStr) + 2;
-      } else if (remaining > 80) {
-        optionalSections.push(truncate(formsStr, remaining * 3));
-        remaining = 0;
-      }
-    }
-
-    // Interactive elements
-    if (remaining > 0 && pageModel.interactiveElements.length > 0) {
-      const ieStr = this.buildInteractiveElementsSection(pageModel);
-      if (estimateTokens(ieStr) <= remaining) {
-        optionalSections.push(ieStr);
-      } else if (remaining > 80) {
-        optionalSections.push(truncate(ieStr, remaining * 3));
-      }
-    }
-
-    // Insert optional sections after current-page and before viewport
-    const result = [
-      essentialParts[0], // Role
-      essentialParts[1], // Current Page
-      ...optionalSections,
-      essentialParts[2], // Viewport
-      ...essentialParts.slice(3), // Tools + Guidelines
-    ];
-
-    return result.join('\n\n');
   }
 
   // -------------------------------------------------------------------------

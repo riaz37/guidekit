@@ -1,0 +1,56 @@
+# Package Compatibility Tiers
+
+GuideKit uses a tiered release model so core integrations stay stable while optional platform packages evolve independently.
+
+## Tier A — Integrated (lockstep semver)
+
+These packages ship together for breaking API changes:
+
+| Package | Role |
+|---------|------|
+| `@guidekit/core` | Pipeline orchestrator, DOM, LLM, context |
+| `@guidekit/react` | Provider, hooks, widget |
+| `@guidekit/server` | JWT auth, LLM/STT/TTS proxy, session store |
+| `@guidekit/vanilla` | IIFE bundle for non-React apps |
+
+**Rule:** Bump all Tier A packages together when pipeline options, proxy routes, or provider props change incompatibly.
+
+## Tier B — Extensions (peer on core)
+
+| Package | Role |
+|---------|------|
+| `@guidekit/intelligence` | Semantic scan, hallucination guard |
+| `@guidekit/knowledge` | BM25/TF-IDF RAG |
+| `@guidekit/plugins` | Plugin registry and hooks |
+
+**Rule:** Minor bumps when core types change. Optional — zero bundle cost when not imported.
+
+## Tier C — Experimental subpaths
+
+| Export | Role |
+|--------|------|
+| `@guidekit/core/cognitive` | QueryRouter, ModelRouter, CognitiveEngine |
+| `@guidekit/core/telemetry` | Pipeline span instrumentation |
+
+**Rule:** May change more frequently; tree-shakeable subpath exports.
+
+## Multi-instance deployments
+
+For horizontal scaling, use `RedisSessionStore` from `@guidekit/server/redis`:
+
+```typescript
+import { RedisSessionStore } from '@guidekit/server/redis';
+import { createGuideKitHandler } from '@guidekit/server';
+
+const sessionStore = new RedisSessionStore({ url: process.env.REDIS_URL! });
+export const { token, llm, health } = createGuideKitHandler({ sessionStore, /* ... */ });
+```
+
+Each app instance shares session keys via Redis while the client holds only a short-lived JWT.
+
+## Production security checklist
+
+1. Use `tokenEndpoint` + `proxy.llm` — never ship provider API keys to the browser.
+2. Store keys in `SessionStore` server-side only.
+3. Enable rate limiting middleware on proxy routes.
+4. Run `pnpm audit --audit-level high` in CI (enabled by default).

@@ -16,6 +16,16 @@
       "types": "./dist/rendering.d.ts",
       "import": "./dist/rendering.js",
       "require": "./dist/rendering.cjs"
+    },
+    "./cognitive": {
+      "types": "./dist/cognitive/index.d.ts",
+      "import": "./dist/cognitive/index.js",
+      "require": "./dist/cognitive/index.cjs"
+    },
+    "./telemetry": {
+      "types": "./dist/telemetry/index.d.ts",
+      "import": "./dist/telemetry/index.js",
+      "require": "./dist/telemetry/index.cjs"
     }
   },
   "files": [
@@ -33,10 +43,14 @@
     "clean": "rm -rf dist"
   },
   "peerDependencies": {
-    "@guidekit/vad": "workspace:^"
+    "@guidekit/vad": "workspace:^",
+    "js-tiktoken": "^1.0.21"
   },
   "peerDependenciesMeta": {
     "@guidekit/vad": {
+      "optional": true
+    },
+    "js-tiktoken": {
       "optional": true
     }
   },
