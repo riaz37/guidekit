@@ -182,6 +182,8 @@ export function useGuideKitContext(): {
       handler: (params: Record<string, unknown>) => Promise<unknown>;
     },
   ) => void;
+  addKnowledgeDocument: (doc: import('@guidekit/core').KnowledgeDocument) => void;
+  removeKnowledgeDocument: (documentId: string) => void;
 } {
   const core = useGuideKitCore();
 
@@ -213,7 +215,23 @@ export function useGuideKitContext(): {
     [core],
   );
 
-  return { setPageContext, addContext, registerAction };
+  return {
+    setPageContext,
+    addContext,
+    registerAction,
+    addKnowledgeDocument: useCallback(
+      (doc) => {
+        core?.addKnowledgeDocument(doc);
+      },
+      [core],
+    ),
+    removeKnowledgeDocument: useCallback(
+      (documentId) => {
+        core?.removeKnowledgeDocument(documentId);
+      },
+      [core],
+    ),
+  };
 }
 
 // ---------------------------------------------------------------------------

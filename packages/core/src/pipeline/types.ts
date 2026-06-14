@@ -35,7 +35,6 @@ export type PipelineStage =
   | 'context'
   | 'cognize'
   | 'llm'
-  | 'tools'
   | 'validate'
   | 'render';
 
@@ -46,7 +45,6 @@ export const PIPELINE_STAGES: readonly PipelineStage[] = [
   'context',
   'cognize',
   'llm',
-  'tools',
   'validate',
   'render',
 ] as const;
@@ -80,7 +78,7 @@ export interface PipelineContext {
   metadata: Record<string, unknown>;
 }
 
-/** Optional stage hooks — no-op by default until wired in later phases. */
+/** Optional stage hooks for pipeline extensions and custom integrations. */
 export interface PipelineStageHooks {
   enrich?: (ctx: PipelineContext) => PipelineContext | Promise<PipelineContext>;
   retrieve?: (ctx: PipelineContext) => PipelineContext | Promise<PipelineContext>;
@@ -111,6 +109,13 @@ export interface PipelineDependencies {
   notifyListeners: () => void;
   stageHooks?: PipelineStageHooks;
   telemetry?: PipelineTelemetry;
+  getExtraContextSections?: () => Promise<string[]>;
+  pluginRegistry?: PluginRegistryLike | null;
+}
+
+/** Minimal plugin registry surface used by the pipeline orchestrator. */
+export interface PluginRegistryLike {
+  getPipeline<T>(hook: string): { execute(ctx: T): Promise<T>; length: number };
 }
 
 export interface PipelineOrchestratorResult {

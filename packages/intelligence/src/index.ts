@@ -18,4 +18,4 @@ export { SemanticScanner } from './semantic-scanner';
 export type { SemanticScannerOptions } from './semantic-scanner';
 
 // Version
-export const INTELLIGENCE_VERSION = '0.1.0';
+export const INTELLIGENCE_VERSION = '1.0.0';

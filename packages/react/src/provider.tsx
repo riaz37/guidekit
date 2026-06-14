@@ -34,6 +34,7 @@ export function GuideKitProvider(
     knowledge,
     plugins,
     hallucinationGuard,
+    cognitive,
   } = props;
 
   // Use a ref so the core instance is created once and never causes re-renders.
@@ -66,6 +67,7 @@ export function GuideKitProvider(
       knowledge,
       plugins,
       hallucinationGuard,
+      cognitive,
     };
     coreRef.current = new GuideKitCore(coreOptions);
   }

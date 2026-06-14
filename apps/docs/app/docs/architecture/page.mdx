@@ -7,30 +7,25 @@ GuideKit is built as a modular monorepo with clear separation of concerns. This 
 ```
 guidekit/
   packages/
-    core/           # @guidekit/core — all runtime logic
+    core/           # @guidekit/core — pipeline, DOM, LLM, context
       src/
+        pipeline/   # v2 PipelineOrchestrator (scan → render)
         dom/        # DOM Intelligence Engine
-        awareness/  # User Awareness System
-        voice/      # Voice Pipeline (STT + TTS)
-        visual/     # Visual Guidance (spotlight, tooltips)
-        navigation/ # Navigation Controller
-        context/    # Context Manager (LLM prompt assembly)
-        llm/        # LLM Orchestrator (streaming, tool calls)
-        bus/        # Typed EventBus
-        errors/     # Error hierarchy
-        resources/  # Resource lifecycle manager
-        connectivity/ # ConnectionManager
-        i18n/       # Internationalization
-        types/      # Shared TypeScript types
-    vad/            # @guidekit/vad — Silero ONNX VAD model
+        cognitive/  # Tier C experimental subpath
+        telemetry/  # Tier C experimental subpath
+    intelligence/   # @guidekit/intelligence — Platform Mode enrich/validate
+    knowledge/      # @guidekit/knowledge — client-side RAG
+    plugins/        # @guidekit/plugins — plugin hooks and tools
     react/          # @guidekit/react — Provider + hooks + widget
-    server/         # @guidekit/server — JWT tokens, middleware
+    server/         # @guidekit/server — JWT tokens, async SessionStore, proxy
     vanilla/        # @guidekit/vanilla — IIFE script-tag bundle
     cli/            # @guidekit/cli — CLI tools
   apps/
     docs/           # Documentation site (Nextra)
     example-nextjs/ # Reference Next.js integration
 ```
+
+See [Platform Mode](/docs/platform-mode) for the full v2 pipeline stage diagram.
 
 ## Core Subsystems
 

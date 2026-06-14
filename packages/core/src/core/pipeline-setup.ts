@@ -72,5 +72,7 @@ export function setupPipelineOrchestrator(ctx: PipelineSetupContext): PipelineOr
     notifyListeners: ctx.notifyListeners,
     stageHooks: mergeStageHooks(ctx.platformExtensions?.stageHooks, ctx.pipelineHooks),
     telemetry: ctx.telemetry,
+    getExtraContextSections: ctx.platformExtensions?.getExtraContextSections,
+    pluginRegistry: ctx.platformExtensions?.pluginRegistry ?? null,
   });
 }

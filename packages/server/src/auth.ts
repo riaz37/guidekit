@@ -57,15 +57,21 @@ export interface ValidateSessionTokenOptions {
 /**
  * Retrieve provider API keys associated with a session.
  */
-export function getSessionKeys(sessionId: string): ProviderKeys | undefined {
-  return defaultSessionStore.get(sessionId);
+export async function getSessionKeys(
+  sessionId: string,
+  sessionStore: SessionStore = defaultSessionStore,
+): Promise<ProviderKeys | undefined> {
+  return sessionStore.get(sessionId);
 }
 
 /**
  * Remove provider API keys for a session.
  */
-export function clearSessionKeys(sessionId: string): boolean {
-  return defaultSessionStore.delete(sessionId);
+export async function clearSessionKeys(
+  sessionId: string,
+  sessionStore: SessionStore = defaultSessionStore,
+): Promise<boolean> {
+  return sessionStore.delete(sessionId);
 }
 
 // ---------------------------------------------------------------------------
@@ -256,7 +262,7 @@ export async function createSessionToken(
   if (llmApiKey) providerKeys.llmApiKey = llmApiKey;
 
   if (Object.keys(providerKeys).length > 0) {
-    sessionStore.set(sessionId, providerKeys, expiresAt);
+    await sessionStore.set(sessionId, providerKeys, expiresAt);
   }
 
   return {

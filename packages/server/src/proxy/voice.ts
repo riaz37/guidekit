@@ -56,7 +56,7 @@ export async function handleVoiceProxy(
     return jsonResponse({ error: `Permission "${options.kind}" not granted` }, 403);
   }
 
-  const keys = options.sessionStore.get(validation.payload.sessionId);
+  const keys = await options.sessionStore.get(validation.payload.sessionId);
   const apiKey =
     options.kind === 'stt' ? keys?.sttApiKey : keys?.ttsApiKey;
 

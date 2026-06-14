@@ -41,13 +41,7 @@ export class RedisSessionStore implements SessionStore {
     return `${this.prefix}${sessionId}`;
   }
 
-  get(_sessionId: string): ProviderKeys | undefined {
-    throw new Error(
-      'RedisSessionStore.get is async-only. Use getAsync() with an async proxy handler.',
-    );
-  }
-
-  async getAsync(sessionId: string): Promise<ProviderKeys | undefined> {
+  async get(sessionId: string): Promise<ProviderKeys | undefined> {
     const raw = await this.redis.get(this.key(sessionId));
     if (!raw) return undefined;
     try {
@@ -62,9 +56,9 @@ export class RedisSessionStore implements SessionStore {
     }
   }
 
-  set(sessionId: string, keys: ProviderKeys, expiresAt: number): void {
+  async set(sessionId: string, keys: ProviderKeys, expiresAt: number): Promise<void> {
     const payload: StoredEntry = { keys, expiresAt };
-    void this.redis.set(
+    await this.redis.set(
       this.key(sessionId),
       JSON.stringify(payload),
       'EX',
@@ -72,26 +66,24 @@ export class RedisSessionStore implements SessionStore {
     );
   }
 
-  delete(sessionId: string): boolean {
-    void this.redis.del(this.key(sessionId));
-    return true;
+  async delete(sessionId: string): Promise<boolean> {
+    const deleted = await this.redis.del(this.key(sessionId));
+    return deleted > 0;
   }
 
-  evictExpired(): void {
-    // Redis TTL handles expiry; optional keys() sweep for custom deployments.
+  async evictExpired(): Promise<void> {
     if (!this.redis.keys) return;
-    void this.redis.keys(`${this.prefix}*`).then(async (keys) => {
-      const now = Math.floor(Date.now() / 1000);
-      for (const key of keys) {
-        const raw = await this.redis.get(key);
-        if (!raw) continue;
-        try {
-          const parsed = JSON.parse(raw) as StoredEntry;
-          if (parsed.expiresAt <= now) await this.redis.del(key);
-        } catch {
-          await this.redis.del(key);
-        }
+    const keys = await this.redis.keys(`${this.prefix}*`);
+    const now = Math.floor(Date.now() / 1000);
+    for (const key of keys) {
+      const raw = await this.redis.get(key);
+      if (!raw) continue;
+      try {
+        const parsed = JSON.parse(raw) as StoredEntry;
+        if (parsed.expiresAt <= now) await this.redis.del(key);
+      } catch {
+        await this.redis.del(key);
       }
-    });
+    }
   }
 }

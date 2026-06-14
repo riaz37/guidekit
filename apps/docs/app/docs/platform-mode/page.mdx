@@ -29,7 +29,7 @@ const myPlugin = definePlugin({
   tokenEndpoint="/api/guidekit/token"
   proxy={{ llm: '/api/guidekit/llm', health: '/api/guidekit/health' }}
   llm={{ provider: 'gemini', model: 'gemini-2.5-flash' }}
-  intelligence
+  intelligence={true}
   knowledge={{ documents: docs, engine: 'bm25', topK: 5 }}
   plugins={[myPlugin]}
   hallucinationGuard
@@ -44,10 +44,31 @@ const myPlugin = definePlugin({
 2. **enrich** — `SemanticScanner` → `SemanticPageModel`
 3. **retrieve** — BM25/TF-IDF knowledge search
 4. **context** — System prompt with semantic sections + RAG
-5. **cognize** — Query complexity routing (`@guidekit/core/cognitive`)
-6. **llm** — Proxy-backed streaming
-7. **validate** — Hallucination guard confidence
+5. **cognize** — Optional cognitive planning when `cognitive={true}` (Tier C experimental)
+6. **llm** — Proxy-backed streaming (includes tool execution)
+7. **validate** — Hallucination guard confidence (advisory only in 1.0)
 8. **render** — Store + events
+
+## Plugin hooks
+
+Plugins registered via `@guidekit/plugins` can implement lifecycle hooks that the v2 pipeline invokes:
+
+| Hook | When it runs |
+|------|----------------|
+| `beforeScan` / `afterScan` | Around DOM page model capture |
+| `beforeEnrich` / `afterEnrich` | Around semantic enrichment (Platform Mode) |
+| `beforeRetrieve` / `afterRetrieve` | Around knowledge retrieval |
+| `beforeLLMCall` / `afterLLMCall` | Before and after each LLM round |
+| `onToolCall` | When a tool is about to execute |
+| `onError` | On pipeline or tool errors |
+
+Use `getExtraContextSections()` on a plugin to inject additional system-prompt sections during the **context** stage.
+
+## Knowledge limits (1.0)
+
+- Documents are held **in memory** on the client for the session — there is no IndexedDB persistence in 1.0.
+- Use `addKnowledgeDocument` / `removeKnowledgeDocument` on the core instance (or React context) for runtime updates.
+- Large corpora should live server-side; pass a curated subset via `knowledge.documents` at init time.
 
 ## Reference integration
 

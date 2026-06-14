@@ -40,4 +40,6 @@ export interface GuideKitCoreOptions {
   };
   plugins?: PluginDefinition[];
   hallucinationGuard?: boolean;
+  /** Enable heuristic cognitive planning. Default: false. */
+  cognitive?: boolean;
 }

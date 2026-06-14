@@ -21,16 +21,26 @@ export const platformKnowledgeDocuments: KnowledgeDocument[] = [
   },
 ];
 
-/** Sample plugin that adds context to the system prompt. */
+/** Sample plugin demonstrating multiple lifecycle hooks. */
 export const platformDemoPlugin: PluginDefinition = definePlugin({
   name: 'platform-demo',
   version: '1.0.0',
-  description: 'Adds platform mode demo context',
+  description: 'Adds platform mode demo context and post-response metadata',
   hooks: {
     beforeLLMCall: async (ctx, next) => {
-      ctx.systemPrompt += '\n\n## Platform Mode\nThis app runs GuideKit v2 Platform Mode with intelligence, RAG, and plugins enabled.';
+      ctx.systemPrompt +=
+        '\n\n## Platform Mode\nThis app runs GuideKit Platform Mode with intelligence, RAG, and plugins enabled.';
+      ctx.metadata.platformDemo = true;
+      return next();
+    },
+    afterLLMCall: async (ctx, next) => {
+      if (ctx.responseText && !ctx.responseText.includes('[Platform Mode]')) {
+        ctx.responseText = `${ctx.responseText}\n\n[Platform Mode] Response validated by platform-demo plugin.`;
+      }
       return next();
     },
   },
-  setup: () => {},
+  setup: (api) => {
+    api.addContextProvider('demo-banner', () => 'Demo app: custom actions and proxy routes are enabled.');
+  },
 });

@@ -64,8 +64,9 @@ export interface RuntimeHostRefs {
 
 export function buildRuntimeInitHost(host: RuntimeHostRefs): RuntimeInitHost {
   const refs = host.getRefs();
-  return {
-    ...host.toolsHost,
+  // Preserve VisualNavController prototype methods (highlight, scrollToSection, …).
+  // Object spread would copy only own properties and break builtin tool execution.
+  return Object.assign(host.toolsHost, {
     instanceId: host.instanceId,
     debug: host.debug,
     options: host.options,
@@ -79,28 +80,29 @@ export function buildRuntimeInitHost(host: RuntimeHostRefs): RuntimeInitHost {
     resolveLLMConfig: host.resolveLLMConfig,
     getToolDefinitions: host.getToolDefinitions,
     toolExecutor: refs.toolExecutor,
-    setToolExecutor: (e) => host.setRefs({ toolExecutor: e }),
+    setToolExecutor: (e: ToolExecutor) => host.setRefs({ toolExecutor: e }),
     domScanner: refs.domScanner,
-    setDomScanner: (s) => host.setRefs({ domScanner: s }),
-    setPageModel: (m) => host.setRefs({ pageModel: m }),
+    setDomScanner: (s: DOMScanner) => host.setRefs({ domScanner: s }),
+    setPageModel: (m: PageModel | null) => host.setRefs({ pageModel: m }),
     llmOrchestrator: refs.llmOrchestrator,
-    setLlmOrchestrator: (o) => host.setRefs({ llmOrchestrator: o }),
+    setLlmOrchestrator: (o: LLMOrchestrator) => host.setRefs({ llmOrchestrator: o }),
     tokenManager: refs.tokenManager,
-    setTokenManager: (m) => host.setRefs({ tokenManager: m }),
+    setTokenManager: (m: TokenManager) => host.setRefs({ tokenManager: m }),
     connectionManager: refs.connectionManager,
-    setConnectionManager: (m) => host.setRefs({ connectionManager: m }),
+    setConnectionManager: (m: ConnectionManager) => host.setRefs({ connectionManager: m }),
     navigationController: refs.navigationController,
-    setNavigationController: (c) => host.setRefs({ navigationController: c }),
+    setNavigationController: (c: NavigationController) => host.setRefs({ navigationController: c }),
     visualGuidance: refs.visualGuidance,
-    setVisualGuidance: (v) => host.setRefs({ visualGuidance: v }),
+    setVisualGuidance: (v: VisualGuidance) => host.setRefs({ visualGuidance: v }),
     awarenessSystem: refs.awarenessSystem,
-    setAwarenessSystem: (s) => host.setRefs({ awarenessSystem: s }),
+    setAwarenessSystem: (s: AwarenessSystem) => host.setRefs({ awarenessSystem: s }),
     proactiveEngine: refs.proactiveEngine,
-    setProactiveEngine: (e) => host.setRefs({ proactiveEngine: e }),
+    setProactiveEngine: (e: ProactiveTriggerEngine) => host.setRefs({ proactiveEngine: e }),
     voicePipeline: refs.voicePipeline,
-    setVoicePipeline: (p) => host.setRefs({ voicePipeline: p }),
+    setVoicePipeline: (p: VoicePipeline | null) => host.setRefs({ voicePipeline: p }),
     platformExtensions: refs.platformExtensions,
-    setPlatformExtensions: (ext) => host.setRefs({ platformExtensions: ext }),
-    setExtraToolDefinitions: (tools) => host.setRefs({ extraToolDefinitions: tools }),
-  };
+    setPlatformExtensions: (ext: PlatformExtensionResult) => host.setRefs({ platformExtensions: ext }),
+    setExtraToolDefinitions: (tools: ToolDefinition[]) =>
+      host.setRefs({ extraToolDefinitions: tools }),
+  }) as RuntimeInitHost;
 }

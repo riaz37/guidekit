@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 const E2E_GUIDEKIT_SECRET =
   process.env.GUIDEKIT_SECRET ?? 'guidekit-example-e2e-secret-32-chars';
+const E2E_LLM_API_KEY =
+  process.env.LLM_API_KEY ?? 'e2e-dummy-llm-key-for-contract-tests';
 
 export default defineConfig({
   testDir: './e2e',
@@ -34,6 +36,7 @@ export default defineConfig({
     env: {
       ...process.env,
       GUIDEKIT_SECRET: E2E_GUIDEKIT_SECRET,
+      LLM_API_KEY: E2E_LLM_API_KEY,
     },
     url: 'http://localhost:3099',
     reuseExistingServer: !process.env.CI,

@@ -230,6 +230,33 @@ function checkGuideKitRepoParity(root: string): CheckResult[] {
   return results;
 }
 
+function checkPlatformPackages(root: string): CheckResult[] {
+  const pkgPath = path.join(root, 'package.json');
+  if (!fileExists(pkgPath)) return [];
+
+  const pkg = JSON.parse(readFile(pkgPath)) as { dependencies?: Record<string, string> };
+  const deps = { ...pkg.dependencies, ...(pkg as { devDependencies?: Record<string, string> }).devDependencies };
+  const platformPackages = ['@guidekit/intelligence', '@guidekit/knowledge', '@guidekit/plugins'] as const;
+  const installed = platformPackages.filter((name) => deps[name]);
+
+  if (installed.length === 0) return [];
+
+  const missing = platformPackages.filter((name) => deps[name] && !fileExists(path.join(root, 'node_modules', name)));
+  if (missing.length > 0) {
+    return [{
+      name: 'Platform Mode packages',
+      status: 'error',
+      message: `Missing installed packages: ${missing.join(', ')}. Run npm install.`,
+    }];
+  }
+
+  return [{
+    name: 'Platform Mode packages',
+    status: 'ok',
+    message: `Installed: ${installed.join(', ')}`,
+  }];
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -256,6 +283,7 @@ export async function runDoctor(): Promise<void> {
   results.push(checkPackageInstalled(root, '@guidekit/core'));
   results.push(checkPackageInstalled(root, '@guidekit/react'));
   results.push(checkPackageInstalled(root, '@guidekit/server'));
+  results.push(...checkPlatformPackages(root));
 
   // Connectivity checks
   log(`${c.bold}Connectivity${c.reset}`);

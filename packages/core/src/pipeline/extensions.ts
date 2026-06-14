@@ -6,6 +6,7 @@
  */
 
 import type { EventBus } from '../bus/index.js';
+import { ConfigurationError, ErrorCodes } from '../errors/index.js';
 import type {
   AgentState,
   KnowledgeDocument,
@@ -26,6 +27,8 @@ export interface PlatformExtensionOptions {
     topK?: number;
   };
   plugins?: PluginDefinition[];
+  /** Enable heuristic cognitive planning (@guidekit/core/cognitive). Default: false. */
+  cognitive?: boolean;
   hallucinationGuard?: boolean;
   rootElement?: HTMLElement;
   bus?: EventBus;
@@ -41,6 +44,8 @@ export interface PlatformExtensionResult {
   pluginRegistry: PluginRegistryLike | null;
   getExtraToolDefinitions: () => ToolDefinition[];
   getExtraContextSections: () => Promise<string[]>;
+  addKnowledgeDocument?: (doc: KnowledgeDocument) => void;
+  removeKnowledgeDocument?: (id: string) => void;
   destroy: () => Promise<void>;
 }
 
@@ -62,8 +67,17 @@ function intelligenceEnabled(
   opt: PlatformExtensionOptions['intelligence'],
 ): boolean {
   if (opt === false) return false;
-  if (opt === true || opt === undefined) return true;
+  if (opt === true) return true;
+  if (opt === undefined) return false;
   return opt.enabled !== false;
+}
+
+function platformImportError(packageName: string): ConfigurationError {
+  return new ConfigurationError({
+    code: ErrorCodes.PLUGIN_DEPENDENCY_MISSING,
+    message: `@guidekit/${packageName} is required for the configured Platform Mode options but is not installed.`,
+    suggestion: `Run: npm install @guidekit/${packageName}`,
+  });
 }
 
 /**
@@ -77,6 +91,10 @@ export async function createPlatformExtensions(
   let semanticScanner: { scan(root: Element, base: PageModel): SemanticPageModel } | null =
     null;
   let knowledgeProvider: ((query: string) => string) | null = null;
+  let knowledgeStore: {
+    addDocument(doc: KnowledgeDocument): void;
+    removeDocument(id: string): void;
+  } | null = null;
   let hallucinationGuard: {
     validate(text: string, pageModel: PageModel): { confidence: number; issues: unknown[] };
   } | null = null;
@@ -97,19 +115,19 @@ export async function createPlatformExtensions(
         hallucinationGuard = new intel.HallucinationGuard();
       }
     } catch {
-      if (options.debug) {
-        console.debug('[GuideKit:Core] @guidekit/intelligence not available');
-      }
+      throw platformImportError('intelligence');
     }
   }
 
-  if (options.knowledge?.documents?.length) {
+  if (options.knowledge !== undefined) {
     try {
       const know = await import('@guidekit/knowledge');
       const store = new know.KnowledgeStore({
         engine: options.knowledge.engine ?? 'bm25',
       });
-      for (const doc of options.knowledge.documents) {
+      knowledgeStore = store;
+      const documents = options.knowledge.documents ?? [];
+      for (const doc of documents) {
         store.addDocument(doc);
       }
       knowledgeProvider = know.createKnowledgeContextProvider(store, {
@@ -117,13 +135,11 @@ export async function createPlatformExtensions(
         countTokens: heuristicCount,
       });
     } catch {
-      if (options.debug) {
-        console.debug('[GuideKit:Core] @guidekit/knowledge not available');
-      }
+      throw platformImportError('knowledge');
     }
   }
 
-  if (options.plugins?.length) {
+  if (options.plugins !== undefined) {
     try {
       const plug = await import('@guidekit/plugins');
       pluginRegistry = new plug.PluginRegistry({
@@ -138,10 +154,9 @@ export async function createPlatformExtensions(
       for (const plugin of options.plugins) {
         await pluginRegistry.install(plugin);
       }
-    } catch {
-      if (options.debug) {
-        console.debug('[GuideKit:Core] @guidekit/plugins not available');
-      }
+    } catch (err) {
+      if (err instanceof ConfigurationError) throw err;
+      throw platformImportError('plugins');
     }
   }
 
@@ -166,21 +181,19 @@ export async function createPlatformExtensions(
     };
   }
 
-  const cognitiveEngine = new CognitiveEngine({ voiceMode: options.voiceMode });
-  const existingCognize = stageHooks.cognize;
-  stageHooks.cognize = async (ctx) => {
-    const base = existingCognize ? await existingCognize(ctx) : ctx;
-    const tools = options.getToolDefinitions?.() ?? [];
-    const result = cognitiveEngine.process(base.userMessage, tools);
-    return {
-      ...base,
-      metadata: { ...base.metadata, cognitive: result },
-      validation: {
-        ...base.validation,
-        confidence: result.confidence,
-      },
+  if (options.cognitive === true) {
+    const cognitiveEngine = new CognitiveEngine({ voiceMode: options.voiceMode });
+    const existingCognize = stageHooks.cognize;
+    stageHooks.cognize = async (ctx) => {
+      const base = existingCognize ? await existingCognize(ctx) : ctx;
+      const tools = options.getToolDefinitions?.() ?? [];
+      const result = cognitiveEngine.process(base.userMessage, tools);
+      return {
+        ...base,
+        metadata: { ...base.metadata, cognitive: result },
+      };
     };
-  };
+  }
 
   if (hallucinationGuard) {
     stageHooks.validate = (ctx) => {
@@ -213,15 +226,21 @@ export async function createPlatformExtensions(
       }
       return sections;
     },
+    addKnowledgeDocument: knowledgeStore
+      ? (doc) => knowledgeStore!.addDocument(doc)
+      : undefined,
+    removeKnowledgeDocument: knowledgeStore
+      ? (id) => knowledgeStore!.removeDocument(id)
+      : undefined,
     destroy: async () => {
       if (pluginRegistry) await pluginRegistry.destroy();
     },
   };
 }
 
-export { isSemanticPageModel };
-
 function extractSourceLines(section: string): string[] {
-  const lines = section.split('\n').filter((l) => l.startsWith('- Source:'));
-  return lines.map((l) => l.replace(/^- Source:\s*/, '').trim());
+  const lines = section.split('\n');
+  return lines.filter((l) => l.startsWith('- ')).map((l) => l.slice(2));
 }
+
+export { isSemanticPageModel };

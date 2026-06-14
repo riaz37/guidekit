@@ -284,6 +284,30 @@ export class GuideKitCore {
     this.customActions.set(actionId, action);
   }
 
+  /** Add a document to the knowledge store (requires Platform Mode knowledge). */
+  addKnowledgeDocument(doc: import('./types/index.js').KnowledgeDocument): void {
+    if (!this.platformExtensions?.addKnowledgeDocument) {
+      throw new ConfigurationError({
+        code: ErrorCodes.CONFIG_MISSING_REQUIRED,
+        message: 'Knowledge store is not configured.',
+        suggestion: 'Enable knowledge={{ documents: [...] }} on GuideKitProvider.',
+      });
+    }
+    this.platformExtensions.addKnowledgeDocument(doc);
+  }
+
+  /** Remove a document from the knowledge store by id. */
+  removeKnowledgeDocument(documentId: string): void {
+    if (!this.platformExtensions?.removeKnowledgeDocument) {
+      throw new ConfigurationError({
+        code: ErrorCodes.CONFIG_MISSING_REQUIRED,
+        message: 'Knowledge store is not configured.',
+        suggestion: 'Enable knowledge={{ documents: [...] }} on GuideKitProvider.',
+      });
+    }
+    this.platformExtensions.removeKnowledgeDocument(documentId);
+  }
+
   startListening(): Promise<void> {
     return this.voiceControl.startListening();
   }

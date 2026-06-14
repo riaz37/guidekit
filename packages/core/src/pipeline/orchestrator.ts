@@ -14,6 +14,7 @@ import type {
   PipelineStage,
 } from './types.js';
 import { PIPELINE_STAGES } from './types.js';
+import type { AfterLLMCallCtx } from '../types/index.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -122,10 +123,6 @@ export class PipelineOrchestrator {
         });
 
         for (const stage of PIPELINE_STAGES) {
-          if (stage === 'tools') {
-            continue;
-          }
-
           const span = deps.telemetry?.startSpan(stage);
 
           if (stage === 'llm') {
@@ -136,11 +133,42 @@ export class PipelineOrchestrator {
                 ctx = chunk;
               }
             }
-            if (span) deps.telemetry?.endSpan(span);
+            if (deps.pluginRegistry?.getPipeline('afterLLMCall').length) {
+              const afterCtx = await deps.pluginRegistry
+                .getPipeline<AfterLLMCallCtx>('afterLLMCall')
+                .execute({
+                  responseText: ctx.responseText,
+                  toolCalls: [],
+                  usage: ctx.totalTokens
+                    ? { prompt: 0, completion: 0, total: ctx.totalTokens }
+                    : null,
+                  metadata: ctx.metadata,
+                });
+              ctx = {
+                ...ctx,
+                responseText: afterCtx.responseText,
+                metadata: afterCtx.metadata,
+              };
+            }
+            if (span) {
+              span.attributes = {
+                ...span.attributes,
+                totalTokens: ctx.totalTokens,
+                toolCallsExecuted: ctx.toolCallsExecuted,
+                rounds: ctx.rounds,
+              };
+              deps.telemetry?.endSpan(span);
+            }
             continue;
           }
 
           ctx = await runStage(stage, ctx, deps);
+          if (stage === 'validate') {
+            deps.bus.emit('validation:complete', {
+              confidence: ctx.validation?.confidence,
+              issues: ctx.validation?.issues,
+            });
+          }
           if (span) deps.telemetry?.endSpan(span);
         }
 
@@ -184,6 +212,17 @@ export class PipelineOrchestrator {
             deps.getAgentState().status === 'idle');
 
         if (!isPrivacyHookError) {
+          if (deps.pluginRegistry?.getPipeline('onError').length) {
+            try {
+              await deps.pluginRegistry.getPipeline('onError').execute({
+                error: err,
+                phase: 'llm',
+                metadata: {},
+              });
+            } catch {
+              // Plugin error handlers must not mask the original error.
+            }
+          }
           deps.setAgentState({ status: 'error', error: err });
           deps.bus.emit('error', err);
         }
@@ -268,6 +307,13 @@ async function runContextStage(
 
   if (ctx.knowledgeSection) {
     systemPrompt = `${systemPrompt}\n\n${ctx.knowledgeSection}`;
+  }
+
+  if (deps.getExtraContextSections) {
+    const extraSections = await deps.getExtraContextSections();
+    if (extraSections.length > 0) {
+      systemPrompt = `${systemPrompt}\n\n${extraSections.join('\n\n')}`;
+    }
   }
 
   let userMessage = ctx.userMessage;

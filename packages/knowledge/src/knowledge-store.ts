@@ -32,12 +32,6 @@ export class KnowledgeStore {
       topK: options?.topK ?? 5,
       chunker: options?.chunker,
     };
-
-    if (options?.persistConsent) {
-      console.warn(
-        '[GuideKit] KnowledgeStore persistence via IndexedDB is not yet implemented. Data is in-memory only.',
-      );
-    }
   }
 
   /** Add a document. Chunks it and indexes all chunks. */

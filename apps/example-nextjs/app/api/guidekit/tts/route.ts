@@ -1,3 +1,3 @@
 import { guidekitRoutes } from '../../../../lib/guidekit-routes';
 
-export const GET = guidekitRoutes.GET_health;
+export const POST = guidekitRoutes.POST_tts;

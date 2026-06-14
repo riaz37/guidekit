@@ -17,10 +17,10 @@ export interface SessionEntry {
 }
 
 export interface SessionStore {
-  get(sessionId: string): ProviderKeys | undefined;
-  set(sessionId: string, keys: ProviderKeys, expiresAt: number): void;
-  delete(sessionId: string): boolean;
-  evictExpired(): void;
+  get(sessionId: string): Promise<ProviderKeys | undefined>;
+  set(sessionId: string, keys: ProviderKeys, expiresAt: number): Promise<void>;
+  delete(sessionId: string): Promise<boolean>;
+  evictExpired(): Promise<void>;
 }
 
 const EVICTION_INTERVAL_MS = 60_000;
@@ -30,8 +30,8 @@ export class InMemorySessionStore implements SessionStore {
   private store = new Map<string, SessionEntry>();
   private lastEvictionTime = 0;
 
-  get(sessionId: string): ProviderKeys | undefined {
-    this.evictExpired();
+  async get(sessionId: string): Promise<ProviderKeys | undefined> {
+    await this.evictExpired();
     const entry = this.store.get(sessionId);
     if (!entry) return undefined;
     if (entry.expiresAt <= Math.floor(Date.now() / 1000)) {
@@ -41,16 +41,16 @@ export class InMemorySessionStore implements SessionStore {
     return entry.keys;
   }
 
-  set(sessionId: string, keys: ProviderKeys, expiresAt: number): void {
-    this.evictExpired();
+  async set(sessionId: string, keys: ProviderKeys, expiresAt: number): Promise<void> {
+    await this.evictExpired();
     this.store.set(sessionId, { keys, expiresAt });
   }
 
-  delete(sessionId: string): boolean {
+  async delete(sessionId: string): Promise<boolean> {
     return this.store.delete(sessionId);
   }
 
-  evictExpired(): void {
+  async evictExpired(): Promise<void> {
     const now = Date.now();
     if (now - this.lastEvictionTime < EVICTION_INTERVAL_MS) return;
     this.lastEvictionTime = now;

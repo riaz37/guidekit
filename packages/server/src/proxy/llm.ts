@@ -54,7 +54,7 @@ export async function handleLLMProxy(
     return jsonResponse({ error: validation.error ?? 'Invalid token' }, 401);
   }
 
-  const keys = options.sessionStore.get(validation.payload.sessionId);
+  const keys = await options.sessionStore.get(validation.payload.sessionId);
   if (!keys?.llmApiKey) {
     return jsonResponse({ error: 'No LLM API key for session' }, 403);
   }

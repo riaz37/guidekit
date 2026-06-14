@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2026-06-14
+
+### Tier A — 1.0 GA
+
+#### Breaking changes
+
+- **`SessionStore` is fully async** — `get`, `set`, and `delete` return Promises. `getSessionKeys()` and `clearSessionKeys()` are async.
+- **Intelligence off by default** — enable with `intelligence={true}` for Platform Mode.
+- **Cognitive engine opt-in** — pass `cognitive={true}` to enable heuristic planning; no longer runs on every message.
+- **Removed `tools` pipeline stage** — tool execution remains inside the `llm` stage.
+- **Removed `persistConsent` / `dbName`** from knowledge store public types (IndexedDB deferred to post-1.0).
+
+#### Added
+
+- Plugin hooks wired: `afterLLMCall`, `beforeToolExecution`, `afterToolExecution`, `onError`, context providers in context stage.
+- Runtime knowledge API: `addKnowledgeDocument` / `removeKnowledgeDocument` on core and `useGuideKitContext`.
+- Platform Mode fail-fast when extension packages are configured but not installed.
+- `validation:complete` bus event from hallucination guard stage.
+- Redis session store integration tests; Playwright LLM contract-tier E2E with route mock.
+- Example app: all five proxy routes, custom action demo, multi-hook plugin.
+- CLI: `init --platform`, doctor checks for Platform Mode packages.
+- Docs nav: Platform Mode, Compatibility, Troubleshooting.
+
+### Tier B
+
+- `@guidekit/intelligence`, `@guidekit/knowledge`, `@guidekit/plugins` at **1.0.0** with peer dependency on `@guidekit/core@^1.0.0`.
+
+## [0.3.0] - 2025
+
+### Added
+
+- GuideKit v2 platform: pipeline orchestration, server LLM/voice proxy, cognitive engine, token budgets, platform extensions, telemetry, and a slimmer core facade.
+
 ## [0.1.0-beta] - 2025-03-02
 
 ### Added

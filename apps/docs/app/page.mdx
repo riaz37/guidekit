@@ -38,17 +38,17 @@ That's it. GuideKit auto-discovers your site, builds a page model, and provides 
 
 | Package | Version | Audience | What it is | Status |
 |---------|---------|----------|------------|--------|
-| `@guidekit/core` | `0.2.0` | Every integration | DOM scanner, orchestration, voice pipeline, visual guidance primitives | Core |
-| `@guidekit/react` | `0.2.0` | React / Next.js apps | Provider, hooks, Shadow DOM widget | Core |
-| `@guidekit/server` | `0.2.0` | Backend token endpoints | JWT token generation and session helpers | Core |
-| `@guidekit/vanilla` | `0.1.1` | Non-React apps | IIFE bundle and framework-agnostic browser integration | Stable optional |
-| `@guidekit/cli` | `0.1.1` | Local setup and contributors | CLI tools for init, doctor, secrets, and parity diagnostics | Optional DX |
+| `@guidekit/core` | `1.0.0` | Every integration | DOM scanner, orchestration, voice pipeline, visual guidance primitives | Core |
+| `@guidekit/react` | `1.0.0` | React / Next.js apps | Provider, hooks, Shadow DOM widget | Core |
+| `@guidekit/server` | `1.0.0` | Backend token endpoints | JWT token generation and session helpers | Core |
+| `@guidekit/vanilla` | `1.0.0` | Non-React apps | IIFE bundle and framework-agnostic browser integration | Stable optional |
+| `@guidekit/cli` | `1.0.0` | Local setup and contributors | CLI tools for init, doctor, secrets, and parity diagnostics | Optional DX |
 | `@guidekit/vad` | `0.1.1` | Voice experiences | Silero VAD model and helpers | Optional voice |
-| `@guidekit/intelligence` | `0.1.1` | Advanced guide reasoning | Semantic page intelligence engine | Advanced optional |
-| `@guidekit/knowledge` | `0.1.1` | Retrieval-augmented guidance | Knowledge search and indexing utilities | Advanced optional |
-| `@guidekit/plugins` | `0.1.1` | Extension authors | Plugin system and extension hooks | Advanced optional |
+| `@guidekit/intelligence` | `1.0.0` | Advanced guide reasoning | Semantic page intelligence engine | Advanced optional |
+| `@guidekit/knowledge` | `1.0.0` | Retrieval-augmented guidance | Knowledge search and indexing utilities | Advanced optional |
+| `@guidekit/plugins` | `1.0.0` | Extension authors | Plugin system and extension hooks | Advanced optional |
 
-GuideKit packages release independently. The `0.2.0` track is the recommended default surface today, while `0.1.1` packages represent optional or advanced capabilities that are intentionally versioned on their own cadence.
+**Tier A** packages (`core`, `react`, `server`, `vanilla`) ship together on breaking changes. **Tier B** optional packages require `@guidekit/core@^1.0.0`.
 
 ## Key Features
 

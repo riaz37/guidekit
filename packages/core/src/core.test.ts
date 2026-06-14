@@ -736,7 +736,7 @@ describe('GuideKitCore.sendTextStream()', () => {
         totalTokens: 30,
         toolCallsExecuted: 0,
         rounds: 1,
-        confidence: 1,
+        confidence: undefined,
         sources: undefined,
       });
 

@@ -211,13 +211,6 @@ export async function initializeGuideKitRuntime(host: RuntimeInitHost): Promise<
     cleanup: () => proactiveEngine.destroy(),
   });
 
-  const toolExecutor = new ToolExecutor({
-    maxRounds: 5,
-    debug,
-    onToolCall: (name, args) => host.bus.emit('llm:tool-call', { name, arguments: args }),
-  });
-  host.setToolExecutor(toolExecutor);
-  registerBuiltinTools(host, toolExecutor);
   await host.contextManager.initTokenBudget();
 
   initVoicePipeline(host);
@@ -235,6 +228,7 @@ export async function initializeGuideKitRuntime(host: RuntimeInitHost): Promise<
     intelligence: options.intelligence,
     knowledge: options.knowledge,
     plugins: options.plugins,
+    cognitive: options.cognitive,
     hallucinationGuard: options.hallucinationGuard,
     rootElement: options.rootElement,
     bus: host.bus,
@@ -248,6 +242,40 @@ export async function initializeGuideKitRuntime(host: RuntimeInitHost): Promise<
   });
   host.setPlatformExtensions(platformExtensions);
   host.setExtraToolDefinitions(platformExtensions.getExtraToolDefinitions());
+
+  const pluginRegistry = platformExtensions.pluginRegistry;
+  const lastToolArgs = new Map<string, Record<string, unknown>>();
+
+  const toolExecutor = new ToolExecutor({
+    maxRounds: 5,
+    debug,
+    onToolCall: (name, args) => {
+      lastToolArgs.set(name, args);
+      if (pluginRegistry?.getPipeline('beforeToolExecution').length) {
+        void pluginRegistry.getPipeline('beforeToolExecution').execute({
+          toolName: name,
+          arguments: args,
+          metadata: {},
+        });
+      }
+      host.bus.emit('llm:tool-call', { name, arguments: args });
+    },
+    onToolResult: (name, result, durationMs) => {
+      const args = lastToolArgs.get(name) ?? {};
+      if (pluginRegistry?.getPipeline('afterToolExecution').length) {
+        void pluginRegistry.getPipeline('afterToolExecution').execute({
+          toolName: name,
+          arguments: args,
+          result,
+          durationMs,
+          metadata: {},
+        });
+      }
+      lastToolArgs.delete(name);
+    },
+  });
+  host.setToolExecutor(toolExecutor);
+  registerBuiltinTools(host, toolExecutor);
 
   if (platformExtensions.pluginRegistry) {
     host.resourceManager.register({

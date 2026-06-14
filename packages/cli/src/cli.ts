@@ -14,7 +14,7 @@ import { runDoctor } from './commands/doctor.js';
 import { runGenerateSecret } from './commands/generate-secret.js';
 import { c, log, error as logError } from './utils.js';
 
-const VERSION = '0.1.0-beta.2';
+const VERSION = '1.0.0';
 
 const HELP = `
 ${c.bold}guidekit${c.reset} — CLI tools for GuideKit SDK
@@ -24,6 +24,7 @@ ${c.bold}Usage:${c.reset}
 
 ${c.bold}Commands:${c.reset}
   init              Scaffold GuideKit configuration in your project
+  init --platform   Also scaffold Platform Mode packages and provider props
   doctor            Validate API keys, packages, and provider connectivity
   generate-secret   Generate a signing secret for JWT token authentication
 
@@ -54,7 +55,7 @@ export async function run(args: string[] = process.argv.slice(2)): Promise<void>
 
   switch (command) {
     case 'init':
-      await runInit();
+      await runInit(args.includes('--platform'));
       break;
 
     case 'doctor':

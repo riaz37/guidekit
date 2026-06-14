@@ -361,15 +361,15 @@ describe('getSessionKeys()', () => {
       llmApiKey: 'gem-key-789',
     });
 
-    const keys = getSessionKeys(sessionId);
+    const keys = await getSessionKeys(sessionId);
     expect(keys).toBeDefined();
     expect(keys!.sttApiKey).toBe('dg-key-123');
     expect(keys!.ttsApiKey).toBe('el-key-456');
     expect(keys!.llmApiKey).toBe('gem-key-789');
   });
 
-  it('returns undefined for unknown session', () => {
-    const keys = getSessionKeys('nonexistent-session-id');
+  it('returns undefined for unknown session', async () => {
+    const keys = await getSessionKeys('nonexistent-session-id');
     expect(keys).toBeUndefined();
   });
 
@@ -382,7 +382,7 @@ describe('getSessionKeys()', () => {
       expiresIn: '15m',
     });
 
-    const keys = getSessionKeys(sessionId);
+    const keys = await getSessionKeys(sessionId);
     expect(keys).toBeUndefined();
   });
 
@@ -395,15 +395,15 @@ describe('getSessionKeys()', () => {
       llmApiKey: 'gem-key-to-clear',
     });
 
-    expect(getSessionKeys(sessionId)).toBeDefined();
+    expect(await getSessionKeys(sessionId)).toBeDefined();
 
-    const deleted = clearSessionKeys(sessionId);
+    const deleted = await clearSessionKeys(sessionId);
     expect(deleted).toBe(true);
-    expect(getSessionKeys(sessionId)).toBeUndefined();
+    expect(await getSessionKeys(sessionId)).toBeUndefined();
   });
 
-  it('clearSessionKeys() returns false for unknown session', () => {
-    const deleted = clearSessionKeys('does-not-exist');
+  it('clearSessionKeys() returns false for unknown session', async () => {
+    const deleted = await clearSessionKeys('does-not-exist');
     expect(deleted).toBe(false);
   });
 });

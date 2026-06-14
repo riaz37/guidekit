@@ -21,6 +21,9 @@ export interface EventMap {
   'llm:tool-call': { name: string; arguments: Record<string, unknown> };
   'llm:token-usage': { prompt: number; completion: number; total: number };
 
+  // -- Validation events ----------------------------------------------------
+  'validation:complete': { confidence?: number; issues?: unknown[] };
+
   // -- Voice events ---------------------------------------------------------
   'voice:state-change': { from: string; to: string };
   'voice:transcript': { text: string; isFinal: boolean; confidence: number };

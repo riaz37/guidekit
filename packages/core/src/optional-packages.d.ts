@@ -16,6 +16,7 @@ declare module '@guidekit/knowledge' {
   export class KnowledgeStore {
     constructor(options?: { engine?: 'bm25' | 'tfidf' });
     addDocument(doc: import('./types/index.js').KnowledgeDocument): void;
+    removeDocument(id: string): void;
     search(query: string, options?: { topK?: number }): Array<{ chunk: { content: string } }>;
   }
   export function createKnowledgeContextProvider(

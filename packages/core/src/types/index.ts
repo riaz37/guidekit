@@ -356,8 +356,6 @@ export interface KnowledgeStoreOptions {
   chunker?: ChunkerOptions;
   maxDocuments?: number;
   maxTotalChunks?: number;
-  persistConsent?: boolean;
-  dbName?: string;
   topK?: number;
 }
 
@@ -586,6 +584,8 @@ export interface GuideKitProviderProps {
   };
   /** Plugin definitions (@guidekit/plugins). */
   plugins?: PluginDefinition[];
+  /** Enable heuristic cognitive planning (@guidekit/core/cognitive). Default: false. */
+  cognitive?: boolean;
   /** Run hallucination guard on responses (requires intelligence). Default: true when intelligence enabled. */
   hallucinationGuard?: boolean;
   children?: unknown;

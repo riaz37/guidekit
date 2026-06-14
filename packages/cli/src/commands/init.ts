@@ -86,7 +86,35 @@ export async function handleTokenRequest(req: any, res: any) {
 `;
 }
 
-function providerTemplate(framework: string): string {
+function nextProxyRoutesTemplate(): string {
+  return `// lib/guidekit-routes.ts
+import { createNextAppRouterRoutes } from '@guidekit/server/next';
+
+export const guidekitRoutes = createNextAppRouterRoutes({
+  signingSecret: process.env.GUIDEKIT_SECRET!,
+  createTokenOptions: () => ({
+    llmApiKey: process.env.LLM_API_KEY!,
+    sttApiKey: process.env.STT_API_KEY,
+    ttsApiKey: process.env.TTS_API_KEY,
+    expiresIn: '15m',
+  }),
+});
+`;
+}
+
+function providerTemplate(framework: string, platformMode = false): string {
+  const platformProps = platformMode
+    ? `
+      proxy={{ llm: '/api/guidekit/llm', health: '/api/guidekit/health', stt: '/api/guidekit/stt', tts: '/api/guidekit/tts' }}
+      llm={{ provider: 'gemini', model: 'gemini-2.5-flash' }}
+      intelligence={true}
+      knowledge={{ documents: [], engine: 'bm25', topK: 5 }}
+      plugins={[]}
+      hallucinationGuard`
+    : `
+      proxy={{ llm: '/api/guidekit/llm', health: '/api/guidekit/health' }}
+      llm={{ provider: 'gemini', model: 'gemini-2.5-flash' }}`;
+
   if (framework === 'nextjs-app') {
     return `// app/providers.tsx
 'use client';
@@ -96,7 +124,7 @@ import { GuideKitProvider } from '@guidekit/react';
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <GuideKitProvider
-      tokenEndpoint="/api/guidekit/token"
+      tokenEndpoint="/api/guidekit/token"${platformProps}
       agent={{
         name: 'Guide',
         greeting: 'Hi! How can I help you today?',
@@ -185,7 +213,7 @@ function getProviderPath(root: string, framework: string): string {
 // Main
 // ---------------------------------------------------------------------------
 
-export async function runInit(): Promise<void> {
+export async function runInit(platformMode = false): Promise<void> {
   heading('GuideKit — Project Setup');
 
   const root = findProjectRoot();
@@ -205,6 +233,11 @@ export async function runInit(): Promise<void> {
     if (!deps['@guidekit/core']) missing.push('@guidekit/core');
     if (!deps['@guidekit/react']) missing.push('@guidekit/react');
     if (!deps['@guidekit/server']) missing.push('@guidekit/server');
+    if (platformMode) {
+      if (!deps['@guidekit/intelligence']) missing.push('@guidekit/intelligence');
+      if (!deps['@guidekit/knowledge']) missing.push('@guidekit/knowledge');
+      if (!deps['@guidekit/plugins']) missing.push('@guidekit/plugins');
+    }
 
     if (missing.length > 0) {
       warn(`Missing packages: ${missing.join(', ')}`);
@@ -247,6 +280,15 @@ export async function runInit(): Promise<void> {
     } else {
       info('Token endpoint already exists');
     }
+
+    if (framework === 'nextjs-app' && platformMode) {
+      const routesLib = path.join(root, 'lib', 'guidekit-routes.ts');
+      if (!fileExists(routesLib)) {
+        writeFile(routesLib, nextProxyRoutesTemplate());
+        success(`Created ${c.dim}${path.relative(root, routesLib)}${c.reset}`);
+      }
+      info('Add llm, health, stt, and tts routes under app/api/guidekit/ using guidekitRoutes exports');
+    }
   }
 
   // Step 5: Create provider wrapper (for Next.js App Router)
@@ -255,7 +297,7 @@ export async function runInit(): Promise<void> {
     if (providerPath && !fileExists(providerPath)) {
       const createProvider = await confirm(`Create provider component at ${c.dim}${path.relative(root, providerPath)}${c.reset}?`);
       if (createProvider) {
-        writeFile(providerPath, providerTemplate(framework));
+        writeFile(providerPath, providerTemplate(framework, platformMode));
         success(`Created ${c.dim}${path.relative(root, providerPath)}${c.reset}`);
       }
     }

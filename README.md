@@ -3,7 +3,7 @@
   <img src="https://img.shields.io/npm/v/@guidekit/react?label=react&color=6366f1&style=flat-square" alt="react version" />
   <img src="https://img.shields.io/npm/v/@guidekit/server?label=server&color=6366f1&style=flat-square" alt="server version" />
   <img src="https://img.shields.io/github/license/riaz37/guidekit?style=flat-square" alt="license" />
-  <img src="https://img.shields.io/badge/tests-1242%20passing-brightgreen?style=flat-square" alt="tests" />
+  <img src="https://img.shields.io/badge/tests-1390%20passing-brightgreen?style=flat-square" alt="tests" />
   <img src="https://img.shields.io/badge/TypeScript-strict-blue?style=flat-square" alt="typescript" />
 </p>
 
@@ -49,17 +49,17 @@ Existing solutions fall short:
 
 | Package | Version | Role | Audience | Status |
 |---------|---------|------|----------|--------|
-| [`@guidekit/core`](./packages/core) | `0.2.0` | DOM intelligence, orchestration, context, rendering primitives | Every app integration | Core |
-| [`@guidekit/react`](./packages/react) | `0.2.0` | Provider, hooks, Shadow DOM widget | React / Next.js apps | Core |
-| [`@guidekit/server`](./packages/server) | `0.2.0` | Token generation, auth middleware, session helpers | Server runtimes backing GuideKit clients | Core |
-| [`@guidekit/vanilla`](./packages/vanilla) | `0.1.1` | Script-tag and framework-agnostic browser integration | Non-React apps and simple embeds | Stable optional |
+| [`@guidekit/core`](./packages/core) | `1.0.0` | DOM intelligence, orchestration, context, rendering primitives | Every app integration | Core |
+| [`@guidekit/react`](./packages/react) | `1.0.0` | Provider, hooks, Shadow DOM widget | React / Next.js apps | Core |
+| [`@guidekit/server`](./packages/server) | `1.0.0` | Token generation, auth middleware, session helpers | Server runtimes backing GuideKit clients | Core |
+| [`@guidekit/vanilla`](./packages/vanilla) | `1.0.0` | Script-tag and framework-agnostic browser integration | Non-React apps and simple embeds | Stable optional |
 | [`@guidekit/vad`](./packages/vad) | `0.1.1` | Voice activity detection model and helpers | Voice-enabled experiences | Optional voice |
-| [`@guidekit/cli`](./packages/cli) | `0.1.1` | `init`, `doctor`, `generate-secret` | Local setup, contributor diagnostics, CI parity checks | Optional DX |
-| [`@guidekit/intelligence`](./packages/intelligence) | `0.1.1` | Semantic page intelligence engine | Advanced understanding and ranking pipelines | Advanced optional |
-| [`@guidekit/knowledge`](./packages/knowledge) | `0.1.1` | Knowledge retrieval with BM25 / TF-IDF search | Retrieval-augmented guidance | Advanced optional |
-| [`@guidekit/plugins`](./packages/plugins) | `0.1.1` | Plugin system and extension hooks | Custom platform extensions and partner integrations | Advanced optional |
+| [`@guidekit/cli`](./packages/cli) | `1.0.0` | `init`, `doctor`, `generate-secret` | Local setup, contributor diagnostics, CI parity checks | Optional DX |
+| [`@guidekit/intelligence`](./packages/intelligence) | `1.0.0` | Semantic page intelligence engine | Advanced understanding and ranking pipelines | Advanced optional |
+| [`@guidekit/knowledge`](./packages/knowledge) | `1.0.0` | Knowledge retrieval with BM25 / TF-IDF search | Retrieval-augmented guidance | Advanced optional |
+| [`@guidekit/plugins`](./packages/plugins) | `1.0.0` | Plugin system and extension hooks | Custom platform extensions and partner integrations | Advanced optional |
 
-Version numbers do not move in lockstep. `0.2.0` packages are the default integration path today; `0.1.1` packages are stable optional surfaces or advanced building blocks that can evolve on their own cadence.
+Version numbers do not move in lockstep. **Tier A** packages (`core`, `react`, `server`, `vanilla`) ship together on breaking changes. **Tier B** optional packages evolve on their own cadence with a peer dependency on `@guidekit/core@^1.0.0`.
 
 ## Quick Start
 

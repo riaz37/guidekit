@@ -39,14 +39,45 @@ These packages ship together for breaking API changes:
 For horizontal scaling, use `RedisSessionStore` from `@guidekit/server/redis`:
 
 ```typescript
+import Redis from 'ioredis';
 import { RedisSessionStore } from '@guidekit/server/redis';
 import { createGuideKitHandler } from '@guidekit/server';
 
-const sessionStore = new RedisSessionStore({ url: process.env.REDIS_URL! });
-export const { token, llm, health } = createGuideKitHandler({ sessionStore, /* ... */ });
+const redis = new Redis(process.env.REDIS_URL!);
+const sessionStore = new RedisSessionStore({ redis });
+
+const handler = createGuideKitHandler({
+  signingSecret: process.env.GUIDEKIT_SECRET!,
+  sessionStore,
+  createTokenOptions: () => ({
+    llmApiKey: process.env.LLM_API_KEY!,
+    expiresIn: '15m',
+  }),
+});
+
+// In your HTTP framework:
+// await handler(request, 'llm')
 ```
 
 Each app instance shares session keys via Redis while the client holds only a short-lived JWT.
+
+## Semver governance (1.0)
+
+| Tier | Version policy |
+|------|----------------|
+| **Tier A** | Lockstep — bump `@guidekit/core`, `@guidekit/react`, `@guidekit/server`, `@guidekit/vanilla` together on breaking changes |
+| **Tier B** | Optional peers — require `@guidekit/core@^1.0.0` when using intelligence/knowledge/plugins |
+| **Tier C** | Experimental — `@guidekit/core/cognitive` and `/telemetry` may change without Tier A bumps |
+
+## SessionStore (1.0 breaking change)
+
+`SessionStore` methods are **fully async** in 1.0:
+
+```typescript
+const keys = await sessionStore.get(sessionId);
+await sessionStore.set(sessionId, providerKeys, expiresAt);
+await sessionStore.delete(sessionId);
+```
 
 ## Production security checklist
 

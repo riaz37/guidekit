@@ -51,10 +51,31 @@ Provider keys are stored server-side keyed by **`sessionId`** (not `jti`). The J
 import { InMemorySessionStore, getSessionKeys } from '@guidekit/server';
 
 // Default in-memory store (single instance)
-const keys = getSessionKeys('my-session-id');
+const keys = await getSessionKeys('my-session-id');
 
 // Production: Redis adapter
 import { RedisSessionStore } from '@guidekit/server/redis';
+```
+
+## Framework-agnostic handler
+
+For non-Next.js runtimes, use `createGuideKitHandler`:
+
+```typescript
+import { createGuideKitHandler } from '@guidekit/server';
+
+const handler = createGuideKitHandler({
+  signingSecret: process.env.GUIDEKIT_SECRET!,
+  createTokenOptions: () => ({
+    llmApiKey: process.env.LLM_API_KEY!,
+    expiresIn: '15m',
+  }),
+});
+
+// Route dispatch: 'token' | 'llm' | 'health' | 'stt' | 'tts'
+export async function onRequest(request: Request, route: string) {
+  return handler(request, route as 'token');
+}
 ```
 
 ## Proxy routes

@@ -140,14 +140,14 @@ describe('run() — CLI entry point', () => {
     const { run } = await import('./cli.js');
     await run(['--version']);
     const output = allOutput();
-    expect(output).toContain('0.1.0');
+    expect(output).toContain('1.0.0');
   });
 
   it('shows version with -v flag', async () => {
     const { run } = await import('./cli.js');
     await run(['-v']);
     const output = allOutput();
-    expect(output).toContain('0.1.0');
+    expect(output).toContain('1.0.0');
   });
 
   it('sets exitCode=1 for unknown commands', async () => {
