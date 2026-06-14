@@ -4,6 +4,13 @@
 
 ### Patch Changes
 
+- Updated dependencies [2b44662]
+  - @guidekit/core@1.0.0
+
+## 1.0.0
+
+### Patch Changes
+
 - GuideKit v2 platform: pipeline orchestration, server LLM/voice proxy, cognitive engine, token budgets, platform extensions, telemetry, and a slimmer core facade.
 - Updated dependencies
   - @guidekit/core@0.3.0

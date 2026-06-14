@@ -1,5 +1,16 @@
 # @guidekit/react
 
+## 1.0.0
+
+### Major Changes
+
+- 2b44662: GuideKit 1.0 GA: async SessionStore, pipeline integrity, Platform Mode contracts, runtime knowledge API, docs/E2E parity, and Tier A lockstep release.
+
+### Patch Changes
+
+- Updated dependencies [2b44662]
+  - @guidekit/core@1.0.0
+
 ## 0.3.0
 
 ### Minor Changes
