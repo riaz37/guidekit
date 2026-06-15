@@ -1,5 +1,11 @@
 # @guidekit/server
 
+## 1.0.1
+
+### Patch Changes
+
+- 10de399: Harden real-app integration: session token recovery after server restart, voice widget transcript streaming, continuous mic listening, doctor VAD checks, voice E2E smoke tests, and full live-tier Playwright suite (agent tools, platform mode, proxy API, multi-turn).
+
 ## 1.0.0
 
 ### Major Changes

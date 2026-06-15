@@ -1,6 +1,6 @@
 {
   "name": "@guidekit/server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Server-side utilities for GuideKit SDK — token generation, auth middleware",
   "type": "module",
   "main": "./dist/index.cjs",

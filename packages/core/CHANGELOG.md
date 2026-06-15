@@ -1,5 +1,13 @@
 # @guidekit/core
 
+## 1.0.1
+
+### Patch Changes
+
+- 7b8e304: Expand E2E integration roadmap: contract/live test tiers, full tool coverage, publish live gate, proxy voice credential resolution, and widget test hooks.
+- b2852a8: Add `headless` prop to `GuideKitProvider` to skip the built-in widget and build custom UI with hooks. Export `useGuideKitConsent` for privacy consent in headless apps.
+- 10de399: Harden real-app integration: session token recovery after server restart, voice widget transcript streaming, continuous mic listening, doctor VAD checks, voice E2E smoke tests, and full live-tier Playwright suite (agent tools, platform mode, proxy API, multi-turn).
+
 ## 1.0.0
 
 ### Major Changes
