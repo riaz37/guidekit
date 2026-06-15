@@ -62,9 +62,42 @@ guidekit/
 
 ### Testing expectations
 
-- Unit tests: Vitest (`pnpm test:unit`)
-- E2E: Playwright (`pnpm test:e2e`) — agent flows in `e2e/`
-- New pipeline or cognitive behavior needs unit coverage; integration changes should touch example app or E2E when user-facing
+- Unit tests: Vitest (`pnpm test:unit`) — all packages
+- Contract E2E: Playwright (`pnpm test:e2e:contract`) — mocked LLM + Web Speech voice, runs on every PR
+- Live E2E: Playwright (`pnpm test:e2e:live`) — real Gemini via proxy; **publish gate only** (`LIVE_LLM=1` + `LLM_API_KEY`)
+- New pipeline or cognitive behavior needs unit coverage; user-facing integration changes should touch example app or contract E2E
+
+### E2E layout
+
+```
+e2e/
+├── contract/     # CI + pnpm check (no API key)
+├── live/         # Pre-publish only
+├── fixtures/     # LLM mocks, Web Speech mocks, helpers
+└── env.ts        # .env.local + LIVE_LLM detection
+```
+
+Voice E2E always mocks the browser Web Speech API — no Deepgram/ElevenLabs in Playwright.
+
+### E2E coverage matrix (user-facing flows)
+
+| Flow | Contract | Live |
+|------|:--------:|:----:|
+| Widget UI / a11y | yes | — |
+| Proxy health / token / LLM | yes | yes |
+| Text chat + streaming | mocked | yes |
+| Multi-turn memory | — | yes |
+| Agent tools (scroll, highlight, navigate, tour) | yes | yes |
+| Platform Mode (RAG, plugin, cognitive page) | yes | yes |
+| Session recovery 401 | yes | yes |
+| Voice (Web Speech mock → LLM) | yes | yes |
+| Custom actions / form / readPage / dismiss | yes | partial |
+| STT/TTS proxy key minting | yes | — |
+| Hallucination guard bus event | yes | — |
+
+Commands: `pnpm test:e2e:contract` (CI), `pnpm test:e2e:live` (local), `pnpm test:e2e:live:full` (publish gate).
+
+Before release, run `pnpm test:e2e:live:full` twice locally and confirm both pass (flake budget). Publish workflow uploads Playwright artifacts on live E2E failure.
 
 ## Commands
 

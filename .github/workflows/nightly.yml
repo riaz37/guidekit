@@ -36,12 +36,13 @@ jobs:
         run: pnpm size:check
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+        run: npx playwright install --with-deps chromium
 
-      - name: E2E tests
+      - name: E2E contract tests
         env:
           GUIDEKIT_SECRET: guidekit-example-e2e-secret-32-chars
-        run: npx playwright test
+          LLM_API_KEY: e2e-dummy-llm-key-for-contract-tests
+        run: pnpm test:e2e:contract
 
       - name: Dependency audit
         run: pnpm audit --prod

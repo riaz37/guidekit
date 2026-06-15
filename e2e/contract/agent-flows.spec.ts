@@ -4,7 +4,7 @@ import {
   mockLlmHighlightRoute,
   openWidgetInput,
   isElementInViewport,
-} from './fixtures/mock-llm-proxy';
+} from '../fixtures/mock-llm-proxy';
 
 /**
  * Agent flow E2E tests — guided navigation, forms, and proxy health.

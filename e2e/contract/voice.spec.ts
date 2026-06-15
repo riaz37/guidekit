@@ -1,16 +1,14 @@
 import { test, expect } from '@playwright/test';
-import { openWidgetInput } from './fixtures/mock-llm-proxy';
-import {
-  installVoiceBrowserMocks,
-  mockLlmTextRoute,
-} from './fixtures/voice-mocks';
+import { openWidgetInput } from '../fixtures/mock-llm-proxy';
+import { mockLlmTextRoute } from '../fixtures/voice-mocks';
+import { setupVoiceE2e } from '../fixtures/voice-e2e';
 
+/** Voice E2E — Web Speech mocks only (see fixtures/voice-e2e.ts). */
 test.describe('Voice smoke', () => {
   test.describe.configure({ timeout: 90_000 });
 
   test.beforeEach(async ({ page, context }) => {
-    await context.grantPermissions(['microphone']);
-    await installVoiceBrowserMocks(page, 'scroll to pricing');
+    await setupVoiceE2e(page, context, 'scroll to pricing');
     await mockLlmTextRoute(page, 'Opening the pricing section for you.');
     await page.goto('/');
     await page.waitForSelector('#guidekit-widget', { timeout: 15_000 });

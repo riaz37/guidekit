@@ -312,15 +312,22 @@ export function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetPro
       };
       setMessages((prev) => [...prev, assistantMsg]);
 
-      // Stream tokens into the message
+      // Stream tokens into the message; apply post-pipeline fullText (e.g. plugin hooks).
       const { stream, done } = core.sendTextStream(text);
-      done.catch(() => {});
       for await (const chunk of stream) {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsgId
               ? { ...m, content: m.content + chunk }
               : m,
+          ),
+        );
+      }
+      const result = await done;
+      if (result.fullText) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsgId ? { ...m, content: result.fullText } : m,
           ),
         );
       }
@@ -529,6 +536,7 @@ export function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetPro
         className="gk-panel"
         ref={panelRef}
         data-open={isOpen ? 'true' : 'false'}
+        data-testid="guidekit-panel"
         role="dialog"
         aria-label={t('widgetTitle')}
         aria-hidden={!isOpen}
@@ -557,6 +565,7 @@ export function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetPro
         <div
           className="gk-transcript"
           ref={transcriptRef}
+          data-testid="guidekit-transcript"
           role="log"
           aria-live="polite"
           aria-label="Conversation transcript"
@@ -603,6 +612,7 @@ export function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetPro
           {hasVoice && (
             <button
               className="gk-mic-btn"
+              data-testid="guidekit-mic"
               onClick={handleMicToggle}
               disabled={!isReady || isSending}
               data-active={isVoiceActive || isListeningState ? 'true' : 'false'}
@@ -615,6 +625,7 @@ export function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetPro
           <textarea
             className="gk-input"
             ref={inputRef}
+            data-testid="guidekit-input"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -626,6 +637,7 @@ export function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetPro
           />
           <button
             className="gk-send-btn"
+            data-testid="guidekit-send"
             onClick={handleSend}
             disabled={!isReady || isSending || !inputValue.trim()}
             aria-label={t('sendMessage')}
@@ -672,6 +684,7 @@ export function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetPro
       <button
         className="gk-fab"
         ref={fabRef}
+        data-testid="guidekit-fab"
         onClick={togglePanel}
         aria-label={isOpen ? t('closeAssistant') : t('openAssistant')}
         aria-expanded={isOpen || showConsentDialog}

@@ -385,13 +385,13 @@ export type AgentState =
 
 /** Speech-to-text provider configuration. */
 export type STTConfig =
-  | { provider: 'deepgram'; apiKey: string; model?: 'nova-2' | 'nova-3' }
-  | { provider: 'elevenlabs'; apiKey: string; language?: string }
+  | { provider: 'deepgram'; apiKey?: string; model?: 'nova-2' | 'nova-3' }
+  | { provider: 'elevenlabs'; apiKey?: string; language?: string }
   | { provider: 'web-speech'; language?: string; continuous?: boolean; interimResults?: boolean };
 
 /** Text-to-speech provider configuration. */
 export type TTSConfig =
-  | { provider: 'elevenlabs'; apiKey: string; voiceId?: string }
+  | { provider: 'elevenlabs'; apiKey?: string; voiceId?: string }
   | { provider: 'web-speech'; voice?: string; rate?: number; pitch?: number; language?: string };
 
 /** Transcript event emitted by any STT adapter. */
@@ -419,7 +419,7 @@ export type LLMConfig =
        * @deprecated Use `proxy.llm` + `tokenEndpoint` in production. Client API keys are dev-only.
        */
       apiKey?: string;
-      model?: 'gemini-2.5-flash' | 'gemini-2.5-pro';
+      model?: 'gemini-2.5-flash' | 'gemini-2.5-flash-lite' | 'gemini-2.5-pro';
     }
   | {
       provider: 'openai';

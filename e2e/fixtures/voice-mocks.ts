@@ -33,6 +33,7 @@ export async function mockLlmTextRoute(page: Page, text: string): Promise<void> 
 
 /**
  * Browser mocks for Web Speech STT and microphone access.
+ * Used by all voice E2E specs — do not swap for Deepgram/ElevenLabs here.
  * VAD still loads from @guidekit/vad; allow ~15s on first mic click in CI.
  */
 export async function installVoiceBrowserMocks(

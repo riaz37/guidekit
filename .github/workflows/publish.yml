@@ -14,8 +14,48 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  live-e2e:
+    name: Live E2E (pre-publish)
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm build
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run live E2E suite
+        env:
+          LIVE_LLM: '1'
+          GUIDEKIT_SECRET: guidekit-example-e2e-secret-32-chars
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: pnpm test:e2e:live:full
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: publish-live-e2e-report
+          path: playwright-report/
+          retention-days: 14
+
   publish:
     name: Publish @guidekit/* to npm
+    needs: live-e2e
+    if: ${{ always() && (inputs.dry_run || needs.live-e2e.result == 'success') }}
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
