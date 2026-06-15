@@ -8,7 +8,9 @@ Common issues and solutions when working with GuideKit.
 
 **Symptom:** `GuideKitError: LLM_API_KEY_MISSING` on initialization.
 
-**Fix:** Ensure you pass a valid API key to your provider configuration:
+**Fix (production):** Use proxy mode with server-side keys. Run `npx guidekit init` to scaffold `lib/guidekit-routes.ts` and `/api/guidekit/*` routes, then set `GUIDEKIT_SECRET` and `LLM_API_KEY` in `.env.local`. See [Getting Started](/docs/getting-started).
+
+**Fix (dev only):** You can pass a client key for quick prototyping — never ship this to production:
 
 ```tsx
 <GuideKitProvider
@@ -44,7 +46,11 @@ llm={{ provider: 'anthropic', apiKey: '...' }}
 2. Check browser console for errors — enable debug mode for detailed logs:
 
 ```tsx
-<GuideKitProvider debug={true} llm={{ provider: '...', apiKey: '...' }}>
+<GuideKitProvider
+  options={{ debug: true }}
+  proxy={{ llm: '/api/guidekit/llm', health: '/api/guidekit/health' }}
+  tokenEndpoint="/api/guidekit/token"
+>
 ```
 
 3. Verify you are not rendering on the server without SSR guards.
@@ -140,7 +146,11 @@ See the full [Error Codes Reference](/docs/error-codes) for a complete list.
 Enable debug mode for verbose console output:
 
 ```tsx
-<GuideKitProvider debug={true} llm={{ provider: '...', apiKey: '...' }}>
+<GuideKitProvider
+  options={{ debug: true }}
+  proxy={{ llm: '/api/guidekit/llm', health: '/api/guidekit/health' }}
+  tokenEndpoint="/api/guidekit/token"
+>
 ```
 
 This logs:

@@ -75,6 +75,8 @@ options={{
 
 ### Theme
 
+Applies to the **built-in widget only** (when `headless` is not set). For full UI control, use [Custom UI (Headless)](/docs/custom-ui).
+
 ```tsx
 theme={{
   primaryColor: '#4a9eed',
@@ -83,6 +85,19 @@ theme={{
   zIndex: 1000, // default: 2147483647
 }}
 ```
+
+### Headless mode
+
+Set `headless` to skip the built-in widget and build your own UI with hooks:
+
+```tsx
+<GuideKitProvider headless tokenEndpoint="/api/guidekit/token">
+  <YourApp />
+  <MyCustomAssistant />
+</GuideKitProvider>
+```
+
+See [Custom UI (Headless)](/docs/custom-ui) for patterns, positioning, and consent.
 
 ### Callbacks
 
@@ -102,6 +117,7 @@ theme={{
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
+| `headless` | `boolean` | `false` | Skip built-in widget; use hooks for custom UI |
 | `instanceId` | `string` | `'default'` | For multi-instance setups |
 | `rootElement` | `HTMLElement` | `document.body` | DOM scan scope |
 | `locale` | `string \| object` | `'auto'` | i18n locale or custom strings |

@@ -8,6 +8,7 @@ import { SSR_SNAPSHOT, SSR_STREAMING, SSR_SUBSCRIBE } from './constants.js';
 import { useGuideKitCore } from './use-guidekit-core.js';
 
 export { useGuideKitCore };
+export { useGuideKitConsent, getGuideKitConsentStorageKey } from './use-guidekit-consent.js';
 
 export function useGuideKitStatus(): {
   isReady: boolean;

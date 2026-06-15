@@ -24,18 +24,21 @@ Interactive setup wizard that scaffolds GuideKit configuration for your project.
 
 ```bash
 npx guidekit init
+npx guidekit init --platform
 ```
 
 **What it does:**
 1. Detects your framework (Next.js App Router, Pages Router, React)
 2. Checks for missing packages
 3. Creates `.env.local` with GuideKit variables
-4. Creates a token endpoint (for token-based auth)
-5. Creates a provider wrapper component (Next.js App Router)
+4. For Next.js App Router + token auth: creates `lib/guidekit-routes.ts` and `/api/guidekit/{token,llm,health}` routes
+5. With `--platform`: also scaffolds STT/TTS routes and Platform Mode provider props
+6. Creates a provider wrapper component (Next.js App Router)
+7. Optionally patches `layout.tsx` to import `Providers`
 
 ### `guidekit doctor`
 
-Validates your setup — checks environment variables, packages, provider connectivity, and, when run inside the GuideKit monorepo, CI/local parity for the example app and release-confidence workflows.
+Validates your setup — checks environment variables, packages, proxy route files, provider wiring, local endpoints (when the dev server is running), external provider connectivity, and, when run inside the GuideKit monorepo, CI/local parity for the example app and release-confidence workflows.
 
 ```bash
 npx guidekit doctor
@@ -48,6 +51,8 @@ npx guidekit doctor
 - `LLM_API_KEY` is present
 - `STT_API_KEY` and `TTS_API_KEY` (optional, for voice)
 - `@guidekit/core`, `@guidekit/react`, `@guidekit/server` are installed
+- Proxy route files and `layout.tsx` provider wiring (Next.js App Router)
+- Local `/api/guidekit/token` and `/api/guidekit/health` (warns if dev server is not running)
 - Connectivity to Google AI, Deepgram, and ElevenLabs APIs
 - In the GuideKit monorepo, example-app token-route parity, hosted PR E2E coverage, and the Nightly dependency-audit gate
 

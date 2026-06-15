@@ -23,7 +23,15 @@ import {
 // Templates
 // ---------------------------------------------------------------------------
 
-function tokenEndpointTemplate(framework: string): string {
+function tokenEndpointTemplate(framework: string, routesImportPath?: string): string {
+  if (framework === 'nextjs-app' && routesImportPath) {
+    return `// app/api/guidekit/token/route.ts
+import { guidekitRoutes } from '${routesImportPath}';
+
+export const POST = guidekitRoutes.POST_token;
+`;
+  }
+
   if (framework === 'nextjs-app') {
     return `// app/api/guidekit/token/route.ts
 import { createSessionToken } from '@guidekit/server';
@@ -100,6 +108,17 @@ export const guidekitRoutes = createNextAppRouterRoutes({
     expiresIn: '15m',
   }),
 });
+`;
+}
+
+function proxyRouteTemplate(
+  handler: 'POST_llm' | 'GET_health' | 'POST_stt' | 'POST_tts',
+  routesImportPath: string,
+): string {
+  const exportName = handler.startsWith('GET') ? 'GET' : 'POST';
+  return `import { guidekitRoutes } from '${routesImportPath}';
+
+export const ${exportName} = guidekitRoutes.${handler};
 `;
 }
 
@@ -185,13 +204,37 @@ TTS_API_KEY=
 // File path helpers
 // ---------------------------------------------------------------------------
 
+function usesSrcApp(root: string): boolean {
+  return fileExists(path.join(root, 'src', 'app'));
+}
+
+function getAppDir(root: string): string {
+  return usesSrcApp(root)
+    ? path.join(root, 'src', 'app')
+    : path.join(root, 'app');
+}
+
+function getGuidekitRoutesImportPath(root: string): string {
+  return usesSrcApp(root)
+    ? '../../../../../lib/guidekit-routes'
+    : '../../../../lib/guidekit-routes';
+}
+
+function getProxyRoutesLibPath(root: string): string {
+  return path.join(root, 'lib', 'guidekit-routes.ts');
+}
+
+function getApiRoutePath(root: string, segment: string): string {
+  return path.join(getAppDir(root), 'api', 'guidekit', segment, 'route.ts');
+}
+
+function getLayoutPath(root: string): string {
+  return path.join(getAppDir(root), 'layout.tsx');
+}
+
 function getTokenEndpointPath(root: string, framework: string): string {
   if (framework === 'nextjs-app') {
-    // Check src/app vs app
-    if (fileExists(path.join(root, 'src', 'app'))) {
-      return path.join(root, 'src', 'app', 'api', 'guidekit', 'token', 'route.ts');
-    }
-    return path.join(root, 'app', 'api', 'guidekit', 'token', 'route.ts');
+    return getApiRoutePath(root, 'token');
   }
   if (framework === 'nextjs-pages') {
     if (fileExists(path.join(root, 'src', 'pages'))) {
@@ -204,12 +247,108 @@ function getTokenEndpointPath(root: string, framework: string): string {
 
 function getProviderPath(root: string, framework: string): string {
   if (framework === 'nextjs-app') {
-    if (fileExists(path.join(root, 'src', 'app'))) {
-      return path.join(root, 'src', 'app', 'providers.tsx');
-    }
-    return path.join(root, 'app', 'providers.tsx');
+    return path.join(getAppDir(root), 'providers.tsx');
   }
   return '';  // No file created for other frameworks — just show instructions
+}
+
+async function scaffoldFile(
+  filePath: string,
+  content: string,
+  label: string,
+  root: string,
+): Promise<void> {
+  if (fileExists(filePath)) {
+    info(`${label} already exists`);
+    return;
+  }
+  const create = await confirm(`Create ${label} at ${c.dim}${path.relative(root, filePath)}${c.reset}?`);
+  if (create) {
+    writeFile(filePath, content);
+    success(`Created ${c.dim}${path.relative(root, filePath)}${c.reset}`);
+  }
+}
+
+async function scaffoldNextProxyRoutes(root: string, platformMode: boolean): Promise<void> {
+  const routesImportPath = getGuidekitRoutesImportPath(root);
+
+  await scaffoldFile(
+    getProxyRoutesLibPath(root),
+    nextProxyRoutesTemplate(),
+    'proxy routes helper',
+    root,
+  );
+
+  await scaffoldFile(
+    getApiRoutePath(root, 'token'),
+    tokenEndpointTemplate('nextjs-app', routesImportPath),
+    'token endpoint',
+    root,
+  );
+  await scaffoldFile(
+    getApiRoutePath(root, 'llm'),
+    proxyRouteTemplate('POST_llm', routesImportPath),
+    'LLM proxy route',
+    root,
+  );
+  await scaffoldFile(
+    getApiRoutePath(root, 'health'),
+    proxyRouteTemplate('GET_health', routesImportPath),
+    'health route',
+    root,
+  );
+
+  if (platformMode) {
+    await scaffoldFile(
+      getApiRoutePath(root, 'stt'),
+      proxyRouteTemplate('POST_stt', routesImportPath),
+      'STT proxy route',
+      root,
+    );
+    await scaffoldFile(
+      getApiRoutePath(root, 'tts'),
+      proxyRouteTemplate('POST_tts', routesImportPath),
+      'TTS proxy route',
+      root,
+    );
+  }
+}
+
+async function maybeWireProvidersInLayout(root: string): Promise<void> {
+  const layoutPath = getLayoutPath(root);
+  if (!fileExists(layoutPath)) return;
+
+  const layoutContent = readFile(layoutPath);
+  if (
+    layoutContent.includes('GuideKitProvider') ||
+    layoutContent.includes('<Providers') ||
+    layoutContent.includes('from \'./providers\'') ||
+    layoutContent.includes('from "./providers"')
+  ) {
+    return;
+  }
+
+  const patch = await confirm(
+    `Wrap ${c.dim}${path.relative(root, layoutPath)}${c.reset} with the Providers component?`,
+  );
+  if (!patch) return;
+
+  let updated = layoutContent;
+  if (!updated.includes('import { Providers }')) {
+    const importLine = "import { Providers } from './providers';\n";
+    if (updated.includes("'use client'")) {
+      updated = updated.replace(/('use client';\n)/, `$1${importLine}`);
+    } else {
+      updated = `${importLine}${updated}`;
+    }
+  }
+
+  if (updated.includes('{children}') && !updated.includes('<Providers>')) {
+    updated = updated.replace('{children}', '<Providers>{children}</Providers>');
+  }
+
+  writeFile(layoutPath, updated);
+  success(`Updated ${c.dim}${path.relative(root, layoutPath)}${c.reset}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -274,26 +413,18 @@ export async function runInit(platformMode = false): Promise<void> {
     info('.env file already exists — make sure GUIDEKIT_SECRET and LLM_API_KEY are set');
   }
 
-  // Step 4: Create token endpoint (if token auth)
+  // Step 4: Create proxy routes (if token auth)
   if (authMode === 0) {
-    const tokenPath = getTokenEndpointPath(root, framework);
-    if (!fileExists(tokenPath)) {
-      const createToken = await confirm(`Create token endpoint at ${c.dim}${path.relative(root, tokenPath)}${c.reset}?`);
-      if (createToken) {
-        writeFile(tokenPath, tokenEndpointTemplate(framework));
-        success(`Created ${c.dim}${path.relative(root, tokenPath)}${c.reset}`);
-      }
+    if (framework === 'nextjs-app') {
+      await scaffoldNextProxyRoutes(root, platformMode);
     } else {
-      info('Token endpoint already exists');
-    }
-
-    if (framework === 'nextjs-app' && platformMode) {
-      const routesLib = path.join(root, 'lib', 'guidekit-routes.ts');
-      if (!fileExists(routesLib)) {
-        writeFile(routesLib, nextProxyRoutesTemplate());
-        success(`Created ${c.dim}${path.relative(root, routesLib)}${c.reset}`);
-      }
-      info('Add llm, health, stt, and tts routes under app/api/guidekit/ using guidekitRoutes exports');
+      const tokenPath = getTokenEndpointPath(root, framework);
+      await scaffoldFile(
+        tokenPath,
+        tokenEndpointTemplate(framework),
+        'token endpoint',
+        root,
+      );
     }
   }
 
@@ -306,7 +437,11 @@ export async function runInit(platformMode = false): Promise<void> {
         writeFile(providerPath, providerTemplate(framework, platformMode));
         success(`Created ${c.dim}${path.relative(root, providerPath)}${c.reset}`);
       }
+    } else if (providerPath) {
+      info('Provider component already exists');
     }
+
+    await maybeWireProvidersInLayout(root);
   }
 
   // Step 6: Summary
@@ -321,7 +456,8 @@ export async function runInit(platformMode = false): Promise<void> {
   log(`  ${c.bold}3.${c.reset} Wrap your app in ${c.cyan}<GuideKitProvider>${c.reset}`);
 
   if (framework === 'nextjs-app') {
-    log(`     Import the Providers component in your layout.tsx`);
+    log(`     Import ${c.cyan}Providers${c.reset} from ${c.cyan}./providers${c.reset} in your ${c.cyan}layout.tsx${c.reset}`);
+    log(`     (or run init again — it can patch layout.tsx for you)`);
   }
 
   log('');

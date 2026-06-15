@@ -1235,6 +1235,71 @@ describe('doctor — summary output', () => {
   });
 });
 
+describe('doctor — integration checks', () => {
+  beforeEach(() => {
+    captureConsole();
+    resetFsMocks();
+    vi.spyOn(process, 'cwd').mockReturnValue('/project');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+  });
+
+  afterEach(() => {
+    restoreConsole();
+    process.env = { ...originalEnv };
+  });
+
+  it('reports ok when proxy route files exist for nextjs-app', async () => {
+    mockExistsSync.mockImplementation((p) => {
+      const s = String(p);
+      return [
+        path.join('/project', 'package.json'),
+        path.join('/project', 'app'),
+        path.join('/project', 'lib', 'guidekit-routes.ts'),
+        path.join('/project', 'app', 'api', 'guidekit', 'token', 'route.ts'),
+        path.join('/project', 'app', 'api', 'guidekit', 'llm', 'route.ts'),
+        path.join('/project', 'app', 'api', 'guidekit', 'health', 'route.ts'),
+        path.join('/project', 'app', 'layout.tsx'),
+      ].includes(s);
+    });
+    mockReadFileSync.mockImplementation((p) => {
+      const s = String(p);
+      if (s.endsWith('package.json')) {
+        return JSON.stringify({ dependencies: { next: '^14.0.0' } });
+      }
+      if (s.endsWith('layout.tsx')) {
+        return "import { Providers } from './providers';\nexport default function Layout({ children }) { return <Providers>{children}</Providers>; }";
+      }
+      return JSON.stringify({ dependencies: {} });
+    });
+
+    const { runDoctor } = await import('./commands/doctor.js');
+    await runDoctor();
+    const output = allOutput();
+    expect(output).toContain('Proxy routes');
+    expect(output).toContain('token/llm/health routes are present');
+    expect(output).toContain('Provider wiring');
+  });
+
+  it('warns when local dev server is not running', async () => {
+    mockExistsSync.mockImplementation((p) => {
+      const s = String(p);
+      if (s === path.join('/project', 'package.json')) return true;
+      if (s === path.join('/project', 'app')) return true;
+      return false;
+    });
+    mockReadFileSync.mockReturnValue(
+      JSON.stringify({ dependencies: { next: '^14.0.0' }, scripts: { dev: 'next dev' } }),
+    );
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch failed')));
+
+    const { runDoctor } = await import('./commands/doctor.js');
+    await runDoctor();
+    const output = allOutput();
+    expect(output).toContain('Local token endpoint');
+    expect(output).toContain('Dev server not reachable');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Test Suite: init command — template generation and framework detection
 // ---------------------------------------------------------------------------
@@ -1388,6 +1453,56 @@ describe('init — template generation', () => {
     await runInit();
     const output = allOutput();
     expect(output).toContain('.env.local');
+  });
+
+  it('scaffolds proxy routes for Next.js App Router', async () => {
+    vi.spyOn(process, 'cwd').mockReturnValue('/project');
+    mockExistsSync.mockImplementation((p) => {
+      const s = String(p);
+      return [
+        path.join('/project', 'package.json'),
+        path.join('/project', 'app'),
+      ].includes(s);
+    });
+    mockReadFileSync.mockReturnValue(
+      JSON.stringify({
+        dependencies: {
+          next: '^14.0.0',
+          '@guidekit/core': '^1.0.0',
+          '@guidekit/react': '^1.0.0',
+          '@guidekit/server': '^1.0.0',
+        },
+      }),
+    );
+
+    const { createInterface } = await import('node:readline/promises');
+    vi.mocked(createInterface).mockReturnValue({
+      question: vi.fn()
+        .mockResolvedValueOnce('1') // token auth
+        .mockResolvedValueOnce('y') // create .env.local
+        .mockResolvedValueOnce('y') // guidekit-routes.ts
+        .mockResolvedValueOnce('y') // token route
+        .mockResolvedValueOnce('y') // llm route
+        .mockResolvedValueOnce('y') // health route
+        .mockResolvedValueOnce('y') // providers.tsx
+        .mockResolvedValueOnce('n') as ReturnType<typeof vi.fn>, // skip layout patch
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+
+    const { runInit } = await import('./commands/init.js');
+    await runInit();
+
+    const writtenPaths = mockWriteFileSync.mock.calls.map((call) => String(call[0]));
+    expect(writtenPaths).toContain(path.join('/project', 'lib', 'guidekit-routes.ts'));
+    expect(writtenPaths).toContain(path.join('/project', 'app', 'api', 'guidekit', 'token', 'route.ts'));
+    expect(writtenPaths).toContain(path.join('/project', 'app', 'api', 'guidekit', 'llm', 'route.ts'));
+    expect(writtenPaths).toContain(path.join('/project', 'app', 'api', 'guidekit', 'health', 'route.ts'));
+    expect(writtenPaths).toContain(path.join('/project', 'app', 'providers.tsx'));
+
+    const llmRoute = mockWriteFileSync.mock.calls.find(
+      (call) => String(call[0]).endsWith(path.join('guidekit', 'llm', 'route.ts')),
+    )?.[1];
+    expect(String(llmRoute)).toContain('guidekitRoutes.POST_llm');
   });
 });
 

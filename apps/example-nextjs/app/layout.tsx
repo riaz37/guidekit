@@ -8,6 +8,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <a href="/" style={{ marginRight: '16px' }}>Home</a>
           <a href="/about" style={{ marginRight: '16px' }}>About</a>
           <a href="/demo">Demo</a>
+          <a href="/headless" style={{ marginLeft: '16px' }}>Headless</a>
         </nav>
         <main>{children}</main>
       </body>

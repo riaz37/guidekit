@@ -3,8 +3,8 @@
 // ---------------------------------------------------------------------------
 // @vitest-environment jsdom
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import React from 'react';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import React, { act } from 'react';
 import ReactDOMClient from 'react-dom/client';
 import { flushSync } from 'react-dom';
 
@@ -22,6 +22,7 @@ import {
   useGuideKitVoice,
   useGuideKitActions,
   useGuideKitContext,
+  useGuideKitConsent,
   useGuideKit,
 } from './index.js';
 
@@ -478,6 +479,30 @@ describe('GuideKitProvider', () => {
     expect(widgetHost).toBeTruthy();
     expect(widgetHost?.style.zIndex).toBe('1234');
   });
+
+  it('does not mount the default widget when headless is true', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = ReactDOMClient.createRoot(container);
+
+    flushSync(() => {
+      root.render(
+        React.createElement(
+          GuideKitProvider,
+          {
+            tokenEndpoint: '/api/guidekit/token',
+            headless: true,
+            onError: () => {},
+          },
+          React.createElement('span', { 'data-testid': 'child' }, 'headless'),
+        ),
+      );
+    });
+
+    expect(container.querySelector('#guidekit-widget')).toBeNull();
+    expect(container.querySelector('[data-testid="guidekit-fab"]')).toBeNull();
+    expect(container.textContent).toContain('headless');
+  });
 });
 
 // ===========================================================================
@@ -636,5 +661,65 @@ describe('useGuideKitStream', () => {
     expect(() => result.current.sendTextStream('test')).toThrow(
       /GuideKit not initialised/,
     );
+  });
+});
+
+// ===========================================================================
+// 10. useGuideKitConsent
+// ===========================================================================
+
+describe('useGuideKitConsent', () => {
+  const storage = new Map<string, string>();
+
+  beforeEach(() => {
+    storage.clear();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        storage.set(key, value);
+      },
+      removeItem: (key: string) => {
+        storage.delete(key);
+      },
+      clear: () => {
+        storage.clear();
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns hasConsent true when consent is not required', () => {
+    const { result } = renderHook(() => useGuideKitConsent({ consentRequired: false }));
+    expect(result.current.hasConsent).toBe(true);
+  });
+
+  it('persists consent via grantConsent', () => {
+    const { result } = renderHook(() =>
+      useGuideKitConsent({ consentRequired: true, instanceId: 'test' }),
+    );
+
+    expect(result.current.hasConsent).toBe(false);
+    act(() => {
+      result.current.grantConsent();
+    });
+    expect(result.current.hasConsent).toBe(true);
+    expect(storage.get('guidekit-consent:test')).toBe('granted');
+  });
+
+  it('revokeConsent clears stored consent', () => {
+    storage.set('guidekit-consent:default', 'granted');
+    const { result } = renderHook(() =>
+      useGuideKitConsent({ consentRequired: true }),
+    );
+
+    expect(result.current.hasConsent).toBe(true);
+    act(() => {
+      result.current.revokeConsent();
+    });
+    expect(result.current.hasConsent).toBe(false);
+    expect(storage.has('guidekit-consent:default')).toBe(false);
   });
 });

@@ -3,6 +3,7 @@ import type { MetaRecord } from 'nextra'
 const meta: MetaRecord = {
   'getting-started': 'Getting Started',
   provider: 'Provider Setup',
+  'custom-ui': 'Custom UI (Headless)',
   hooks: 'Hooks API',
   voice: 'Voice',
   i18n: 'Internationalization',

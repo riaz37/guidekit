@@ -202,6 +202,23 @@ function StreamingChat() {
 }
 ```
 
+## useGuideKitConsent
+
+Manages privacy consent for headless or custom UIs. Persists consent in `localStorage` per GuideKit instance.
+
+```tsx
+const { hasConsent, grantConsent, revokeConsent } = useGuideKitConsent({
+  consentRequired: true,
+  instanceId: 'default', // optional, matches GuideKitProvider instanceId
+});
+```
+
+When `consentRequired` is `false` (default), `hasConsent` starts as `true`. When `true`, the user must call `grantConsent()` before sending messages or enabling voice.
+
+**Re-renders:** Only when consent state changes.
+
+See [Custom UI (Headless)](/docs/custom-ui) for a full consent dialog pattern.
+
 ## useGuideKit (Combined)
 
 Subscribes to all store slices. Use only for prototyping — prefer focused hooks in production.
@@ -225,4 +242,5 @@ const {
 | `useGuideKitActions` | Never (stable refs) |
 | `useGuideKitStream` | Streaming state or text changes |
 | `useGuideKitContext` | Never (stable refs) |
+| `useGuideKitConsent` | Consent state changes |
 | `useGuideKit` | Any slice changes |

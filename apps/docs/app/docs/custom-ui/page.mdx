@@ -1,0 +1,144 @@
+# Custom UI (Headless)
+
+Use `headless` mode when you want full control over layout, styling, and component structure. GuideKit still initializes the core engine and exposes hooks — you build the interface.
+
+## When to use headless
+
+| Approach | Best for |
+|----------|----------|
+| **Default widget** (`headless={false}`, default) | Fastest integration, Shadow DOM isolation, mobile bottom sheet |
+| **Headless** (`headless`) | Custom design systems, embedded panels, sidebars, branded assistants |
+
+## React setup
+
+```tsx
+import { GuideKitProvider } from '@guidekit/react';
+import { MyAssistant } from './MyAssistant';
+
+export function App() {
+  return (
+    <GuideKitProvider
+      headless
+      tokenEndpoint="/api/guidekit/token"
+      agent={{ name: 'Guide', greeting: 'Hi!' }}
+      options={{ mode: 'text' }}
+    >
+      <YourApp />
+      <MyAssistant />
+    </GuideKitProvider>
+  );
+}
+```
+
+The `theme` prop only applies when the built-in `GuideKitWidget` is mounted (i.e. when `headless` is not set). In headless mode, position and styling are entirely yours.
+
+## Building a chat UI
+
+Use split hooks to minimize re-renders:
+
+```tsx
+import {
+  useGuideKitCore,
+  useGuideKitStatus,
+  useGuideKitStream,
+  useGuideKitVoice,
+} from '@guidekit/react';
+
+function MyAssistant() {
+  const core = useGuideKitCore();
+  const { isReady, agentState } = useGuideKitStatus();
+  const { sendText } = useGuideKitVoice();
+
+  // Manage display messages locally (same pattern as the built-in widget)
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  async function handleSend(text: string) {
+    if (!core) return;
+    setMessages((prev) => [...prev, { role: 'user', content: text }]);
+
+    const { stream, done } = core.sendTextStream(text);
+    let assistant = '';
+    for await (const chunk of stream) {
+      assistant += chunk;
+      // update UI incrementally
+    }
+    const result = await done;
+    setMessages((prev) => [
+      ...prev,
+      { role: 'assistant', content: result.fullText || assistant },
+    ]);
+  }
+
+  return (
+    <div style={{ position: 'fixed', bottom: 24, right: 24 }}>
+      {/* Your FAB, panel, sidebar, or inline layout */}
+    </div>
+  );
+}
+```
+
+### Positioning examples
+
+Headless UI uses normal React + CSS. Examples:
+
+```tsx
+// Bottom-right floating (like default widget, custom design)
+<div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 9999 }} />
+
+// Bottom-left
+<div style={{ position: 'fixed', bottom: 24, left: 24, zIndex: 9999 }} />
+
+// Right sidebar
+<aside style={{ position: 'fixed', top: 0, right: 0, width: 400, height: '100vh' }} />
+
+// Inline embed in page content
+<section className="my-assistant-panel" />
+```
+
+## Voice mode
+
+```tsx
+const { startListening, stopListening, isListening } = useGuideKitVoice();
+const { agentState } = useGuideKitStatus();
+
+// agentState.status: 'idle' | 'listening' | 'processing' | 'speaking' | 'error'
+```
+
+Subscribe to `onEvent` on the provider for `voice:transcript` if you want to append interim/final user transcripts to your message list.
+
+## Privacy consent
+
+When `options.consentRequired` is enabled, use `useGuideKitConsent` before starting voice or sending messages:
+
+```tsx
+import { useGuideKitConsent } from '@guidekit/react';
+
+const { hasConsent, grantConsent, revokeConsent } = useGuideKitConsent({
+  consentRequired: true,
+  instanceId: 'default',
+});
+
+if (!hasConsent) {
+  return <ConsentBanner onAccept={grantConsent} />;
+}
+```
+
+## Optional: stock widget without auto-mount
+
+Export `GuideKitWidget` and mount it manually inside your tree (rare — most headless apps skip it):
+
+```tsx
+import { GuideKitProvider, GuideKitWidget } from '@guidekit/react';
+
+<GuideKitProvider headless tokenEndpoint="...">
+  <GuideKitWidget theme={{ position: 'bottom-right' }} />
+</GuideKitProvider>
+```
+
+## Vanilla
+
+Vanilla already supports `headless: true` on `init()`. See [Vanilla (Non-React)](/docs/vanilla).
+
+## Example app
+
+The example Next.js app includes a `/headless` route with a custom bottom-left assistant built with hooks — useful as a reference implementation and contract E2E target.

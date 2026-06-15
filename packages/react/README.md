@@ -28,6 +28,31 @@ function App() {
 }
 ```
 
+## Headless / custom UI
+
+Skip the built-in widget and own the full interface (any layout, corner, sidebar, or embed):
+
+```tsx
+import { GuideKitProvider, useGuideKitStatus, useGuideKitVoice } from '@guidekit/react';
+
+function App() {
+  return (
+    <GuideKitProvider headless tokenEndpoint="/api/guidekit/token">
+      <YourApp />
+      <MyAssistant />
+    </GuideKitProvider>
+  );
+}
+
+function MyAssistant() {
+  const { isReady } = useGuideKitStatus();
+  const { sendText } = useGuideKitVoice();
+  // Build your own FAB, panel, or inline UI with normal React + CSS
+}
+```
+
+See [Custom UI docs](https://guidekit-docs.vercel.app/docs/custom-ui) for streaming, consent, and positioning examples.
+
 ## Hooks
 
 ```tsx

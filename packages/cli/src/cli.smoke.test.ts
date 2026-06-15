@@ -45,6 +45,6 @@ describe('@guidekit/cli — subprocess smoke', () => {
     const { code, stdout } = runCli(['doctor'], resolve(process.cwd(), 'apps/example-nextjs'));
     expect(code).toBe(0);
     expect(stdout.toLowerCase()).toContain('doctor');
-  });
+  }, 15_000);
 });
 

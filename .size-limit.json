@@ -56,7 +56,7 @@
   {
     "name": "@guidekit/cli",
     "path": "packages/cli/dist/index.js",
-    "limit": "8 KB",
+    "limit": "9 KB",
     "gzip": true
   }
 ]

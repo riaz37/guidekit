@@ -588,6 +588,8 @@ export interface GuideKitProviderProps {
   cognitive?: boolean;
   /** Run hallucination guard on responses (requires intelligence). Default: true when intelligence enabled. */
   hallucinationGuard?: boolean;
+  /** Disable the built-in widget UI and build your own with hooks. Default: false. */
+  headless?: boolean;
   children?: unknown;
 }
 

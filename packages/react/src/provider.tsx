@@ -35,6 +35,7 @@ export function GuideKitProvider(
     plugins,
     hallucinationGuard,
     cognitive,
+    headless = false,
   } = props;
 
   // Use a ref so the core instance is created once and never causes re-renders.
@@ -107,7 +108,13 @@ export function GuideKitProvider(
   return (
     <GuideKitContext.Provider value={coreRef.current}>
       {children}
-      <GuideKitWidget theme={theme} consentRequired={options?.consentRequired} instanceId={instanceId} />
+      {!headless && (
+        <GuideKitWidget
+          theme={theme}
+          consentRequired={options?.consentRequired}
+          instanceId={instanceId}
+        />
+      )}
     </GuideKitContext.Provider>
   );
 }

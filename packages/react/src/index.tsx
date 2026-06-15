@@ -8,6 +8,8 @@ export {
   useGuideKitActions,
   useGuideKitContext,
   useGuideKitStream,
+  useGuideKitConsent,
+  getGuideKitConsentStorageKey,
   useGuideKit,
 } from './hooks/index.js';
 export { GuideKitWidget } from './widget/index.js';

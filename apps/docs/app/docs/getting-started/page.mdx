@@ -12,15 +12,22 @@ For voice support, also install the VAD package:
 npm install @guidekit/vad
 ```
 
-## Setup with CLI
+## Setup with CLI (recommended)
 
-The fastest way to get started:
+The fastest way to get started with **proxy mode** (API keys stay on the server):
 
 ```bash
 npx @guidekit/cli init
 ```
 
-This scaffolds the token endpoint, provider component, and environment variables for your framework (Next.js App Router, Pages Router, or generic React).
+For Next.js App Router, `init` scaffolds:
+
+- `lib/guidekit-routes.ts` — shared proxy route handlers
+- `app/api/guidekit/{token,llm,health}/route.ts` — server routes
+- `app/providers.tsx` — `GuideKitProvider` with `tokenEndpoint`, `proxy`, and `llm` model config
+- `.env.local` template with required keys
+
+Use `npx @guidekit/cli init --platform` to also scaffold STT/TTS routes and Platform Mode provider props.
 
 Then generate a signing secret:
 
@@ -37,37 +44,89 @@ STT_API_KEY=your-stt-api-key        # Optional, for voice
 TTS_API_KEY=your-tts-api-key        # Optional, for voice
 ```
 
-## Manual Setup
+Wrap your root layout with the generated `Providers` component (or let `init` patch `layout.tsx` for you):
 
-### 1. Create Token Endpoint
+```tsx
+// app/layout.tsx
+import { Providers } from './providers';
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  );
+}
+```
+
+### Verify setup
+
+```bash
+npx @guidekit/cli doctor
+```
+
+Doctor checks environment variables, installed packages, proxy route files, provider wiring, and (when your dev server is running) local `/api/guidekit/token` and `/api/guidekit/health` endpoints.
+
+## Manual Setup (Next.js App Router)
+
+If you prefer to wire routes yourself, mirror the example app pattern.
+
+### 1. Shared proxy routes
 
 ```typescript
-// app/api/guidekit/token/route.ts (Next.js App Router)
-import { createSessionToken } from '@guidekit/server';
+// lib/guidekit-routes.ts
+import { createNextAppRouterRoutes, getSharedSessionStore } from '@guidekit/server/next';
 
-export async function POST() {
-  const token = await createSessionToken({
-    signingSecret: process.env.GUIDEKIT_SECRET!,
+export const guidekitRoutes = createNextAppRouterRoutes({
+  signingSecret: process.env.GUIDEKIT_SECRET!,
+  sessionStore: getSharedSessionStore(),
+  createTokenOptions: () => ({
     llmApiKey: process.env.LLM_API_KEY!,
     sttApiKey: process.env.STT_API_KEY,
     ttsApiKey: process.env.TTS_API_KEY,
     expiresIn: '15m',
-  });
-  return Response.json(token);
-}
+  }),
+});
 ```
 
-### 2. Add the Provider
+### 2. API routes
+
+```typescript
+// app/api/guidekit/token/route.ts
+import { guidekitRoutes } from '../../../../lib/guidekit-routes';
+
+export const POST = guidekitRoutes.POST_token;
+```
+
+```typescript
+// app/api/guidekit/llm/route.ts
+import { guidekitRoutes } from '../../../../lib/guidekit-routes';
+
+export const POST = guidekitRoutes.POST_llm;
+```
+
+```typescript
+// app/api/guidekit/health/route.ts
+import { guidekitRoutes } from '../../../../lib/guidekit-routes';
+
+export const GET = guidekitRoutes.GET_health;
+```
+
+### 3. Provider
 
 ```tsx
 'use client';
-// app/layout.tsx
+// app/providers.tsx
 import { GuideKitProvider } from '@guidekit/react';
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <GuideKitProvider
       tokenEndpoint="/api/guidekit/token"
+      proxy={{ llm: '/api/guidekit/llm', health: '/api/guidekit/health' }}
+      llm={{ provider: 'gemini', model: 'gemini-2.5-flash' }}
       agent={{
         name: 'Guide',
         greeting: 'Hi! How can I help you today?',
@@ -83,17 +142,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 }
 ```
 
-### 3. Verify Setup
-
-```bash
-npx @guidekit/cli doctor
-```
-
-This checks your environment variables, package installations, and provider connectivity.
-
 ## Quick Prototyping (Dev Only)
 
-For quick prototyping without a token endpoint, pass API keys directly:
+For quick prototyping without server routes, pass API keys directly:
 
 ```tsx
 <GuideKitProvider
@@ -104,7 +155,7 @@ For quick prototyping without a token endpoint, pass API keys directly:
 </GuideKitProvider>
 ```
 
-**Warning:** This exposes keys in the browser. Only use for local development.
+**Warning:** This exposes keys in the browser. Only use for local development. Production apps should use proxy mode and a token endpoint — see [Server SDK](/docs/server).
 
 ## Framework Support
 
@@ -119,6 +170,7 @@ For quick prototyping without a token endpoint, pass API keys directly:
 ## Next Steps
 
 - [Provider Setup](/docs/provider) — Configuration options in depth
-- [Platform Mode](/docs/platform-mode) — Intelligence, knowledge RAG, and plugins
+- [Custom UI (Headless)](/docs/custom-ui) — Build your own assistant UI with hooks
+- [Platform Mode](/docs/platform-mode) — Intelligence, knowledge RAG, and plugins (see the full example app)
 - [Hooks API](/docs/hooks) — Using hooks in your components
 - [Architecture](/docs/architecture) — How GuideKit works under the hood

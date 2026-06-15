@@ -95,6 +95,7 @@ Voice E2E always mocks the browser Web Speech API — no Deepgram/ElevenLabs in 
 | STT/TTS proxy key minting | yes | — |
 | Hallucination guard bus event | yes | — |
 | Vanilla IIFE widget | yes | — |
+| Headless custom UI | yes | — |
 
 Commands: `pnpm test:e2e:contract` (CI), `pnpm test:e2e:live` (local), `pnpm test:e2e:live:full` (publish gate).
 

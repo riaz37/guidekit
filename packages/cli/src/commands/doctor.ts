@@ -2,7 +2,7 @@
 // guidekit doctor — Validate API keys and provider connectivity
 // ---------------------------------------------------------------------------
 
-import { c, log, success, warn, error, info, heading, fileExists, readFile, findProjectRoot } from '../utils.js';
+import { c, log, success, warn, error, info, heading, fileExists, readFile, findProjectRoot, detectFramework } from '../utils.js';
 import * as path from 'node:path';
 
 // ---------------------------------------------------------------------------
@@ -348,6 +348,166 @@ function checkPlatformPackages(root: string): CheckResult[] {
   }];
 }
 
+function usesSrcApp(root: string): boolean {
+  return fileExists(path.join(root, 'src', 'app'));
+}
+
+function getAppDir(root: string): string {
+  return usesSrcApp(root)
+    ? path.join(root, 'src', 'app')
+    : path.join(root, 'app');
+}
+
+function detectDevServerPort(root: string): number {
+  const pkgPath = path.join(root, 'package.json');
+  if (!fileExists(pkgPath)) return 3000;
+
+  const pkg = JSON.parse(readFile(pkgPath)) as { scripts?: Record<string, string> };
+  const devScript = pkg.scripts?.dev ?? pkg.scripts?.start ?? '';
+  const portMatch = devScript.match(/(?:^|\s)(?:-p|--port)\s+(\d+)/);
+  if (portMatch) return Number(portMatch[1]);
+
+  const portEnvMatch = devScript.match(/PORT=(\d+)/);
+  if (portEnvMatch) return Number(portEnvMatch[1]);
+
+  return 3000;
+}
+
+function checkProxyRouteFiles(root: string): CheckResult[] {
+  const framework = detectFramework(root);
+  if (framework !== 'nextjs-app') {
+    return [{
+      name: 'Proxy routes',
+      status: 'skip',
+      message: 'Next.js App Router integration checks apply only to nextjs-app projects',
+    }];
+  }
+
+  const required = [
+    { name: 'guidekit-routes helper', filePath: path.join(root, 'lib', 'guidekit-routes.ts') },
+    { name: 'token route', filePath: path.join(getAppDir(root), 'api', 'guidekit', 'token', 'route.ts') },
+    { name: 'LLM proxy route', filePath: path.join(getAppDir(root), 'api', 'guidekit', 'llm', 'route.ts') },
+    { name: 'health route', filePath: path.join(getAppDir(root), 'api', 'guidekit', 'health', 'route.ts') },
+  ];
+
+  const missing = required.filter((entry) => !fileExists(entry.filePath));
+  if (missing.length === 0) {
+    return [{
+      name: 'Proxy routes',
+      status: 'ok',
+      message: 'lib/guidekit-routes.ts and token/llm/health routes are present',
+    }];
+  }
+
+  return [{
+    name: 'Proxy routes',
+    status: 'warn',
+    message: `Missing: ${missing.map((entry) => entry.name).join(', ')}. Run npx guidekit init to scaffold proxy mode.`,
+  }];
+}
+
+function checkProviderWiring(root: string): CheckResult {
+  const framework = detectFramework(root);
+  if (framework !== 'nextjs-app') {
+    return {
+      name: 'Provider wiring',
+      status: 'skip',
+      message: 'Next.js App Router layout checks apply only to nextjs-app projects',
+    };
+  }
+
+  const layoutPath = path.join(getAppDir(root), 'layout.tsx');
+  if (!fileExists(layoutPath)) {
+    return {
+      name: 'Provider wiring',
+      status: 'warn',
+      message: 'No app/layout.tsx found. Wrap your app in GuideKitProvider or Providers.',
+    };
+  }
+
+  const layoutContent = readFile(layoutPath);
+  const wired =
+    layoutContent.includes('GuideKitProvider') ||
+    layoutContent.includes('<Providers') ||
+    layoutContent.includes("from './providers'") ||
+    layoutContent.includes('from "./providers"');
+
+  if (wired) {
+    return {
+      name: 'Provider wiring',
+      status: 'ok',
+      message: 'layout.tsx imports GuideKitProvider or Providers',
+    };
+  }
+
+  return {
+    name: 'Provider wiring',
+    status: 'warn',
+    message: 'layout.tsx does not import Providers. Import ./providers and wrap {children}.',
+  };
+}
+
+async function checkLocalGuidekitEndpoint(
+  name: string,
+  url: string,
+  method: 'GET' | 'POST',
+): Promise<CheckResult> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 500);
+
+    const response = await fetch(url, {
+      method,
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (response.ok) {
+      return { name, status: 'ok', message: `Responded HTTP ${response.status}` };
+    }
+
+    if (response.status === 401 || response.status === 403 || response.status === 405) {
+      return { name, status: 'ok', message: `Reachable (HTTP ${response.status})` };
+    }
+
+    return {
+      name,
+      status: 'warn',
+      message: `HTTP ${response.status} from ${url}`,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    if (message.includes('abort')) {
+      return { name, status: 'warn', message: 'Timed out — is your dev server running?' };
+    }
+    if (
+      message.includes('ECONNREFUSED') ||
+      message.includes('fetch failed') ||
+      message.includes('Failed to fetch')
+    ) {
+      return {
+        name,
+        status: 'warn',
+        message: 'Dev server not reachable. Start it and re-run doctor.',
+      };
+    }
+    return { name, status: 'warn', message };
+  }
+}
+
+async function checkLocalIntegration(root: string): Promise<CheckResult[]> {
+  const framework = detectFramework(root);
+  if (framework !== 'nextjs-app') return [];
+
+  const port = detectDevServerPort(root);
+  const baseUrl = `http://localhost:${port}`;
+
+  return Promise.all([
+    checkLocalGuidekitEndpoint('Local token endpoint', `${baseUrl}/api/guidekit/token`, 'POST'),
+    checkLocalGuidekitEndpoint('Local health endpoint', `${baseUrl}/api/guidekit/health`, 'GET'),
+  ]);
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -380,11 +540,27 @@ export async function runDoctor(): Promise<void> {
   log(`${c.bold}Voice${c.reset}`);
   results.push(checkVoiceBrowserNote());
 
+  const integrationChecks = checkProxyRouteFiles(root);
+  if (integrationChecks.length > 0) {
+    log(`${c.bold}Integration${c.reset}`);
+    results.push(...integrationChecks);
+    results.push(checkProviderWiring(root));
+  }
+
   // Connectivity checks
   log(`${c.bold}Connectivity${c.reset}`);
-  results.push(await checkProviderConnectivity('Google AI', 'https://generativelanguage.googleapis.com'));
-  results.push(await checkProviderConnectivity('Deepgram', 'https://api.deepgram.com'));
-  results.push(await checkProviderConnectivity('ElevenLabs', 'https://api.elevenlabs.io'));
+  const connectivityResults = await Promise.all([
+    checkProviderConnectivity('Google AI', 'https://generativelanguage.googleapis.com'),
+    checkProviderConnectivity('Deepgram', 'https://api.deepgram.com'),
+    checkProviderConnectivity('ElevenLabs', 'https://api.elevenlabs.io'),
+  ]);
+  results.push(...connectivityResults);
+
+  const localChecks = await checkLocalIntegration(root);
+  if (localChecks.length > 0) {
+    log(`${c.bold}Local endpoints${c.reset}`);
+    results.push(...localChecks);
+  }
 
   const repoParityChecks = checkGuideKitRepoParity(root);
   if (repoParityChecks.length > 0) {

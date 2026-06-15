@@ -14,25 +14,27 @@ GuideKit is an embeddable React/Next.js SDK that gives your app an AI assistant 
 
 ```bash
 npm install @guidekit/core @guidekit/react @guidekit/server
+npx @guidekit/cli init
 ```
+
+`init` scaffolds proxy-mode routes (`/api/guidekit/token`, `/api/guidekit/llm`, `/api/guidekit/health`), a provider component, and `.env.local` placeholders. Add `GUIDEKIT_SECRET` and `LLM_API_KEY`, then wrap your layout:
 
 ```tsx
 // app/layout.tsx
-import { GuideKitProvider } from '@guidekit/react';
+import { Providers } from './providers';
 
 export default function Layout({ children }) {
   return (
-    <GuideKitProvider
-      tokenEndpoint="/api/guidekit/token"
-      agent={{ name: 'Guide', greeting: 'Hi! How can I help?' }}
-    >
-      {children}
-    </GuideKitProvider>
+    <html lang="en">
+      <body>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
   );
 }
 ```
 
-That's it. GuideKit auto-discovers your site, builds a page model, and provides an AI assistant ready to help users.
+GuideKit auto-discovers your site, builds a page model, and provides an AI assistant ready to help users. See [Getting Started](/docs/getting-started) for the full proxy setup.
 
 ## Packages
 

@@ -4,7 +4,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { useGuideKitCore, useGuideKitStatus, useGuideKitStream } from '../hooks/index.js';
+import { useGuideKitCore, useGuideKitStatus, useGuideKitStream, useGuideKitConsent } from '../hooks/index.js';
 import { WIDGET_STYLES } from './styles.js';
 import type { TranscriptMessage, WidgetProps } from './types.js';
 
@@ -66,17 +66,7 @@ export function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetPro
 
   // ---- Privacy consent state ----
 
-  const consentStorageKey = `guidekit-consent:${instanceId ?? 'default'}`;
-
-  const [hasConsent, setHasConsent] = useState<boolean>(() => {
-    if (!consentRequired) return true;
-    if (typeof window === 'undefined') return false;
-    try {
-      return localStorage.getItem(consentStorageKey) === 'granted';
-    } catch {
-      return false;
-    }
-  });
+  const { hasConsent, grantConsent } = useGuideKitConsent({ consentRequired, instanceId });
 
   const [showConsentDialog, setShowConsentDialog] = useState(false);
 
@@ -408,15 +398,10 @@ export function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetPro
   // ---- Consent handlers ----
 
   const handleConsentAccept = useCallback(() => {
-    try {
-      localStorage.setItem(consentStorageKey, 'granted');
-    } catch {
-      // localStorage may be unavailable (e.g. private browsing quota)
-    }
-    setHasConsent(true);
+    grantConsent();
     setShowConsentDialog(false);
     setIsOpen(true);
-  }, [consentStorageKey]);
+  }, [grantConsent]);
 
   const handleConsentDecline = useCallback(() => {
     setShowConsentDialog(false);
