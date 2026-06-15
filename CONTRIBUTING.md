@@ -26,6 +26,16 @@ pnpm lint         # ESLint
 pnpm test         # Unit tests (Vitest)
 ```
 
+### Production readiness gate (before publishing)
+
+Use the full release gate locally (it runs the live E2E suite twice):
+
+```bash
+pnpm check:release
+```
+
+This requires a real `LLM_API_KEY` (or `apps/example-nextjs/.env.local`) and will skip npm publish dry-run unless `NODE_AUTH_TOKEN`/`NPM_TOKEN` is present.
+
 ## Development Workflow
 
 1. **Fork** the repository and create a feature branch from `main`.

@@ -5,19 +5,17 @@ import type { ReactNode } from 'react';
 import {
   platformDemoPlugin,
   platformKnowledgeDocuments,
-} from '../lib/guidekit-platform';
-import { GuideKitDemoActions } from './guidekit-demo-actions';
-import { GuideKitTestBridge } from './guidekit-test-bridge';
+} from '../../lib/guidekit-platform';
+import { GuideKitDemoActions } from '../guidekit-demo-actions';
+import { GuideKitTestBridge } from '../guidekit-test-bridge';
 
 const GuideKitProvider = dynamic(
   () => import('@guidekit/react').then((mod) => mod.GuideKitProvider),
   { ssr: false },
 );
 
-// Voice is on by default in the example app (Web Speech + @guidekit/vad). Set NEXT_PUBLIC_GUIDEKIT_VOICE=0 to disable.
-const voiceEnabled = process.env.NEXT_PUBLIC_GUIDEKIT_VOICE !== '0';
-
-export function Providers({ children }: { children: ReactNode }) {
+/** Demo layout with cognitive engine enabled for E2E contract tests. */
+export default function DemoLayout({ children }: { children: ReactNode }) {
   return (
     <GuideKitProvider
       tokenEndpoint="/api/guidekit/token"
@@ -32,10 +30,11 @@ export function Providers({ children }: { children: ReactNode }) {
       knowledge={{ documents: platformKnowledgeDocuments, engine: 'bm25', topK: 3 }}
       plugins={[platformDemoPlugin]}
       hallucinationGuard
-      agent={{ name: 'GuideKit Assistant', greeting: 'Hello! How can I help you today?' }}
+      cognitive
+      agent={{ name: 'GuideKit Cognitive Demo', greeting: 'Cognitive mode is enabled.' }}
       options={{
         debug: process.env.NODE_ENV === 'development',
-        mode: voiceEnabled ? 'voice' : 'text',
+        mode: 'text',
         clickableSelectors: {
           allow: ['#name', '#email', '#message', 'input', 'textarea'],
         },

@@ -35,7 +35,50 @@ export function geminiScrollToSectionSse(sectionId: string): string {
   return geminiToolCallSse('scrollToSection', { sectionId });
 }
 
-/** Mock /api/guidekit/llm; first POST returns tool SSE, later POSTs return text-only STOP. */
+export function geminiTextStopSse(text = 'Done.'): string {
+  return `data: {"candidates":[{"content":{"parts":[{"text":${JSON.stringify(text)}}]},"finishReason":"STOP"}]}\n\ndata: [DONE]\n\n`;
+}
+
+export function geminiStartTourSse(sectionIds: string[]): string {
+  return geminiToolCallSse('startTour', { sectionIds, mode: 'manual' });
+}
+
+export function geminiClickElementSse(selector: string): string {
+  return geminiToolCallSse('clickElement', { selector });
+}
+
+export function geminiExecuteCustomActionSse(actionId: string, params: Record<string, unknown>): string {
+  return geminiToolCallSse('executeCustomAction', { actionId, params });
+}
+
+export function geminiDismissHighlightSse(): string {
+  return geminiToolCallSse('dismissHighlight', {});
+}
+
+export function geminiReadPageContentSse(sectionId: string): string {
+  return geminiToolCallSse('readPageContent', { sectionId });
+}
+
+/** Mock /api/guidekit/llm; each POST returns the next tool SSE, then text STOP. */
+export async function mockLlmToolSequenceRoute(page: Page, rounds: string[]): Promise<void> {
+  let calls = 0;
+  await page.route('**/api/guidekit/llm', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.continue();
+      return;
+    }
+    calls += 1;
+    const body = calls <= rounds.length ? rounds[calls - 1]! : geminiTextStopSse();
+    await route.fulfill({
+      status: 200,
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+      },
+      body,
+    });
+  });
+}
 export async function mockLlmToolRoute(
   page: Page,
   firstRoundBody: string,

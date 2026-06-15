@@ -1,32 +1,20 @@
+/**
+ * Playwright E2E for the example-nextjs app.
+ *
+ * Voice tests intentionally mock the Web Speech API (see e2e/fixtures/voice-e2e.ts).
+ * Contract tier (e2e/contract): mocked LLM, runs on every PR.
+ * Live tier (e2e/live): real LLM when LIVE_LLM=1, publish gate only.
+ */
 import { defineConfig, devices } from '@playwright/test';
-import { existsSync, readFileSync } from 'fs';
-import { resolve } from 'path';
+import { resolveGuidekitSecret, resolveLlmApiKey } from './e2e/env';
 
-/** Load apps/example-nextjs/.env.local for local live-LLM runs (gitignored). */
-function loadExampleEnvLocal(): Record<string, string> {
-  const envPath = resolve(__dirname, 'apps/example-nextjs/.env.local');
-  if (!existsSync(envPath)) return {};
-  const vars: Record<string, string> = {};
-  for (const line of readFileSync(envPath, 'utf8').split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eq = trimmed.indexOf('=');
-    if (eq === -1) continue;
-    vars[trimmed.slice(0, eq)] = trimmed.slice(eq + 1);
-  }
-  return vars;
-}
+const E2E_GUIDEKIT_SECRET = resolveGuidekitSecret();
+const E2E_LLM_API_KEY = resolveLlmApiKey();
 
-const exampleEnv = loadExampleEnvLocal();
-
-const E2E_GUIDEKIT_SECRET =
-  process.env.GUIDEKIT_SECRET ??
-  exampleEnv.GUIDEKIT_SECRET ??
-  'guidekit-example-e2e-secret-32-chars';
-const E2E_LLM_API_KEY =
-  process.env.LLM_API_KEY ??
-  exampleEnv.LLM_API_KEY ??
-  'e2e-dummy-llm-key-for-contract-tests';
+const sharedUse = {
+  ...devices['Desktop Chrome'],
+  baseURL: 'http://localhost:3099',
+};
 
 export default defineConfig({
   testDir: './e2e',
@@ -35,7 +23,6 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
-  timeout: 30_000,
   expect: {
     timeout: 10_000,
   },
@@ -46,11 +33,17 @@ export default defineConfig({
 
   projects: [
     {
-      name: 'example-nextjs',
-      use: {
-        ...devices['Desktop Chrome'],
-        baseURL: 'http://localhost:3099',
-      },
+      name: 'contract',
+      testDir: './e2e/contract',
+      timeout: 30_000,
+      use: sharedUse,
+    },
+    {
+      name: 'live',
+      testDir: './e2e/live',
+      timeout: 120_000,
+      retries: 2,
+      use: sharedUse,
     },
   ],
 
@@ -60,6 +53,8 @@ export default defineConfig({
       ...process.env,
       GUIDEKIT_SECRET: E2E_GUIDEKIT_SECRET,
       LLM_API_KEY: E2E_LLM_API_KEY,
+      STT_API_KEY: process.env.STT_API_KEY ?? 'e2e-dummy-stt-key-for-contract-tests',
+      TTS_API_KEY: process.env.TTS_API_KEY ?? 'e2e-dummy-tts-key-for-contract-tests',
     },
     url: 'http://localhost:3099',
     reuseExistingServer: !process.env.CI,

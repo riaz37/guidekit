@@ -62,9 +62,52 @@ guidekit/
 
 ### Testing expectations
 
-- Unit tests: Vitest (`pnpm test:unit`)
-- E2E: Playwright (`pnpm test:e2e`) — agent flows in `e2e/`
-- New pipeline or cognitive behavior needs unit coverage; integration changes should touch example app or E2E when user-facing
+- Unit tests: Vitest (`pnpm test:unit`) — all packages
+- Contract E2E: Playwright (`pnpm test:e2e:contract`) — mocked LLM + Web Speech voice, runs on every PR
+- Live E2E: Playwright (`pnpm test:e2e:live`) — real Gemini via proxy; **publish gate only** (`LIVE_LLM=1` + `LLM_API_KEY`)
+- New pipeline or cognitive behavior needs unit coverage; user-facing integration changes should touch example app or contract E2E
+
+### E2E layout
+
+```
+e2e/
+├── contract/     # CI + pnpm check (no API key)
+├── live/         # Pre-publish only
+├── fixtures/     # LLM mocks, Web Speech mocks, helpers
+└── env.ts        # .env.local + LIVE_LLM detection
+```
+
+Voice E2E always mocks the browser Web Speech API — no Deepgram/ElevenLabs in Playwright.
+
+### E2E coverage matrix (user-facing flows)
+
+| Flow | Contract | Live |
+|------|:--------:|:----:|
+| Widget UI / a11y | yes | — |
+| Proxy health / token / LLM | yes | yes |
+| Text chat + streaming | mocked | yes |
+| Multi-turn memory | — | yes |
+| Agent tools (scroll, highlight, navigate, tour, clickElement) | yes | yes |
+| Platform Mode (RAG, plugin, cognitive page) | yes | yes |
+| Session recovery 401 | yes | yes |
+| Voice (Web Speech mock → LLM) | yes | yes |
+| Custom actions / form / readPage / dismiss | yes | partial |
+| STT/TTS proxy key minting | yes | — |
+| Hallucination guard bus event | yes | — |
+| Vanilla IIFE widget | yes | — |
+
+Commands: `pnpm test:e2e:contract` (CI), `pnpm test:e2e:live` (local), `pnpm test:e2e:live:full` (publish gate).
+
+Before release, run `pnpm check:release` (runs live suite twice for the flake budget). Publish workflow uploads Playwright artifacts on failure.
+
+### Release gate (production readiness)
+
+Run `pnpm check:release` before publishing. It includes:
+
+- `pnpm check` (build, typecheck, lint, unit, size, contract E2E)
+- Package artifact verification (`scripts/verify-published-packages.mjs`)
+- CLI subprocess smoke (`packages/cli/src/cli.smoke.test.ts`)
+- Live E2E twice (`pnpm test:e2e:live:full` ×2)
 
 ## Commands
 
@@ -74,6 +117,7 @@ pnpm skills:sync          # Link skills/guidekit for Codex/Cursor discovery
 pnpm dev                  # Start docs + example apps
 pnpm build                # Build all packages
 pnpm check                # Full CI parity (build, typecheck, lint, test)
+pnpm check:release        # Production publish gate (includes live E2E x2)
 pnpm publish:packages:dry-run  # Dry-run npm publish locally
 pnpm stats                # Package LOC + core facade size
 pnpm llms:generate        # Regenerate llms.txt agent index

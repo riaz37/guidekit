@@ -16,10 +16,9 @@ import { TokenManager } from '../auth/token-manager.js';
 import { ConfigurationError, ErrorCodes } from '../errors/index.js';
 import { createPlatformExtensions } from '../pipeline/extensions.js';
 import type { PlatformExtensionResult } from '../pipeline/extensions.js';
+import { resolveSttConfig, resolveTtsConfig } from './voice-config.js';
 import type {
   LLMConfig,
-  STTConfig,
-  TTSConfig,
   AgentState,
   PageModel,
   ToolDefinition,
@@ -214,7 +213,7 @@ export async function initializeGuideKitRuntime(host: RuntimeInitHost): Promise<
 
   await host.contextManager.initTokenBudget();
 
-  initVoicePipeline(host);
+  await initVoicePipeline(host);
 
   const session = host.contextManager.restoreSession();
   if (session && debug) {
@@ -286,10 +285,27 @@ export async function initializeGuideKitRuntime(host: RuntimeInitHost): Promise<
   }
 }
 
-function initVoicePipeline(host: RuntimeInitHost): void {
+async function initVoicePipeline(host: RuntimeInitHost): Promise<void> {
   const { options, debug } = host;
-  const sttConfig: STTConfig = options.stt ?? { provider: 'web-speech' };
-  const ttsConfig: TTSConfig = options.tts ?? { provider: 'web-speech' };
+  const getToken = () => host.tokenManager?.token ?? null;
+  const refreshSession = host.tokenManager
+    ? async () => {
+        await host.tokenManager!.refresh();
+      }
+    : undefined;
+
+  const sttConfig = await resolveSttConfig(
+    options,
+    host.tokenManager !== null,
+    getToken,
+    refreshSession,
+  );
+  const ttsConfig = await resolveTtsConfig(
+    options,
+    host.tokenManager !== null,
+    getToken,
+    refreshSession,
+  );
 
   let voiceSttConfig: VoicePipelineOptions['sttConfig'];
   let voiceTtsConfig: VoicePipelineOptions['ttsConfig'];

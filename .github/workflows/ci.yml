@@ -69,11 +69,11 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Run E2E tests
+      - name: Run E2E contract tests
         env:
           GUIDEKIT_SECRET: guidekit-example-e2e-secret-32-chars
           LLM_API_KEY: e2e-dummy-llm-key-for-contract-tests
-        run: pnpm test:e2e
+        run: pnpm test:e2e:contract
 
       - name: Upload test results
         if: failure()
