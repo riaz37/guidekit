@@ -30,6 +30,7 @@
     "typecheck": "turbo typecheck",
     "clean": "turbo clean",
     "test:e2e": "playwright test",
+    "test:e2e:live": "LIVE_LLM=1 playwright test e2e/live-llm.spec.ts",
     "size": "size-limit",
     "size:check": "size-limit --limit",
     "release": "pnpm changeset version && pnpm install && pnpm build && pnpm changeset publish",

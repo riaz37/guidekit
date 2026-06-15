@@ -14,6 +14,7 @@
     "@guidekit/plugins": "workspace:^",
     "@guidekit/react": "workspace:^",
     "@guidekit/server": "workspace:^",
+    "@guidekit/vad": "workspace:^",
     "next": "^15.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

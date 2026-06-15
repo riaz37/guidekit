@@ -184,6 +184,9 @@ export class GuideKitCore {
             this._options,
             this.tokenManager !== null,
             () => this.tokenManager?.token ?? null,
+            async () => {
+              await this.tokenManager?.refresh();
+            },
           ),
         getToolDefinitions: () => this.getToolDefinitions(),
         getRefs: () => ({

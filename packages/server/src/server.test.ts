@@ -482,4 +482,19 @@ describe('createGuideKitHandler()', () => {
     );
     expect(res.status).toBe(401);
   });
+
+  it('token route returns 503 when no provider keys configured', async () => {
+    const { createGuideKitHandler } = await import('./handler.js');
+    const handler = createGuideKitHandler({
+      signingSecret: TEST_SECRET,
+      createTokenOptions: () => ({}),
+    });
+    const res = await handler(
+      new Request('http://localhost/token', { method: 'POST' }),
+      'token',
+    );
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.error).toContain('LLM_API_KEY');
+  });
 });

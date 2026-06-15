@@ -8,6 +8,7 @@ import { ToolExecutor } from '../llm/tool-executor.js';
 import { ConnectionManager } from '../connectivity/index.js';
 import { NavigationController } from '../navigation/index.js';
 import { VoicePipeline, type VoicePipelineOptions } from '../voice/index.js';
+import { WebSpeechSTT } from '../voice/web-speech-stt.js';
 import { VisualGuidance } from '../visual/index.js';
 import { AwarenessSystem } from '../awareness/index.js';
 import { ProactiveTriggerEngine } from '../awareness/proactive.js';
@@ -306,6 +307,15 @@ function initVoicePipeline(host: RuntimeInitHost): void {
       language: sttConfig.language,
     };
   } else {
+    if (typeof window !== 'undefined' && !WebSpeechSTT.isSupported()) {
+      host.setVoicePipeline(null);
+      if (debug) {
+        console.debug(
+          '[GuideKit:Core] Web Speech STT is not supported in this browser — voice disabled',
+        );
+      }
+      return;
+    }
     voiceSttConfig = {
       provider: 'web-speech',
       language: sttConfig.language,
@@ -357,7 +367,7 @@ function initVoicePipeline(host: RuntimeInitHost): void {
     voicePipeline.onTranscript((text, isFinal) => {
       host.bus.emit('voice:transcript', { text, isFinal, confidence: 0.95 });
       if (isFinal && text.trim()) {
-        host.voicePipeline?.processTranscript(text, (t) => host.sendText(t));
+        void voicePipeline.processTranscript(text, (t) => host.sendText(t));
       }
     });
 

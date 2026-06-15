@@ -1,9 +1,32 @@
 import { defineConfig, devices } from '@playwright/test';
+import { existsSync, readFileSync } from 'fs';
+import { resolve } from 'path';
+
+/** Load apps/example-nextjs/.env.local for local live-LLM runs (gitignored). */
+function loadExampleEnvLocal(): Record<string, string> {
+  const envPath = resolve(__dirname, 'apps/example-nextjs/.env.local');
+  if (!existsSync(envPath)) return {};
+  const vars: Record<string, string> = {};
+  for (const line of readFileSync(envPath, 'utf8').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq === -1) continue;
+    vars[trimmed.slice(0, eq)] = trimmed.slice(eq + 1);
+  }
+  return vars;
+}
+
+const exampleEnv = loadExampleEnvLocal();
 
 const E2E_GUIDEKIT_SECRET =
-  process.env.GUIDEKIT_SECRET ?? 'guidekit-example-e2e-secret-32-chars';
+  process.env.GUIDEKIT_SECRET ??
+  exampleEnv.GUIDEKIT_SECRET ??
+  'guidekit-example-e2e-secret-32-chars';
 const E2E_LLM_API_KEY =
-  process.env.LLM_API_KEY ?? 'e2e-dummy-llm-key-for-contract-tests';
+  process.env.LLM_API_KEY ??
+  exampleEnv.LLM_API_KEY ??
+  'e2e-dummy-llm-key-for-contract-tests';
 
 export default defineConfig({
   testDir: './e2e',

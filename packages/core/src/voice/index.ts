@@ -363,12 +363,12 @@ export class VoicePipeline {
     try {
       await this._stt.connect();
       this._log('STT connected');
-    } catch (_err) {
+    } catch (err) {
       this._log('STT connection failed — degrading to text mode');
       this._bus.emit('voice:degraded', { reason: 'STT connection failed', fallback: 'text' });
       this._stopMicTracks();
       this._setState('error');
-      return;
+      throw err instanceof Error ? err : new Error('STT connection failed');
     }
 
     // ── Wire STT transcript events ──────────────────────────────────
@@ -433,6 +433,10 @@ export class VoicePipeline {
     sendToLLM: (text: string) => Promise<string>,
   ): Promise<void> {
     if (this._destroyed) return;
+    if (this._state !== 'listening') {
+      this._log('Ignoring transcript — pipeline state is', this._state);
+      return;
+    }
 
     this._setState('processing');
 
@@ -467,6 +471,8 @@ export class VoicePipeline {
     } else {
       this._setState('idle');
     }
+
+    this._resumeListeningIfMicActive();
   }
 
   // ────────────────────────────────────────────────────────────────────
@@ -840,6 +846,17 @@ export class VoicePipeline {
       }
       this._mediaStream = null;
     }
+  }
+
+  /**
+   * After a voice turn completes, re-enter listening when the mic is still
+   * active so the user does not have to toggle the mic button again.
+   */
+  private _resumeListeningIfMicActive(): void {
+    if (this._destroyed || !this._mediaStream || this._state !== 'idle') return;
+    if (!this._stt?.isConnected) return;
+    this._setState('listening');
+    this._log('Resumed listening (mic still active)');
   }
 
   // ════════════════════════════════════════════════════════════════════

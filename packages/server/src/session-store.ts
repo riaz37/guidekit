@@ -25,6 +25,19 @@ export interface SessionStore {
 
 const EVICTION_INTERVAL_MS = 60_000;
 
+const SHARED_STORE_KEY = Symbol.for('@guidekit/server/sharedSessionStore');
+
+/** Process-wide store for Next.js dev (each route bundle may load session-store separately). */
+export function getSharedSessionStore(): SessionStore {
+  const globalStore = globalThis as typeof globalThis & {
+    [SHARED_STORE_KEY]?: InMemorySessionStore;
+  };
+  if (!globalStore[SHARED_STORE_KEY]) {
+    globalStore[SHARED_STORE_KEY] = new InMemorySessionStore();
+  }
+  return globalStore[SHARED_STORE_KEY];
+}
+
 /** In-memory session store (single process). */
 export class InMemorySessionStore implements SessionStore {
   private store = new Map<string, SessionEntry>();
@@ -63,5 +76,5 @@ export class InMemorySessionStore implements SessionStore {
   }
 }
 
-/** Default process-wide session store. */
-export const defaultSessionStore = new InMemorySessionStore();
+/** Default session store — shared across module reloads in the same Node process. */
+export const defaultSessionStore: SessionStore = getSharedSessionStore();

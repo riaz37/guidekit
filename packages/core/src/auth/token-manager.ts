@@ -105,8 +105,10 @@ export class TokenManager {
 
   /**
    * Force a token refresh, regardless of TTL.
+   * Clears cached localStorage token so a new server session is created.
    */
   async refresh(): Promise<void> {
+    this.clearCachedToken();
     await this.fetchToken();
   }
 
@@ -379,6 +381,17 @@ export class TokenManager {
       return JSON.parse(raw) as TokenData;
     } catch {
       return null;
+    }
+  }
+
+  private clearCachedToken(): void {
+    this._token = null;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(this.storageKey);
+      }
+    } catch {
+      // localStorage unavailable
     }
   }
 

@@ -5,6 +5,8 @@
 import type { GuideKitHandlerOptions } from '../handler.js';
 import { createGuideKitHandler } from '../handler.js';
 
+export { getSharedSessionStore } from '../session-store.js';
+
 export interface NextGuideKitRoutes {
   POST_token: (request: Request) => Promise<Response>;
   POST_llm: (request: Request) => Promise<Response>;

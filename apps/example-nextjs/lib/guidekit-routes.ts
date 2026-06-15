@@ -1,7 +1,8 @@
-import { createNextAppRouterRoutes } from '@guidekit/server/next';
+import { createNextAppRouterRoutes, getSharedSessionStore } from '@guidekit/server/next';
 
 export const guidekitRoutes = createNextAppRouterRoutes({
   signingSecret: process.env.GUIDEKIT_SECRET!,
+  sessionStore: getSharedSessionStore(),
   createTokenOptions: () => ({
     llmApiKey: process.env.LLM_API_KEY!,
     sttApiKey: process.env.STT_API_KEY,

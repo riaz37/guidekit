@@ -7,6 +7,7 @@ export function resolveLLMConfig(
   options: GuideKitCoreOptions,
   hasTokenManager: boolean,
   getToken: () => string | null,
+  refreshSession?: () => Promise<void>,
 ): LLMConfig | null {
   const llmConfig = options.llm;
   const proxyEndpoint = options.proxy?.llm;
@@ -28,6 +29,7 @@ export function resolveLLMConfig(
         adapter: new ProxyLLMAdapter({
           endpoint: proxyEndpoint,
           getToken,
+          refreshSession,
           provider,
           model: model as string | undefined,
         }),

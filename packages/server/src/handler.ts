@@ -100,6 +100,16 @@ async function handleTokenRoute(
     ? await options.createTokenOptions(request)
     : {};
 
+  if (!tokenOpts.llmApiKey && !tokenOpts.sttApiKey && !tokenOpts.ttsApiKey) {
+    return new Response(
+      JSON.stringify({
+        error:
+          'Server misconfigured: set LLM_API_KEY (and optional STT_API_KEY/TTS_API_KEY) in server environment.',
+      }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
+
   const result = await createSessionToken({
     signingSecret: options.signingSecret,
     sessionStore: store,

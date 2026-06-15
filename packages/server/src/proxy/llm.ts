@@ -56,7 +56,10 @@ export async function handleLLMProxy(
 
   const keys = await options.sessionStore.get(validation.payload.sessionId);
   if (!keys?.llmApiKey) {
-    return jsonResponse({ error: 'No LLM API key for session' }, 403);
+    return jsonResponse(
+      { error: 'Session expired or server restarted — request a new token' },
+      401,
+    );
   }
 
   let body: LLMProxyRequestBody;

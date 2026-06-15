@@ -898,6 +898,7 @@ describe('doctor — checkPackageInstalled', () => {
           '@guidekit/core': '^1.0.0',
           '@guidekit/react': '^1.0.0',
           '@guidekit/server': '^1.0.0',
+          '@guidekit/vad': '^0.1.1',
         },
       }),
     );
@@ -921,6 +922,36 @@ describe('doctor — checkPackageInstalled', () => {
     await runDoctor();
     const output = allOutput();
     expect(output).toContain('Not installed');
+  });
+
+  it('reports error when voice mode is enabled without @guidekit/vad', async () => {
+    mockExistsSync.mockImplementation((p) => {
+      const s = String(p);
+      if (s === path.join('/project', 'package.json')) return true;
+      if (s === path.join('/project', 'app', 'providers.tsx')) return true;
+      return false;
+    });
+    mockReadFileSync.mockImplementation((p) => {
+      if (String(p) === path.join('/project', 'package.json')) {
+        return JSON.stringify({
+          dependencies: {
+            '@guidekit/core': '^1.0.0',
+            '@guidekit/react': '^1.0.0',
+            '@guidekit/server': '^1.0.0',
+          },
+        });
+      }
+      if (String(p) === path.join('/project', 'app', 'providers.tsx')) {
+        return "export const x = { options: { mode: 'voice' } };";
+      }
+      return '';
+    });
+
+    const { runDoctor } = await import('./commands/doctor.js');
+    await runDoctor();
+    const output = allOutput();
+    expect(output).toContain('@guidekit/vad');
+    expect(output).toContain('Required for voice mode');
   });
 
   it('reports error when no package.json found', async () => {
@@ -1035,6 +1066,7 @@ describe('doctor — summary output', () => {
       if (s === path.join('/project', 'package.json')) return true;
       if (s === path.join('/project', '.env.local')) return true;
       if (s === path.join('/project', '.gitignore')) return true;
+      if (s.includes(path.join('node_modules', '@guidekit', 'vad'))) return true;
       return false;
     });
     mockReadFileSync.mockImplementation((p) => {
@@ -1045,6 +1077,7 @@ describe('doctor — summary output', () => {
           '@guidekit/core': '^1.0.0',
           '@guidekit/react': '^1.0.0',
           '@guidekit/server': '^1.0.0',
+          '@guidekit/vad': '^0.1.1',
         },
       });
     });
@@ -1090,6 +1123,7 @@ describe('doctor — summary output', () => {
     mockExistsSync.mockImplementation((p) => {
       const s = String(p);
       if (s === path.join('/project', 'package.json')) return true;
+      if (s.includes(path.join('node_modules', '@guidekit', 'vad'))) return true;
       return false;
     });
     mockReadFileSync.mockReturnValue(
@@ -1098,6 +1132,7 @@ describe('doctor — summary output', () => {
           '@guidekit/core': '^1.0.0',
           '@guidekit/react': '^1.0.0',
           '@guidekit/server': '^1.0.0',
+          '@guidekit/vad': '^0.1.1',
         },
       }),
     );
@@ -1147,6 +1182,7 @@ describe('doctor — summary output', () => {
           '@guidekit/core': '^1.0.0',
           '@guidekit/react': '^1.0.0',
           '@guidekit/server': '^1.0.0',
+          '@guidekit/vad': '^0.1.1',
         },
       });
     });
@@ -1281,6 +1317,7 @@ describe('init — template generation', () => {
           '@guidekit/core': '^1.0.0',
           '@guidekit/react': '^1.0.0',
           '@guidekit/server': '^1.0.0',
+          '@guidekit/vad': '^0.1.1',
         },
       }),
     );

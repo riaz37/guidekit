@@ -4,7 +4,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { useGuideKitCore, useGuideKitStatus } from '../hooks/index.js';
+import { useGuideKitCore, useGuideKitStatus, useGuideKitStream } from '../hooks/index.js';
 import { WIDGET_STYLES } from './styles.js';
 import type { TranscriptMessage, WidgetProps } from './types.js';
 
@@ -56,6 +56,7 @@ const SparkleIcon = () => (
 export function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetProps) {
   const core = useGuideKitCore();
   const { isReady, agentState } = useGuideKitStatus();
+  const { isStreaming, streamingText } = useGuideKitStream();
 
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<TranscriptMessage[]>([]);
@@ -89,6 +90,9 @@ export function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetPro
 
   // Monotonic ID counter for messages
   const msgIdRef = useRef(0);
+  const voiceUserMsgIdRef = useRef<string | null>(null);
+  const voiceAssistantMsgIdRef = useRef<string | null>(null);
+  const lastVoiceStreamTextRef = useRef('');
 
   // i18n helper — get localized string from core
   const t = useCallback(
@@ -189,6 +193,87 @@ export function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetPro
     }
   }, [messages, isSending]);
 
+  // ---- Voice transcript → chat messages ----
+
+  useEffect(() => {
+    if (!core) return;
+
+    const unsub = core.bus.on('voice:transcript', ({ text, isFinal }) => {
+      if (!text.trim()) return;
+
+      const msgId = voiceUserMsgIdRef.current ?? `msg-${++msgIdRef.current}`;
+      if (isFinal) {
+        voiceUserMsgIdRef.current = null;
+      } else {
+        voiceUserMsgIdRef.current = msgId;
+      }
+
+      setMessages((prev) => {
+        const idx = prev.findIndex((m) => m.id === msgId);
+        const userMsg: TranscriptMessage = {
+          id: msgId,
+          role: 'user',
+          content: text,
+          timestamp: Date.now(),
+        };
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = userMsg;
+          return next;
+        }
+        return [...prev, userMsg];
+      });
+
+      if (!isFinal) return;
+
+      const assistantId = `msg-${++msgIdRef.current}`;
+      voiceAssistantMsgIdRef.current = assistantId;
+      lastVoiceStreamTextRef.current = '';
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantId,
+          role: 'assistant',
+          content: '',
+          timestamp: Date.now(),
+        },
+      ]);
+      setIsSending(true);
+    });
+
+    return unsub;
+  }, [core]);
+
+  // ---- Mirror voice LLM stream into the assistant bubble ----
+
+  useEffect(() => {
+    const assistantId = voiceAssistantMsgIdRef.current;
+    if (!assistantId) return;
+
+    if (streamingText) {
+      lastVoiceStreamTextRef.current = streamingText;
+    }
+
+    if (isStreaming) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId ? { ...m, content: streamingText } : m,
+        ),
+      );
+      return;
+    }
+
+    const finalText = lastVoiceStreamTextRef.current;
+    if (finalText) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, content: finalText } : m)),
+      );
+    }
+    lastVoiceStreamTextRef.current = '';
+    voiceAssistantMsgIdRef.current = null;
+    setIsSending(false);
+  }, [isStreaming, streamingText]);
+
   // ---- Focus input when panel opens ----
 
   useEffect(() => {
@@ -269,6 +354,17 @@ export function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetPro
       } catch (err) {
         console.error('[GuideKit] Failed to start voice:', err);
         setIsVoiceActive(false);
+        const message =
+          err instanceof Error ? err.message : 'Voice input is unavailable in this browser.';
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `msg-${++msgIdRef.current}`,
+            role: 'assistant',
+            content: message,
+            timestamp: Date.now(),
+          },
+        ]);
       }
     }
   }, [core, isVoiceActive]);
@@ -363,12 +459,12 @@ export function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetPro
 
   // Sync voice active state with agent state
   useEffect(() => {
-    if (!isListeningState && isVoiceActive) {
-      // Voice state changed externally (e.g. barge-in ended listening)
-      // Don't clear if speaking - that's expected in half-duplex
-      if (!isSpeakingState && !isProcessing) {
-        setIsVoiceActive(false);
-      }
+    if (isListeningState || isSpeakingState) {
+      setIsVoiceActive(true);
+      return;
+    }
+    if (!isProcessing && isVoiceActive) {
+      setIsVoiceActive(false);
     }
   }, [isListeningState, isSpeakingState, isProcessing, isVoiceActive]);
 

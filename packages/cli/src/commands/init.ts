@@ -88,10 +88,11 @@ export async function handleTokenRequest(req: any, res: any) {
 
 function nextProxyRoutesTemplate(): string {
   return `// lib/guidekit-routes.ts
-import { createNextAppRouterRoutes } from '@guidekit/server/next';
+import { createNextAppRouterRoutes, getSharedSessionStore } from '@guidekit/server/next';
 
 export const guidekitRoutes = createNextAppRouterRoutes({
   signingSecret: process.env.GUIDEKIT_SECRET!,
+  sessionStore: getSharedSessionStore(),
   createTokenOptions: () => ({
     llmApiKey: process.env.LLM_API_KEY!,
     sttApiKey: process.env.STT_API_KEY,
@@ -169,12 +170,14 @@ function envTemplate(): string {
 # Generate a signing secret: npx guidekit generate-secret
 GUIDEKIT_SECRET=
 
-# LLM Provider (required)
+# LLM Provider (required for proxy mode)
 LLM_API_KEY=
 
-# Voice Providers (optional — for voice mode)
+# Voice (optional — also run: npm install @guidekit/vad)
+# Browser Web Speech STT/TTS work without server keys; Deepgram/ElevenLabs use:
 STT_API_KEY=
 TTS_API_KEY=
+# NEXT_PUBLIC_GUIDEKIT_VOICE=0
 `;
 }
 
@@ -233,6 +236,9 @@ export async function runInit(platformMode = false): Promise<void> {
     if (!deps['@guidekit/core']) missing.push('@guidekit/core');
     if (!deps['@guidekit/react']) missing.push('@guidekit/react');
     if (!deps['@guidekit/server']) missing.push('@guidekit/server');
+    if (deps['@guidekit/react'] && !deps['@guidekit/vad']) {
+      missing.push('@guidekit/vad');
+    }
     if (platformMode) {
       if (!deps['@guidekit/intelligence']) missing.push('@guidekit/intelligence');
       if (!deps['@guidekit/knowledge']) missing.push('@guidekit/knowledge');

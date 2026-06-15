@@ -80,7 +80,8 @@ function checkSttApiKey(): CheckResult {
     return {
       name: 'STT API Key',
       status: 'skip',
-      message: 'Not set (optional — required for voice/STT)',
+      message:
+        'Not set (optional — browser Web Speech STT works without a server key; Deepgram/ElevenLabs need STT_API_KEY)',
     };
   }
   return { name: 'STT API Key', status: 'ok', message: 'Found' };
@@ -92,10 +93,100 @@ function checkTtsApiKey(): CheckResult {
     return {
       name: 'TTS API Key',
       status: 'skip',
-      message: 'Not set (optional — required for voice/TTS)',
+      message:
+        'Not set (optional — browser Web Speech TTS works without a server key; ElevenLabs needs TTS_API_KEY)',
     };
   }
   return { name: 'TTS API Key', status: 'ok', message: 'Found' };
+}
+
+function projectUsesVoiceMode(root: string): boolean {
+  const candidates = [
+    path.join(root, 'app', 'providers.tsx'),
+    path.join(root, 'src', 'app', 'providers.tsx'),
+    path.join(root, 'app', 'layout.tsx'),
+    path.join(root, 'src', 'app', 'layout.tsx'),
+  ];
+
+  for (const filePath of candidates) {
+    if (!fileExists(filePath)) continue;
+    const content = readFile(filePath);
+    if (
+      content.includes("mode: 'voice'") ||
+      content.includes('mode: "voice"') ||
+      content.includes('NEXT_PUBLIC_GUIDEKIT_VOICE') ||
+      content.includes("options={{ mode: 'voice'")
+    ) {
+      return true;
+    }
+  }
+
+  if (process.env.NEXT_PUBLIC_GUIDEKIT_VOICE === '1') {
+    return true;
+  }
+  if (process.env.NEXT_PUBLIC_GUIDEKIT_VOICE !== '0') {
+    // Example app defaults voice on unless explicitly disabled.
+    const exampleProviders = path.join(root, 'apps', 'example-nextjs', 'app', 'providers.tsx');
+    if (fileExists(exampleProviders)) {
+      const content = readFile(exampleProviders);
+      if (content.includes('NEXT_PUBLIC_GUIDEKIT_VOICE')) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function checkVadPackage(root: string): CheckResult {
+  const pkgPath = path.join(root, 'package.json');
+  if (!fileExists(pkgPath)) {
+    return { name: '@guidekit/vad', status: 'skip', message: 'No package.json found' };
+  }
+
+  const pkgJson = JSON.parse(readFile(pkgPath)) as {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+  const deps = { ...pkgJson.dependencies, ...pkgJson.devDependencies };
+  const usesReact = Boolean(deps['@guidekit/react']);
+  if (!usesReact) {
+    return {
+      name: '@guidekit/vad',
+      status: 'skip',
+      message: 'Not applicable (install @guidekit/react first for voice UI)',
+    };
+  }
+
+  const voiceEnabled = projectUsesVoiceMode(root);
+  if (!deps['@guidekit/vad']) {
+    return {
+      name: '@guidekit/vad',
+      status: voiceEnabled ? 'error' : 'warn',
+      message: voiceEnabled
+        ? 'Required for voice mode — run: npm install @guidekit/vad'
+        : 'Not installed (required when enabling options.mode = "voice")',
+    };
+  }
+
+  if (!fileExists(path.join(root, 'node_modules', '@guidekit', 'vad'))) {
+    return {
+      name: '@guidekit/vad',
+      status: 'error',
+      message: 'Listed in package.json but missing from node_modules. Run npm install.',
+    };
+  }
+
+  return { name: '@guidekit/vad', status: 'ok', message: 'Installed (Silero VAD for mic pipeline)' };
+}
+
+function checkVoiceBrowserNote(): CheckResult {
+  return {
+    name: 'Voice browser support',
+    status: 'skip',
+    message:
+      'Use Chrome or Edge for Web Speech STT/TTS; Firefox needs Deepgram STT. Mic requires HTTPS or localhost.',
+  };
 }
 
 function checkPackageInstalled(root: string, pkg: string): CheckResult {
@@ -283,7 +374,11 @@ export async function runDoctor(): Promise<void> {
   results.push(checkPackageInstalled(root, '@guidekit/core'));
   results.push(checkPackageInstalled(root, '@guidekit/react'));
   results.push(checkPackageInstalled(root, '@guidekit/server'));
+  results.push(checkVadPackage(root));
   results.push(...checkPlatformPackages(root));
+
+  log(`${c.bold}Voice${c.reset}`);
+  results.push(checkVoiceBrowserNote());
 
   // Connectivity checks
   log(`${c.bold}Connectivity${c.reset}`);

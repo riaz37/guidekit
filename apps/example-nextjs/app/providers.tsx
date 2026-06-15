@@ -13,7 +13,8 @@ const GuideKitProvider = dynamic(
   { ssr: false },
 );
 
-const voiceEnabled = process.env.NEXT_PUBLIC_GUIDEKIT_VOICE === '1';
+// Voice is on by default in the example app (Web Speech + @guidekit/vad). Set NEXT_PUBLIC_GUIDEKIT_VOICE=0 to disable.
+const voiceEnabled = process.env.NEXT_PUBLIC_GUIDEKIT_VOICE !== '0';
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
@@ -25,7 +26,7 @@ export function Providers({ children }: { children: ReactNode }) {
         stt: '/api/guidekit/stt',
         tts: '/api/guidekit/tts',
       }}
-      llm={{ provider: 'gemini', model: 'gemini-2.5-flash' }}
+      llm={{ provider: 'gemini', model: 'gemini-2.5-flash-lite' }}
       intelligence={true}
       knowledge={{ documents: platformKnowledgeDocuments, engine: 'bm25', topK: 3 }}
       plugins={[platformDemoPlugin]}

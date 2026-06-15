@@ -112,7 +112,7 @@ describe('handleLLMProxy auth contract', () => {
     expect(res.status).toBe(401);
   });
 
-  it('rejects session without LLM key with 403', async () => {
+  it('rejects session without LLM key with 401', async () => {
     const sessionId = `no-llm-${Date.now()}`;
     const { token } = await createSessionToken({
       signingSecret: TEST_SECRET,
@@ -134,7 +134,7 @@ describe('handleLLMProxy auth contract', () => {
       }),
       { signingSecret: TEST_SECRET, sessionStore: new RedisSessionStore({ redis: createMockRedis() }) },
     );
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(401);
   });
 });
 

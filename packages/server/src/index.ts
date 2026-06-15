@@ -21,6 +21,7 @@ export type {
 export {
   InMemorySessionStore,
   defaultSessionStore,
+  getSharedSessionStore,
 } from './session-store.js';
 
 export type { ProviderKeys, SessionStore, SessionEntry } from './session-store.js';

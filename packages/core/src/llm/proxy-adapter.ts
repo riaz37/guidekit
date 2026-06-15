@@ -14,6 +14,8 @@ export interface ProxyLLMAdapterOptions {
   endpoint: string;
   /** Returns current session JWT */
   getToken: () => string | null;
+  /** Re-fetch token when server-side session keys are missing (e.g. after restart). */
+  refreshSession?: () => Promise<void>;
   provider: 'gemini' | 'openai' | 'anthropic';
   model?: string;
   /** Inner adapter for format/parse (defaults to Gemini) */
@@ -27,12 +29,14 @@ export class ProxyLLMAdapter implements LLMProviderAdapter {
   private readonly inner: LLMProviderAdapter;
   private readonly endpoint: string;
   private readonly getToken: () => string | null;
+  private readonly refreshSession?: () => Promise<void>;
   private readonly provider: 'gemini' | 'openai' | 'anthropic';
   private readonly model?: string;
 
   constructor(options: ProxyLLMAdapterOptions) {
     this.endpoint = options.endpoint;
     this.getToken = options.getToken;
+    this.refreshSession = options.refreshSession;
     this.provider = options.provider;
     this.model = options.model;
     const geminiModel =
@@ -74,6 +78,20 @@ export class ProxyLLMAdapter implements LLMProviderAdapter {
     signal?: AbortSignal;
     timeoutMs?: number;
   }): Promise<{ stream: ReadableStream<Uint8Array>; response: Response }> {
+    return this.streamRequestWithRetry(params, false);
+  }
+
+  private async streamRequestWithRetry(
+    params: {
+      systemPrompt: string;
+      contents: unknown;
+      userMessage?: string;
+      tools?: unknown;
+      signal?: AbortSignal;
+      timeoutMs?: number;
+    },
+    retried: boolean,
+  ): Promise<{ stream: ReadableStream<Uint8Array>; response: Response }> {
     const token = this.getToken();
     if (!token) {
       throw new AuthenticationError({
@@ -103,6 +121,16 @@ export class ProxyLLMAdapter implements LLMProviderAdapter {
 
     if (!response.ok) {
       const errorBody = await response.text().catch(() => '');
+      const sessionStale =
+        (response.status === 401 || response.status === 403) &&
+        (errorBody.includes('No LLM API key for session') ||
+          errorBody.includes('Session expired or server restarted'));
+
+      if (sessionStale && this.refreshSession && !retried) {
+        await this.refreshSession();
+        return this.streamRequestWithRetry(params, true);
+      }
+
       throw new NetworkError({
         code: ErrorCodes.NETWORK_CONNECTION_LOST,
         message: `LLM proxy request failed (${response.status}): ${errorBody}`,
