@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useGuideKitCore } from '@guidekit/react';
+import type { KnowledgeDocument } from '@guidekit/core';
 
 type BusEvent = { name: string; data: unknown; at: number };
 
@@ -10,6 +11,9 @@ declare global {
     __guidekitTest?: {
       events: BusEvent[];
       waitForEvent: (name: string, timeoutMs?: number) => Promise<BusEvent>;
+      waitForReady: (timeoutMs?: number) => Promise<void>;
+      addKnowledgeDocument: (doc: KnowledgeDocument) => void;
+      removeKnowledgeDocument: (documentId: string) => void;
       clear: () => void;
     };
   }
@@ -71,6 +75,27 @@ export function GuideKitTestBridge() {
           list.push({ resolve, reject, timer });
           waiters.set(name, list);
         }),
+      waitForReady: (timeoutMs = 30_000) =>
+        new Promise<void>((resolve, reject) => {
+          const start = Date.now();
+          const timer = setInterval(() => {
+            if (core.isReady) {
+              clearInterval(timer);
+              resolve();
+              return;
+            }
+            if (Date.now() - start > timeoutMs) {
+              clearInterval(timer);
+              reject(new Error('Timed out waiting for GuideKitCore to become ready.'));
+            }
+          }, 50);
+        }),
+      addKnowledgeDocument: (doc) => {
+        core.addKnowledgeDocument(doc);
+      },
+      removeKnowledgeDocument: (documentId) => {
+        core.removeKnowledgeDocument(documentId);
+      },
       clear: () => {
         events.length = 0;
       },

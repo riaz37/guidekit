@@ -435,9 +435,14 @@ class VanillaWidget {
 
 export interface GuideKitVanillaOptions {
   tokenEndpoint?: string;
+  proxy?: GuideKitCoreOptions['proxy'];
   stt?: GuideKitCoreOptions['stt'];
   tts?: GuideKitCoreOptions['tts'];
   llm?: GuideKitCoreOptions['llm'];
+  intelligence?: GuideKitCoreOptions['intelligence'];
+  knowledge?: GuideKitCoreOptions['knowledge'];
+  plugins?: GuideKitCoreOptions['plugins'];
+  hallucinationGuard?: GuideKitCoreOptions['hallucinationGuard'];
   agent?: GuideKitCoreOptions['agent'];
   contentMap?: GuideKitCoreOptions['contentMap'];
   options?: GuideKitCoreOptions['options'];
@@ -464,9 +469,14 @@ export async function init(options: GuideKitVanillaOptions): Promise<void> {
 
   _core = new GuideKitCore({
     tokenEndpoint: options.tokenEndpoint,
+    proxy: options.proxy,
     stt: options.stt,
     tts: options.tts,
     llm: options.llm,
+    intelligence: options.intelligence,
+    knowledge: options.knowledge,
+    plugins: options.plugins,
+    hallucinationGuard: options.hallucinationGuard,
     agent: options.agent,
     contentMap: options.contentMap,
     options: options.options,

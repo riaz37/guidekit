@@ -31,9 +31,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build all packages
-        run: pnpm build
-
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
@@ -42,7 +39,8 @@ jobs:
           LIVE_LLM: '1'
           GUIDEKIT_SECRET: guidekit-example-e2e-secret-32-chars
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-        run: pnpm test:e2e:live:full
+          SKIP_NPM_DRY_RUN: '1'
+        run: pnpm check:release
 
       - name: Upload Playwright report
         if: failure()

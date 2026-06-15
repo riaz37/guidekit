@@ -40,15 +40,30 @@ test.describe('Live LLM integration', () => {
   });
 
   test('multi-turn conversation retains context', async ({ page }) => {
-    await sendChatMessage(page, 'Remember this codeword: ORBIT42. Reply with only OK.');
+    const firstTurn = 'Remember this codeword: ORBIT42. Reply with only OK.';
+    await sendChatMessage(page, firstTurn);
     await waitForAssistantReply(page, { minLength: 1 });
     await expect(page.locator('.gk-processing')).toBeHidden({ timeout: 60_000 });
 
-    await sendChatMessage(
-      page,
-      'What codeword did I ask you to remember? Reply with only the codeword.',
-    );
-    const reply = await waitForAssistantReply(page, { minLength: 4 });
-    expect(reply.toUpperCase()).toContain('ORBIT42');
+    const secondTurn = 'What codeword did I ask you to remember? Reply with only the codeword.';
+    const secondRequest = page.waitForRequest((req) => {
+      if (!req.url().includes('/api/guidekit/llm') || req.method() !== 'POST') return false;
+      try {
+        const body = req.postDataJSON() as { userMessage?: string; contents?: unknown[] };
+        return body.userMessage === secondTurn;
+      } catch {
+        return false;
+      }
+    });
+
+    await sendChatMessage(page, secondTurn);
+
+    const req = await secondRequest;
+    const body = req.postDataJSON() as { contents?: Array<{ role?: string; parts?: Array<{ text?: string }> }> };
+    const historyText = JSON.stringify(body.contents ?? []);
+    expect(historyText).toContain('ORBIT42');
+
+    // Still wait for a reply as a smoke check, but do not depend on model compliance.
+    await waitForAssistantReply(page, { minLength: 1 });
   });
 });

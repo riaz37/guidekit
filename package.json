@@ -41,6 +41,7 @@
     "changeset": "changeset",
     "skills:sync": "bash scripts/setup-codex-skills.sh",
     "check": "bash scripts/ci-check.sh",
+    "check:release": "bash scripts/release-check.sh",
     "stats": "node scripts/package-stats.mjs",
     "llms:generate": "node scripts/generate-llms-txt.mjs"
   },
