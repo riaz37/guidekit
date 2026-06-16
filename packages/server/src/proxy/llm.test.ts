@@ -131,4 +131,96 @@ describe('handleLLMProxy SSE contract', () => {
     const calledUrl = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as string;
     expect(calledUrl).toBe('https://api.anthropic.com/v1/messages');
   });
+
+  it('rejects requests when llm permission is not granted', async () => {
+    globalThis.fetch = vi.fn() as unknown as typeof fetch;
+
+    const store = new InMemorySessionStore();
+    const { token } = await createSessionToken({
+      signingSecret: TEST_SECRET,
+      sessionId: 'no-llm-perm',
+      llmApiKey: 'test-llm-key',
+      permissions: ['stt', 'tts'],
+      sessionStore: store,
+    });
+
+    const request = new Request('http://localhost/api/guidekit/llm', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        provider: 'gemini',
+        systemPrompt: 'test',
+        contents: [],
+        userMessage: 'hello',
+      }),
+    });
+
+    const res = await handleLLMProxy(request, {
+      signingSecret: TEST_SECRET,
+      sessionStore: store,
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toContain('Permission "llm"');
+  });
+
+  it('enforces allowedOrigins when token includes aud', async () => {
+    globalThis.fetch = vi.fn() as unknown as typeof fetch;
+
+    const store = new InMemorySessionStore();
+    const { token } = await createSessionToken({
+      signingSecret: TEST_SECRET,
+      sessionId: 'origin-check',
+      llmApiKey: 'test-llm-key',
+      allowedOrigins: ['https://app.example.com'],
+      sessionStore: store,
+    });
+
+    const request = new Request('http://localhost/api/guidekit/llm', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Origin: 'https://evil.example.com',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        provider: 'gemini',
+        systemPrompt: 'test',
+        contents: [],
+        userMessage: 'hello',
+      }),
+    });
+
+    const res = await handleLLMProxy(request, {
+      signingSecret: TEST_SECRET,
+      sessionStore: store,
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toContain('Origin');
+  });
+
+  it('validates request body shape', async () => {
+    globalThis.fetch = vi.fn() as unknown as typeof fetch;
+
+    const { request, store } = await authedProxyRequest({
+      provider: 'gemini',
+      systemPrompt: '',
+      contents: 'not-an-array',
+    });
+
+    const res = await handleLLMProxy(request, {
+      signingSecret: TEST_SECRET,
+      sessionStore: store,
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain('Invalid body');
+  });
 });

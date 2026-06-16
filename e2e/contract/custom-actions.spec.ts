@@ -23,7 +23,7 @@ test.describe('Custom actions', () => {
 
     const input = await openWidgetInput(page);
     await input.fill('Show alert');
-    await page.getByTestId('guidekit-send').click();
+    await input.press('Enter');
 
     await expect(page.locator('.gk-message[data-role="assistant"]').last()).not.toHaveText('', {
       timeout: 20_000,

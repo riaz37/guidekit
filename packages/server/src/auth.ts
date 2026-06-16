@@ -307,12 +307,31 @@ export async function validateSessionToken(
 
       const { payload } = await jwtVerify(token, encodeSecret(secret), verifyOptions);
 
+      // Validate required claims defensively (never trust casts).
+      const sessionId = payload.sessionId;
+      const exp = payload.exp;
+      const iat = payload.iat;
+      const permissions = payload.permissions;
+
+      if (typeof sessionId !== 'string' || sessionId.trim().length === 0) {
+        return { valid: false, error: 'Token payload missing required sessionId.' };
+      }
+      if (typeof exp !== 'number' || !Number.isFinite(exp)) {
+        return { valid: false, error: 'Token payload missing required exp.' };
+      }
+      if (typeof iat !== 'number' || !Number.isFinite(iat)) {
+        return { valid: false, error: 'Token payload missing required iat.' };
+      }
+      if (!Array.isArray(permissions) || !permissions.every((p) => typeof p === 'string')) {
+        return { valid: false, error: 'Token payload missing required permissions.' };
+      }
+
       const tokenPayload: TokenPayload = {
-        sessionId: payload.sessionId as string,
-        expiresAt: payload.exp as number,
+        sessionId,
+        expiresAt: exp,
         audience: normalizeAudience(payload.aud),
-        permissions: (payload.permissions as string[]) ?? [],
-        iat: payload.iat as number,
+        permissions,
+        iat,
       };
 
       if (payload.userId !== undefined) {

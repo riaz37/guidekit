@@ -112,6 +112,7 @@ export class PipelineOrchestrator {
       let ctx = createInitialContext(message);
 
       try {
+        deps.telemetry?.clear();
         deps.setStreaming(true, '');
         deps.notifyListeners();
         deps.setAgentState({ status: 'processing', transcript: ctx.userMessage });
@@ -123,7 +124,9 @@ export class PipelineOrchestrator {
         });
 
         for (const stage of PIPELINE_STAGES) {
-          const span = deps.telemetry?.startSpan(stage);
+          const span = deps.telemetry?.startSpan(stage, {
+            conversationId: ctx.conversationId,
+          });
 
           if (stage === 'llm') {
             for await (const chunk of streamLLMChunks(ctx, deps, llmOrchestrator)) {
@@ -151,18 +154,24 @@ export class PipelineOrchestrator {
               };
             }
             if (span) {
-              span.attributes = {
-                ...span.attributes,
+              deps.telemetry?.setAttributes(span, {
                 totalTokens: ctx.totalTokens,
                 toolCallsExecuted: ctx.toolCallsExecuted,
                 rounds: ctx.rounds,
-              };
+              });
               deps.telemetry?.endSpan(span);
             }
             continue;
           }
 
           ctx = await runStage(stage, ctx, deps);
+          if (span) {
+            deps.telemetry?.setAttributes(span, {
+              totalTokens: ctx.totalTokens,
+              toolCallsExecuted: ctx.toolCallsExecuted,
+              rounds: ctx.rounds,
+            });
+          }
           if (stage === 'validate') {
             deps.bus.emit('validation:complete', {
               confidence: ctx.validation?.confidence,

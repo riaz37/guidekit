@@ -37,7 +37,7 @@ export type {
 
 // Telemetry (optional subpath)
 export { PipelineTelemetry } from './telemetry/index.js';
-export type { TelemetrySpan } from './telemetry/index.js';
+export type { TelemetrySpan, TelemetrySpanExport } from './telemetry/index.js';
 
 // Context engine
 export { TokenBudgetManager, heuristicCount } from './context/token-budget.js';

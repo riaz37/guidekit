@@ -21,7 +21,7 @@ function App() {
 
 ## Features
 
-The DevTools panel has four tabs:
+The DevTools panel has five tabs:
 
 ### State Tab
 
@@ -58,6 +58,16 @@ Shows current rate limiter state:
 - STT minutes: current / limit per session
 - TTS characters: current / limit per session
 - Visual meters showing usage
+
+### Telemetry Tab
+
+Shows per-message pipeline spans (stage timings and metadata) recorded by `@guidekit/core`:
+
+- Stage spans: `scan`, `enrich`, `retrieve`, `context`, `cognize`, `llm`, `validate`, `render`
+- Duration per span (`durationMs`)
+- Attributes (like `conversationId`, `totalTokens`, `toolCallsExecuted`, `rounds`)
+
+Use **Copy JSON** to paste spans into an issue, or to correlate client timings with server logs.
 
 ## Appearance
 

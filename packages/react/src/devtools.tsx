@@ -31,7 +31,7 @@ import { GuideKitContext } from './_context.js';
 // Types
 // ---------------------------------------------------------------------------
 
-type TabId = 'state' | 'events' | 'sections' | 'ratelimits';
+type TabId = 'state' | 'events' | 'sections' | 'ratelimits' | 'telemetry';
 
 interface EventLogEntry {
   id: number;
@@ -51,9 +51,10 @@ const TAB_LABELS: Record<TabId, string> = {
   events: 'Events',
   sections: 'Sections',
   ratelimits: 'Rate Limits',
+  telemetry: 'Telemetry',
 };
 
-const TAB_ORDER: TabId[] = ['state', 'events', 'sections', 'ratelimits'];
+const TAB_ORDER: TabId[] = ['state', 'events', 'sections', 'ratelimits', 'telemetry'];
 
 // ---------------------------------------------------------------------------
 // Styles (inline — devtools live outside Shadow DOM)
@@ -634,6 +635,97 @@ function RateLimitsTab({ core }: { core: GuideKitCore }) {
 }
 
 // ---------------------------------------------------------------------------
+// Tab: Telemetry
+// ---------------------------------------------------------------------------
+
+function TelemetryTab({ core }: { core: GuideKitCore }) {
+  const [exported, setExported] = useState<unknown[]>(
+    core.getTelemetrySpans?.() ?? [],
+  );
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setExported(core.getTelemetrySpans?.() ?? []);
+    }, 500);
+    return () => clearInterval(id);
+  }, [core]);
+
+  const spans = Array.isArray(exported) ? exported : [];
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(spans, null, 2));
+    } catch {
+      // ignore clipboard failures in devtools
+    }
+  }, [spans]);
+
+  const handleClear = useCallback(() => {
+    // Clearing happens inside core telemetry; we can only force a refresh view here.
+    setExported(core.getTelemetrySpans?.() ?? []);
+  }, [core]);
+
+  if (spans.length === 0) {
+    return (
+      <div>
+        <div style={S.emptyState}>No telemetry spans yet.</div>
+        <div style={{ ...S.label, fontSize: 10, color: '#475569' }}>
+          Spans are recorded per message and cleared at the start of each send.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 8,
+        }}
+      >
+        <span style={S.label}>{spans.length} spans</span>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={S.clearBtn} onClick={handleClear}>
+            Refresh
+          </button>
+          <button style={S.clearBtn} onClick={handleCopy}>
+            Copy JSON
+          </button>
+        </div>
+      </div>
+
+      <div style={{ maxHeight: 340, overflow: 'auto' }}>
+        {spans.map((s, idx) => {
+          const name = typeof s === 'object' && s ? (s as any).name : 'span';
+          const stage = typeof s === 'object' && s ? (s as any).stage : '';
+          const duration =
+            typeof s === 'object' && s ? (s as any).durationMs : undefined;
+          const attrs =
+            typeof s === 'object' && s ? (s as any).attributes : undefined;
+
+          return (
+            <div key={idx} style={S.eventRow}>
+              <span style={S.eventName}>
+                {String(stage || name)}
+              </span>
+              <span style={{ ...S.eventTime, marginLeft: 6 }}>
+                {typeof duration === 'number' ? `${duration.toFixed(1)}ms` : ''}
+              </span>
+              {attrs && (
+                <span style={S.eventData}>{truncateJSON(attrs, 220)}</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Component: GuideKitDevTools
 // ---------------------------------------------------------------------------
 
@@ -733,6 +825,7 @@ function DevToolsInner({ core: coreProp }: { core?: GuideKitCore }) {
           {activeTab === 'events' && <EventsTab core={core} />}
           {activeTab === 'sections' && <SectionsTab core={core} />}
           {activeTab === 'ratelimits' && <RateLimitsTab core={core} />}
+          {activeTab === 'telemetry' && <TelemetryTab core={core} />}
         </div>
       </div>
     </div>
