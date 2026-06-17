@@ -13,6 +13,9 @@ node scripts/verify-published-packages.mjs
 echo "==> CLI subprocess smoke"
 pnpm test:unit -- packages/cli/src/cli.smoke.test.ts
 
+echo "==> playwright install (live + contract browsers)"
+pnpm exec playwright install chromium-headless-shell
+
 echo "==> live E2E run 1"
 LIVE_LLM=1 pnpm test:e2e:live:full
 

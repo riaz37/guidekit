@@ -10,6 +10,7 @@ const meta: MetaRecord = {
   'proactive-triggers': 'Proactive Triggers',
   'platform-mode': 'Platform Mode',
   privacy: 'Privacy & Security',
+  observability: 'Observability',
   server: 'Server SDK',
   compatibility: 'Compatibility Tiers',
   troubleshooting: 'Troubleshooting',

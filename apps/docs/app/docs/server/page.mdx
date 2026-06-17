@@ -57,6 +57,35 @@ const keys = await getSessionKeys('my-session-id');
 import { RedisSessionStore } from '@guidekit/server/redis';
 ```
 
+### In-memory vs Redis (production guidance)
+
+- **InMemorySessionStore**: good for local dev and single-instance deployments.
+  - Not suitable for **multi-instance** or **serverless** deployments where requests can land on different processes.
+- **RedisSessionStore**: recommended for production when you run multiple instances or need durability across restarts.
+
+The reference example app (`apps/example-nextjs`) uses in-memory storage by default. Set `REDIS_URL` and install `ioredis` in that app to exercise the Redis path locally.
+
+Example:
+
+```typescript
+import Redis from 'ioredis';
+import { RedisSessionStore } from '@guidekit/server/redis';
+import { createNextAppRouterRoutes } from '@guidekit/server/next';
+
+const redis = new Redis(process.env.REDIS_URL!);
+const sessionStore = new RedisSessionStore({ redis });
+
+const routes = createNextAppRouterRoutes({
+  signingSecret: process.env.GUIDEKIT_SECRET!,
+  sessionStore,
+  createTokenOptions: () => ({
+    llmApiKey: process.env.LLM_API_KEY!,
+    expiresIn: '15m',
+    allowedOrigins: ['https://yourapp.com'],
+  }),
+});
+```
+
 ## Framework-agnostic handler
 
 For non-Next.js runtimes, use `createGuideKitHandler`:
@@ -92,7 +121,53 @@ All proxy routes require `Authorization: Bearer <session-token>` except `/token`
 
 ## Rate limiting
 
-`createGuideKitHandler` applies a sliding-window rate limiter per session ID and IP (default: 60 req/min).
+`createGuideKitHandler` applies a **sliding-window** rate limiter keyed by **session ID** (when authenticated) or **client IP**.
+
+### Defaults
+
+| Setting | Default | Meaning |
+|---------|---------|---------|
+| `windowMs` | `60_000` | 1-minute window |
+| `maxRequests` | `60` | Max requests per window per key |
+
+When exceeded, the handler returns **429** with a `Retry-After` header (seconds).
+
+### Production recommendations
+
+| Deployment | Suggested `maxRequests` | Notes |
+|------------|-------------------------|-------|
+| Single-tenant internal app | `60` (default) | Fine for most dashboards |
+| Public consumer app | `30–40` | Tighten if you see abuse |
+| High-traffic B2B | `80–120` | Monitor 429 rates; add CDN/WAF in front |
+
+Tune via handler options:
+
+```typescript
+const handler = createGuideKitHandler({
+  signingSecret: process.env.GUIDEKIT_SECRET!,
+  rateLimit: {
+    windowMs: 60_000,
+    maxRequests: 40,
+  },
+  createTokenOptions: () => ({ llmApiKey: process.env.LLM_API_KEY!, expiresIn: '15m' }),
+});
+```
+
+The example app reads `GUIDEKIT_RATE_LIMIT_WINDOW_MS` and `GUIDEKIT_RATE_LIMIT_MAX` for local tuning.
+
+### Origin allowlist (recommended in production)
+
+Set `allowedOrigins` when minting tokens. Proxy routes (`/llm`, `/stt`, `/tts`) reject requests when the token includes an `aud` claim and the `Origin` header does not match.
+
+```typescript
+createTokenOptions: () => ({
+  llmApiKey: process.env.LLM_API_KEY!,
+  expiresIn: '15m',
+  allowedOrigins: ['https://yourapp.com'],
+}),
+```
+
+In the example app, set `GUIDEKIT_ALLOWED_ORIGINS=https://yourapp.com,https://staging.yourapp.com`.
 
 ## `createSessionToken`
 

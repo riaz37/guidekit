@@ -131,6 +131,69 @@ import { createGuideKit } from '@guidekit/core';
 
 Visual/rendering exports live under `@guidekit/core/rendering` to keep the vanilla bundle smaller.
 
+## Production / Proxy Failures
+
+### Session expired or server restarted (401)
+
+**Symptom:** LLM proxy returns `401` with *"Session expired or server restarted — request a new token"*.
+
+**Cause:** Provider keys live in the server `SessionStore`, keyed by `sessionId`. After a deploy/restart (in-memory store) or TTL expiry, the JWT may still decode but keys are gone.
+
+**Fix:**
+1. Ensure the client refreshes tokens (GuideKit refreshes at ~80% TTL automatically).
+2. For multi-instance/serverless, use [`RedisSessionStore`](/docs/server#in-memory-vs-redis-production-guidance).
+3. See [Session recovery](/docs/troubleshooting#session-recovery-client-side) below.
+
+### Rate limit exceeded (429)
+
+**Symptom:** Proxy returns `429` with `Retry-After`.
+
+**Fix:** Back off and retry after the header value. Tune `rateLimit.maxRequests` on `createGuideKitHandler` — see [Server SDK rate limiting](/docs/server#rate-limiting).
+
+### Origin not allowed (403)
+
+**Symptom:** Proxy returns `403` with *"Origin not allowed"*.
+
+**Fix:** Ensure `allowedOrigins` on `createSessionToken` includes your app's origin (scheme + host + port). Browser `fetch` from the app must send a matching `Origin` header.
+
+### Permission denied (403)
+
+**Symptom:** STT/TTS/LLM proxy returns `403` with *Permission "llm" not granted* (or `stt` / `tts`).
+
+**Fix:** Mint tokens with the required `permissions` array, e.g. `['stt', 'tts', 'llm']` (default).
+
+## Recoverable vs non-recoverable errors
+
+Every `GuideKitError` includes `recoverable`:
+
+| `recoverable` | Meaning | Examples |
+|---------------|---------|----------|
+| `true` | Safe to retry or continue | `SEND_IN_FLIGHT`, `INPUT_TOO_LONG`, rate limits, network blips |
+| `false` | Fix configuration or auth | Missing LLM config, invalid provider, fatal init errors |
+
+**Client pattern:**
+
+```tsx
+core.bus.on('error', (err) => {
+  if (err.recoverable) {
+    // show toast, allow retry
+    return;
+  }
+  // log to monitoring, show support message
+});
+```
+
+Use [Observability](/docs/observability) (DevTools Telemetry tab or `core.getTelemetrySpans()`) to see which pipeline stage failed before the error surfaced.
+
+### Session recovery (client-side)
+
+When the LLM proxy returns **401**, the SDK should fetch a new token and retry. Contract coverage: `e2e/contract/session-recovery.spec.ts`.
+
+If recovery loops:
+1. Confirm `/api/guidekit/token` returns 200 and `LLM_API_KEY` is set server-side.
+2. Confirm all app instances share the same `SessionStore` (Redis in production).
+3. Enable `options={{ debug: true }}` and watch `auth:token-refreshed` events.
+
 ## Error Codes
 
 GuideKit uses structured error codes for all failures. Each `GuideKitError` includes:

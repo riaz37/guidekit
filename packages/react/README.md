@@ -88,6 +88,8 @@ Development-only component for inspecting SDK state, events, and context.
 import { GuideKitDevTools } from '@guidekit/react/devtools';
 ```
 
+DevTools includes a **Telemetry** tab for per-message pipeline stage timings (useful for debugging latency and token-heavy turns).
+
 ### `@guidekit/react/testing`
 
 Test utilities for mocking the provider in unit tests.

@@ -22,6 +22,10 @@ pnpm test:unit
 echo "==> pnpm size:check"
 pnpm size:check
 
+echo "==> playwright install (contract browsers)"
+# Contract E2E uses chromium headless shell. Install if missing (cached in CI).
+pnpm exec playwright install chromium-headless-shell
+
 echo "==> pnpm test:e2e:contract"
 GUIDEKIT_SECRET="${GUIDEKIT_SECRET:-guidekit-example-e2e-secret-32-chars}" \
 LLM_API_KEY="${LLM_API_KEY:-e2e-dummy-llm-key-for-contract-tests}" \

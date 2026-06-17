@@ -1,0 +1,73 @@
+# Observability
+
+GuideKit ships **client-side pipeline telemetry** so you can understand:
+
+- **Latency**: which stages are slow (DOM scan vs LLM vs validation)
+- **Cost signals**: token usage metadata attached to the LLM stage
+- **Failures**: correlate stage timing with `EventBus` errors and server proxy logs
+
+## What gets recorded
+
+Each user message runs the v2 pipeline stages:
+
+`scan → enrich → retrieve → context → cognize → llm → validate → render`
+
+For each stage, GuideKit records one span with:
+
+- `name`: stable span name (example: `guidekit.pipeline.llm`)
+- `stage`: pipeline stage id
+- `startTimeEpochMs` / `endTimeEpochMs`: wall-clock timestamps for log correlation
+- `durationMs`: monotonic duration in milliseconds
+- `attributes`: stage metadata (primitives only)
+
+## Where to see telemetry
+
+### DevTools (recommended)
+
+In development, enable the DevTools panel and open the **Telemetry** tab:
+
+```tsx
+import { GuideKitDevTools } from '@guidekit/react/devtools';
+
+{process.env.NODE_ENV === 'development' && <GuideKitDevTools />}
+```
+
+The Telemetry tab shows stage timings and provides **Copy JSON** for sharing or analysis.
+
+### Programmatic export
+
+If you own a custom UI, you can read the last message spans from the core instance:
+
+```ts
+const spans = core.getTelemetrySpans();
+```
+
+This returns an array of exported spans with epoch timestamps and attributes.
+
+## Attribute contract (stable keys)
+
+GuideKit guarantees these attribute keys when applicable:
+
+- **`stage`**: pipeline stage id
+- **`conversationId`**: unique per user message
+- **`totalTokens`**: total tokens used for the completed message (attached as stages complete)
+- **`toolCallsExecuted`**: number of executed tool calls for the message
+- **`rounds`**: LLM/tool rounds performed
+
+Additional attributes may be added over time, but existing keys are stable.
+
+## Debugging workflow
+
+1. Reproduce the slow or failed message in dev with `options={{ debug: true }}`.
+2. Open **GuideKit DevTools → Telemetry** and note the slowest `stage` (`llm` vs `scan` vs `validate`).
+3. Check **Events** for `error`, `auth:token-refreshed`, or `validation:complete`.
+4. Correlate `conversationId` and `startTimeEpochMs` with server proxy logs.
+
+For proxy/auth failures (401, 403, 429), see [Troubleshooting](/docs/troubleshooting#production--proxy-failures).
+
+## See also
+
+- [Architecture](/docs/architecture) — security model and production checklist
+- [Server SDK](/docs/server) — rate limits, session store, origin allowlist
+- [DevTools](/docs/devtools) — Telemetry tab reference
+

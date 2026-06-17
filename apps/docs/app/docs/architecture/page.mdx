@@ -94,9 +94,18 @@ Client → JWT to server middleware → Server looks up provider keys → Proxy 
 ```
 
 - JWT tokens do **NOT** contain API keys (base64-decodable)
-- Provider keys stay server-side in an in-memory session store
+- Provider keys stay server-side in a `SessionStore` (in-memory for dev; **Redis for multi-instance production** — see [Server SDK](/docs/server#session-storage))
 - Tokens refresh at 80% of TTL, multi-tab coordination via BroadcastChannel
 - Signing secret rotation: accepts array `[newSecret, oldSecret]`
+- Proxy routes enforce **permissions** (`llm` / `stt` / `tts`) and optional **`allowedOrigins`** (JWT `aud` → `Origin` header)
+
+### Production security checklist
+
+1. **Proxy mode only** — never ship provider API keys to the browser ([Privacy & Security](/docs/privacy)).
+2. **Session store** — `RedisSessionStore` when running more than one instance ([compatibility](/docs/compatibility#multi-instance-deployments)).
+3. **Rate limits** — tune `createGuideKitHandler` `rateLimit` ([Server SDK](/docs/server#rate-limiting)).
+4. **Origin allowlist** — set `allowedOrigins` when minting tokens in production.
+5. **Observability** — use pipeline telemetry to debug latency and token-heavy turns ([Observability](/docs/observability)).
 
 ### Privacy
 
@@ -132,6 +141,12 @@ class GuideKitError extends Error {
 ```
 
 Error types: `AuthenticationError`, `ConfigurationError`, `NetworkError`, `TimeoutError`, `RateLimitError`, `PermissionError`, `BrowserSupportError`, `ContentFilterError`, `ResourceExhaustedError`, `InitializationError`.
+
+See [Troubleshooting](/docs/troubleshooting#recoverable-vs-non-recoverable-errors) for how `recoverable` maps to user-facing retry behavior.
+
+## Observability
+
+Each user message records per-stage pipeline spans (latency, token metadata). Use [Observability](/docs/observability) and the DevTools **Telemetry** tab during development.
 
 ## EventBus
 
