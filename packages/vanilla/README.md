@@ -1,5 +1,17 @@
 # @guidekit/vanilla
 
+<p align="center">
+  <a href="https://guidekit-docs.vercel.app">
+    <img src="../../assets/brand/wordmark.svg" alt="GuideKit" width="200" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://guidekit-docs.vercel.app/docs/vanilla">Documentation</a>
+  ·
+  <a href="https://github.com/riaz37/guidekit">GitHub</a>
+</p>
+
 [![npm version](https://img.shields.io/npm/v/@guidekit/vanilla?style=flat-square)](https://www.npmjs.com/package/@guidekit/vanilla)
 
 Vanilla JavaScript bundle for the GuideKit SDK. Provides a script-tag integration for adding an AI assistant to any web page without React.

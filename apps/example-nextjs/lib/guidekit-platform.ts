@@ -21,22 +21,14 @@ export const platformKnowledgeDocuments: KnowledgeDocument[] = [
   },
 ];
 
-/** Sample plugin demonstrating multiple lifecycle hooks. */
+/** Sample plugin demonstrating lifecycle hooks without polluting user-facing replies. */
 export const platformDemoPlugin: PluginDefinition = definePlugin({
   name: 'platform-demo',
   version: '1.0.0',
-  description: 'Adds platform mode demo context and post-response metadata',
+  description: 'Platform Mode demo plugin (context provider + pipeline metadata)',
   hooks: {
     beforeLLMCall: async (ctx, next) => {
-      ctx.systemPrompt +=
-        '\n\n## Platform Mode\nThis app runs GuideKit Platform Mode with intelligence, RAG, and plugins enabled.';
       ctx.metadata.platformDemo = true;
-      return next();
-    },
-    afterLLMCall: async (ctx, next) => {
-      if (ctx.responseText && !ctx.responseText.includes('[Platform Mode]')) {
-        ctx.responseText = `${ctx.responseText}\n\n[Platform Mode] Response validated by platform-demo plugin.`;
-      }
       return next();
     },
   },

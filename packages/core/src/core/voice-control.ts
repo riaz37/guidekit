@@ -9,10 +9,9 @@ export class VoiceController {
   async startListening(): Promise<void> {
     const pipeline = this.getPipeline();
     if (!pipeline) {
-      if (this.debug) {
-        console.debug('[GuideKit:Core] No voice pipeline configured — cannot start listening');
-      }
-      return;
+      throw new Error(
+        'Voice is not available in this browser. Use Chrome or Edge on localhost/HTTPS for Web Speech, or configure Deepgram STT.',
+      );
     }
     await pipeline.init();
     await pipeline.startListening();

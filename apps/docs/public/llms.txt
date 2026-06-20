@@ -1,0 +1,56 @@
+# GuideKit
+
+> AI-powered user guidance SDK — DOM intelligence, LLM orchestration, voice, and visual guidance for web apps.
+
+GuideKit is a pnpm + Turborepo monorepo. Published packages live under `packages/`. Integration docs and examples live under `apps/`.
+
+## Agent entry points
+
+- [AGENTS.md](AGENTS.md): Agent onboarding, architecture rules, validation checklist
+- [skills/guidekit/SKILL.md](skills/guidekit/SKILL.md): Monorepo skill for AI agents
+- [Architecture docs](apps/docs/app/docs/architecture/page.mdx): Public SDK architecture
+- [CONTRIBUTING.md](CONTRIBUTING.md): Setup, testing, changesets
+
+## Core packages
+
+- [@guidekit/cli](packages/cli/README.md): CLI tools for GuideKit SDK — init, doctor, generate-secret
+- [@guidekit/core](packages/core/README.md): Core engine for GuideKit SDK — DOM intelligence, LLM orchestration, context management
+- [@guidekit/intelligence](packages/intelligence/README.md): Semantic page intelligence engine for GuideKit SDK
+- [@guidekit/knowledge](packages/knowledge/README.md): Knowledge base with BM25/TF-IDF search for GuideKit SDK
+- [@guidekit/plugins](packages/plugins/README.md): Plugin system for GuideKit SDK
+- [@guidekit/react](packages/react/README.md): React bindings for GuideKit SDK — Provider, hooks, and Widget
+- [@guidekit/server](packages/server/README.md): Server-side utilities for GuideKit SDK — token generation, auth middleware
+- [@guidekit/vad](packages/vad/README.md): Silero VAD model for GuideKit SDK — voice activity detection via ONNX Runtime
+- [@guidekit/vanilla](packages/vanilla/README.md): Vanilla JS bundle for GuideKit SDK — script-tag integration
+
+## Apps
+
+- [apps/docs](apps/docs/): Documentation site (Nextra)
+- [apps/example-nextjs](apps/example-nextjs/): Reference Next.js integration
+
+## Docs pages
+
+- [architecture](apps/docs/app/docs/architecture/page.mdx)
+- [cli](apps/docs/app/docs/cli/page.mdx)
+- [compatibility](apps/docs/app/docs/compatibility/page.mdx)
+- [devtools](apps/docs/app/docs/devtools/page.mdx)
+- [error-codes](apps/docs/app/docs/error-codes/page.mdx)
+- [getting-started](apps/docs/app/docs/getting-started/page.mdx)
+- [hooks](apps/docs/app/docs/hooks/page.mdx)
+- [i18n](apps/docs/app/docs/i18n/page.mdx)
+- [platform-mode](apps/docs/app/docs/platform-mode/page.mdx)
+- [privacy](apps/docs/app/docs/privacy/page.mdx)
+- [proactive-triggers](apps/docs/app/docs/proactive-triggers/page.mdx)
+- [provider](apps/docs/app/docs/provider/page.mdx)
+- [server](apps/docs/app/docs/server/page.mdx)
+- [testing](apps/docs/app/docs/testing/page.mdx)
+- [troubleshooting](apps/docs/app/docs/troubleshooting/page.mdx)
+- [vanilla](apps/docs/app/docs/vanilla/page.mdx)
+- [voice](apps/docs/app/docs/voice/page.mdx)
+
+## Scripts
+
+- `pnpm skills:sync` — link skills for agent discovery
+- `pnpm check` — build, typecheck, lint, test
+- `pnpm stats` — package LOC report
+- `pnpm llms:generate` — regenerate this file

@@ -39,8 +39,8 @@ export function geminiTextStopSse(text = 'Done.'): string {
   return `data: {"candidates":[{"content":{"parts":[{"text":${JSON.stringify(text)}}]},"finishReason":"STOP"}]}\n\ndata: [DONE]\n\n`;
 }
 
-export function geminiStartTourSse(sectionIds: string[]): string {
-  return geminiToolCallSse('startTour', { sectionIds, mode: 'manual' });
+export function geminiStartTourSse(sectionIds: string[], mode: 'auto' | 'manual' = 'auto'): string {
+  return geminiToolCallSse('startTour', { sectionIds, mode });
 }
 
 export function geminiClickElementSse(selector: string): string {

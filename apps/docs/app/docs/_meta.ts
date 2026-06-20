@@ -1,4 +1,4 @@
-import type { MetaRecord } from 'nextra'
+import type { MetaRecord } from 'nextra';
 
 const meta: MetaRecord = {
   'getting-started': 'Getting Started',
@@ -20,6 +20,6 @@ const meta: MetaRecord = {
   devtools: 'DevTools',
   vanilla: 'Vanilla (Non-React)',
   architecture: 'Architecture',
-}
+};
 
-export default meta
+export default meta;

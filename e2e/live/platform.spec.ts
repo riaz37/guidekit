@@ -33,10 +33,20 @@ test.describe('Live Platform Mode', () => {
     ).toBeTruthy();
   });
 
-  test('platform-demo plugin appends validation footer', async ({ page }) => {
+  test('platform mode validation runs without demo footer', async ({ page }) => {
+    await page.waitForFunction(() => window.__guidekitTest != null, undefined, { timeout: 20_000 });
+
+    const validationPromise = page.evaluate(() =>
+      window.__guidekitTest!.waitForEvent('validation:complete', 45_000),
+    );
+
     await sendChatMessage(page, 'Reply with exactly: Platform check.');
     const reply = await waitForAssistantReply(page);
-    expect(reply).toContain('[Platform Mode]');
+    expect(reply).not.toContain('[Platform Mode]');
+    expect(reply).not.toContain('Response validated by');
+
+    const event = await validationPromise;
+    expect(event.name).toBe('validation:complete');
   });
 
   test('intelligence enriches page context in reply', async ({ page }) => {

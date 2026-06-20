@@ -146,6 +146,21 @@ describe('WebSpeechSTT', () => {
     expect(stt.isConnected).toBe(true);
   });
 
+  it('connect() resolves when only onstart fires (Safari-style, no EventTarget dispatch)', async () => {
+    class OnStartOnlyRecognition extends MockSpeechRecognition {
+      override start(): void {
+        queueMicrotask(() => {
+          this.onstart?.();
+        });
+      }
+    }
+
+    (window as unknown as Record<string, unknown>).SpeechRecognition = OnStartOnlyRecognition;
+    const stt = new WebSpeechSTT();
+    await stt.connect();
+    expect(stt.isConnected).toBe(true);
+  });
+
   it('connect() is idempotent when already connected', async () => {
     const stt = new WebSpeechSTT();
     await stt.connect();
@@ -210,6 +225,30 @@ describe('WebSpeechSTT', () => {
         confidence: 0.85,
       }),
     );
+  });
+
+  it('promotes interim to final after silence timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      const stt = new WebSpeechSTT();
+      const cb = vi.fn();
+      stt.onTranscript(cb);
+      await stt.connect();
+
+      lastInstance().simulateResult('hello there', false, 0);
+      expect(cb).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1800);
+
+      expect(cb).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: 'hello there',
+          isFinal: true,
+        }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('unsubscribe prevents further callbacks', async () => {

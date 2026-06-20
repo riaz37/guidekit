@@ -337,6 +337,18 @@ export class GuideKitCore {
     return this.voiceControl.hasVoice;
   }
 
+  /** Resolved greeting: `agent.greeting` or localized default. */
+  get greetingMessage(): string {
+    return this._options.agent?.greeting ?? this._i18n.t('greetingMessage');
+  }
+
+  /** Speak text via TTS without an LLM round-trip (e.g. voice greeting). */
+  async speak(text: string): Promise<void> {
+    const pipeline = this.voicePipeline;
+    if (!pipeline) return;
+    await pipeline.speak(text);
+  }
+
   /** Highlight an element by sectionId or CSS selector. */
   highlight(params: {
     sectionId?: string;

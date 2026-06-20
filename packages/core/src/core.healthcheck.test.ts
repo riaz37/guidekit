@@ -148,6 +148,7 @@ const mockVisualGuidance = {
   nextTourStep: vi.fn(),
   prevTourStep: vi.fn(),
   stopTour: vi.fn(),
+  onTourStep: vi.fn(() => () => {}),
   destroy: vi.fn(),
 };
 

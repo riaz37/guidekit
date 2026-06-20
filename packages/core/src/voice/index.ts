@@ -228,14 +228,22 @@ export class VoicePipeline {
       await this._vad.init();
       this._log('VAD model loaded');
     } catch (err) {
-      throw new BrowserSupportError({
-        code: ErrorCodes.VAD_PACKAGE_MISSING,
-        message:
-          'Failed to load @guidekit/vad. Ensure the package is installed.',
-        suggestion:
-          'Run: npm install @guidekit/vad — or check that WASM is supported.',
-        cause: err instanceof Error ? err : undefined,
-      });
+      if (this._sttConfig.provider === 'web-speech') {
+        this._log(
+          'VAD unavailable — continuing with Web Speech STT only (barge-in during TTS may be limited)',
+          err,
+        );
+        this._vad = null;
+      } else {
+        throw new BrowserSupportError({
+          code: ErrorCodes.VAD_PACKAGE_MISSING,
+          message:
+            'Failed to load @guidekit/vad. Ensure the package is installed.',
+          suggestion:
+            'Run: npm install @guidekit/vad — or check that WASM is supported.',
+          cause: err instanceof Error ? err : undefined,
+        });
+      }
     }
 
     // ── 3. Create STT adapter ───────────────────────────────────────
@@ -295,13 +303,15 @@ export class VoicePipeline {
   async startListening(): Promise<void> {
     if (this._destroyed) return;
 
-    if (!this._audioContext || !this._vad || !this._stt) {
+    if (!this._audioContext || !this._stt) {
       throw new BrowserSupportError({
         code: ErrorCodes.BROWSER_NO_WEB_AUDIO,
         message: 'Voice pipeline not initialized. Call init() first.',
         suggestion: 'Ensure init() is called after a user gesture before startListening().',
       });
     }
+
+    const usesWebSpeechStt = this._stt instanceof WebSpeechSTT;
 
     // Resume AudioContext if it was suspended (browser policy)
     if (this._audioContext.state === 'suspended') {
@@ -312,51 +322,54 @@ export class VoicePipeline {
       }
     }
 
-    // ── Get mic access ──────────────────────────────────────────────
-    if (!navigator.mediaDevices?.getUserMedia) {
-      const err = new BrowserSupportError({
-        code: ErrorCodes.BROWSER_NO_WEB_AUDIO,
-        message: 'navigator.mediaDevices is not available. A secure context (HTTPS) is required for microphone access.',
-        suggestion: 'Serve your app over HTTPS or use localhost with a secure context.',
-      });
-      this._setState('error');
-      this._bus.emit('error', err);
-      throw err;
-    }
-
-    try {
-      this._mediaStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-        },
-      });
-      this._log('Microphone access granted');
-    } catch (err) {
-      const isNotAllowed =
-        err instanceof DOMException &&
-        (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError');
-
-      if (isNotAllowed) {
-        const permErr = new PermissionError({
-          code: ErrorCodes.PERMISSION_MIC_DENIED,
-          message: 'Microphone permission was denied by the user.',
-          suggestion: 'Allow microphone access in your browser settings and try again.',
+    // Web Speech STT captures audio internally — avoid a second getUserMedia stream
+    // that can block or conflict with SpeechRecognition on Safari/Chrome.
+    if (!usesWebSpeechStt) {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        const err = new BrowserSupportError({
+          code: ErrorCodes.BROWSER_NO_WEB_AUDIO,
+          message: 'navigator.mediaDevices is not available. A secure context (HTTPS) is required for microphone access.',
+          suggestion: 'Serve your app over HTTPS or use localhost with a secure context.',
         });
         this._setState('error');
-        this._bus.emit('error', permErr);
-        throw permErr;
+        this._bus.emit('error', err);
+        throw err;
       }
 
-      const unavailErr = new PermissionError({
-        code: ErrorCodes.PERMISSION_MIC_UNAVAILABLE,
-        message: 'No microphone device available.',
-        suggestion: 'Connect a microphone and try again.',
-        cause: err instanceof Error ? err : undefined,
-      });
-      this._setState('error');
-      this._bus.emit('error', unavailErr);
-      throw unavailErr;
+      try {
+        this._mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+          },
+        });
+        this._log('Microphone access granted');
+      } catch (err) {
+        const isNotAllowed =
+          err instanceof DOMException &&
+          (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError');
+
+        if (isNotAllowed) {
+          const permErr = new PermissionError({
+            code: ErrorCodes.PERMISSION_MIC_DENIED,
+            message: 'Microphone permission was denied by the user.',
+            suggestion: 'Allow microphone access in your browser settings and try again.',
+          });
+          this._setState('error');
+          this._bus.emit('error', permErr);
+          throw permErr;
+        }
+
+        const unavailErr = new PermissionError({
+          code: ErrorCodes.PERMISSION_MIC_UNAVAILABLE,
+          message: 'No microphone device available.',
+          suggestion: 'Connect a microphone and try again.',
+          cause: err instanceof Error ? err : undefined,
+        });
+        this._setState('error');
+        this._bus.emit('error', unavailErr);
+        throw unavailErr;
+      }
     }
 
     // ── Connect STT ─────────────────────────────────────────────────
@@ -371,28 +384,48 @@ export class VoicePipeline {
       throw err instanceof Error ? err : new Error('STT connection failed');
     }
 
+    // Pre-connect Web Speech TTS while the user-gesture is active (mic click).
+    // Chrome blocks speechSynthesis.speak() if too much async work elapsed since gesture.
+    if (this._tts instanceof WebSpeechTTS && !this._tts.isConnected) {
+      try {
+        await this._tts.connect();
+        if (typeof window !== 'undefined' && window.speechSynthesis?.paused) {
+          window.speechSynthesis.resume();
+        }
+        this._log('Web Speech TTS pre-connected');
+      } catch (err) {
+        this._log('TTS pre-connect failed (will retry on speak):', err);
+      }
+    }
+
     // ── Wire STT transcript events ──────────────────────────────────
     this._unsubSTTTranscript?.();
     this._unsubSTTTranscript = this._stt.onTranscript((event: STTTranscriptEvent) => {
       this._handleTranscript(event);
     });
 
-    // ── Set up mic → ScriptProcessor for STT forwarding ─────────────
-    this._setupMicCapture();
+    if (usesWebSpeechStt) {
+      this._isForwardingToSTT = true;
+    } else {
+      // ── Set up mic → ScriptProcessor for STT forwarding ─────────────
+      this._setupMicCapture();
+    }
 
-    // ── Start VAD on the MediaStream ────────────────────────────────
-    this._unsubVADSpeechStart?.();
-    this._unsubVADSpeechEnd?.();
+    // ── Start VAD on the MediaStream (Deepgram/ElevenLabs path only) ─
+    if (this._vad && this._mediaStream) {
+      this._unsubVADSpeechStart?.();
+      this._unsubVADSpeechEnd?.();
 
-    this._unsubVADSpeechStart = this._vad.onSpeechStart(() => {
-      this._handleVADSpeechStart();
-    });
-    this._unsubVADSpeechEnd = this._vad.onSpeechEnd(() => {
-      this._handleVADSpeechEnd();
-    });
+      this._unsubVADSpeechStart = this._vad.onSpeechStart(() => {
+        this._handleVADSpeechStart();
+      });
+      this._unsubVADSpeechEnd = this._vad.onSpeechEnd(() => {
+        this._handleVADSpeechEnd();
+      });
 
-    this._vad.start(this._mediaStream);
-    this._log('VAD started');
+      this._vad.start(this._mediaStream);
+      this._log('VAD started');
+    }
 
     // ── Transition state ────────────────────────────────────────────
     this._setState('listening');
@@ -438,28 +471,42 @@ export class VoicePipeline {
       return;
     }
 
+    // Pause STT while processing/speaking to avoid echo from speakers
+    if (this._stt instanceof WebSpeechSTT) {
+      this._stt.suspend();
+    }
+
     this._setState('processing');
 
     // Set up abort controller for barge-in
     this._pendingLLMAbort = new AbortController();
     const signal = this._pendingLLMAbort.signal;
 
-    let response: string;
+    let response: string | undefined;
     try {
       response = await sendToLLM(text);
 
       // Check if aborted during LLM call (barge-in)
       if (signal.aborted) {
         this._log('LLM response discarded (barge-in during processing)');
+        if (this._stt instanceof WebSpeechSTT) {
+          this._stt.resume();
+        }
         return;
       }
     } catch (err) {
       if (signal.aborted) {
         this._log('LLM call aborted (barge-in)');
+        if (this._stt instanceof WebSpeechSTT) {
+          this._stt.resume();
+        }
         return;
       }
       this._log('LLM call failed:', err);
       this._setState('error');
+      if (this._stt instanceof WebSpeechSTT) {
+        this._stt.resume();
+      }
       return;
     } finally {
       this._pendingLLMAbort = null;
@@ -475,10 +522,6 @@ export class VoicePipeline {
     this._resumeListeningIfMicActive();
   }
 
-  // ────────────────────────────────────────────────────────────────────
-  // speak()
-  // ────────────────────────────────────────────────────────────────────
-
   /** Speak text via TTS (ElevenLabs or Web Speech API). */
   async speak(text: string): Promise<void> {
     if (this._destroyed || !text.trim()) return;
@@ -493,6 +536,12 @@ export class VoicePipeline {
     }
 
     this._setState('speaking');
+
+    // Pause STT during playback to avoid echo from speakers
+    if (this._stt instanceof WebSpeechSTT) {
+      this._stt.suspend();
+    }
+
     // Record echo info for later detection
     this._lastTTSEcho = {
       words: new Set(this._normalizeWords(text)),
@@ -541,6 +590,7 @@ export class VoicePipeline {
         if (this._state === 'speaking') {
           this._setState('idle');
         }
+        this._resumeListeningIfMicActive();
         resolve();
       };
 
@@ -853,8 +903,15 @@ export class VoicePipeline {
    * active so the user does not have to toggle the mic button again.
    */
   private _resumeListeningIfMicActive(): void {
-    if (this._destroyed || !this._mediaStream || this._state !== 'idle') return;
-    if (!this._stt?.isConnected) return;
+    if (this._destroyed || this._state !== 'idle') return;
+    if (!this._stt?.isConnected && !(this._stt instanceof WebSpeechSTT)) return;
+    const micActive = this._mediaStream !== null || this._stt instanceof WebSpeechSTT;
+    if (!micActive) return;
+
+    if (this._stt instanceof WebSpeechSTT) {
+      this._stt.resume();
+    }
+
     this._setState('listening');
     this._log('Resumed listening (mic still active)');
   }

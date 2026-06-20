@@ -1,0 +1,21 @@
+{
+  "name": "GuideKit",
+  "short_name": "GuideKit",
+  "description": "AI Guide SDK — embed an assistant that understands your website.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "/icon",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-icon",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

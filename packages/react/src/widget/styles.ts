@@ -54,7 +54,9 @@ export const WIDGET_STYLES = /* css */ `
     box-shadow: 0 4px 16px rgba(99, 102, 241, 0.35);
     transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.15s ease;
     outline: none;
-    position: relative;
+    position: absolute;
+    bottom: 0;
+    right: 0;
     pointer-events: auto;
   }
 
@@ -78,11 +80,6 @@ export const WIDGET_STYLES = /* css */ `
     width: 24px;
     height: 24px;
     fill: currentColor;
-    transition: transform 0.2s ease;
-  }
-
-  .gk-fab[aria-expanded="true"] svg {
-    transform: rotate(45deg);
   }
 
   /* ----- Panel ----- */

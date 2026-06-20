@@ -1,5 +1,17 @@
 # @guidekit/vad
 
+<p align="center">
+  <a href="https://guidekit-docs.vercel.app">
+    <img src="../../assets/brand/wordmark.svg" alt="GuideKit" width="200" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://guidekit-docs.vercel.app/docs/voice">Documentation</a>
+  ·
+  <a href="https://github.com/riaz37/guidekit">GitHub</a>
+</p>
+
 [![npm version](https://img.shields.io/npm/v/@guidekit/vad?style=flat-square)](https://www.npmjs.com/package/@guidekit/vad)
 
 Voice Activity Detection package for the GuideKit SDK. Wraps the Silero VAD ONNX model to detect when a user is speaking, enabling half-duplex voice interactions with barge-in detection.

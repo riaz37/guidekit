@@ -1,4 +1,10 @@
 <p align="center">
+  <a href="https://guidekit-docs.vercel.app">
+    <img src="assets/brand/wordmark.svg" alt="GuideKit" width="220" />
+  </a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/npm/v/@guidekit/core?label=core&color=6366f1&style=flat-square" alt="core version" />
   <img src="https://img.shields.io/npm/v/@guidekit/react?label=react&color=6366f1&style=flat-square" alt="react version" />
   <img src="https://img.shields.io/npm/v/@guidekit/server?label=server&color=6366f1&style=flat-square" alt="server version" />
@@ -16,6 +22,7 @@
 <p align="center">
   <a href="https://guidekit-docs.vercel.app/docs/getting-started">Getting Started</a> ·
   <a href="https://guidekit-docs.vercel.app/docs">Documentation</a> ·
+  <a href="https://github.com/riaz37/guidekit">GitHub</a> ·
   <a href="https://guidekit-docs.vercel.app/docs/architecture">Architecture</a> ·
   <a href="#quick-start">Quick Start</a>
 </p>
@@ -49,15 +56,15 @@ Existing solutions fall short:
 
 | Package | Version | Role | Audience | Status |
 |---------|---------|------|----------|--------|
-| [`@guidekit/core`](./packages/core) | `1.0.0` | DOM intelligence, orchestration, context, rendering primitives | Every app integration | Core |
-| [`@guidekit/react`](./packages/react) | `1.0.0` | Provider, hooks, Shadow DOM widget | React / Next.js apps | Core |
-| [`@guidekit/server`](./packages/server) | `1.0.0` | Token generation, auth middleware, session helpers | Server runtimes backing GuideKit clients | Core |
-| [`@guidekit/vanilla`](./packages/vanilla) | `1.0.0` | Script-tag and framework-agnostic browser integration | Non-React apps and simple embeds | Stable optional |
-| [`@guidekit/vad`](./packages/vad) | `0.1.1` | Voice activity detection model and helpers | Voice-enabled experiences | Optional voice |
-| [`@guidekit/cli`](./packages/cli) | `1.0.0` | `init`, `doctor`, `generate-secret` | Local setup, contributor diagnostics, CI parity checks | Optional DX |
-| [`@guidekit/intelligence`](./packages/intelligence) | `1.0.0` | Semantic page intelligence engine | Advanced understanding and ranking pipelines | Advanced optional |
-| [`@guidekit/knowledge`](./packages/knowledge) | `1.0.0` | Knowledge retrieval with BM25 / TF-IDF search | Retrieval-augmented guidance | Advanced optional |
-| [`@guidekit/plugins`](./packages/plugins) | `1.0.0` | Plugin system and extension hooks | Custom platform extensions and partner integrations | Advanced optional |
+| [`@guidekit/core`](https://github.com/riaz37/guidekit/tree/main/packages/core) | `1.0.0` | DOM intelligence, orchestration, context, rendering primitives | Every app integration | Core |
+| [`@guidekit/react`](https://github.com/riaz37/guidekit/tree/main/packages/react) | `1.0.0` | Provider, hooks, Shadow DOM widget | React / Next.js apps | Core |
+| [`@guidekit/server`](https://github.com/riaz37/guidekit/tree/main/packages/server) | `1.0.0` | Token generation, auth middleware, session helpers | Server runtimes backing GuideKit clients | Core |
+| [`@guidekit/vanilla`](https://github.com/riaz37/guidekit/tree/main/packages/vanilla) | `1.0.0` | Script-tag and framework-agnostic browser integration | Non-React apps and simple embeds | Stable optional |
+| [`@guidekit/vad`](https://github.com/riaz37/guidekit/tree/main/packages/vad) | `0.1.1` | Voice activity detection model and helpers | Voice-enabled experiences | Optional voice |
+| [`@guidekit/cli`](https://github.com/riaz37/guidekit/tree/main/packages/cli) | `1.0.0` | `init`, `doctor`, `generate-secret` | Local setup, contributor diagnostics, CI parity checks | Optional DX |
+| [`@guidekit/intelligence`](https://github.com/riaz37/guidekit/tree/main/packages/intelligence) | `1.0.0` | Semantic page intelligence engine | Advanced understanding and ranking pipelines | Advanced optional |
+| [`@guidekit/knowledge`](https://github.com/riaz37/guidekit/tree/main/packages/knowledge) | `1.0.0` | Knowledge retrieval with BM25 / TF-IDF search | Retrieval-augmented guidance | Advanced optional |
+| [`@guidekit/plugins`](https://github.com/riaz37/guidekit/tree/main/packages/plugins) | `1.0.0` | Plugin system and extension hooks | Custom platform extensions and partner integrations | Advanced optional |
 
 Version numbers do not move in lockstep. **Tier A** packages (`core`, `react`, `server`, `vanilla`) ship together on breaking changes. **Tier B** optional packages evolve on their own cadence with a peer dependency on `@guidekit/core@^1.0.0`.
 

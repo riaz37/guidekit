@@ -1,5 +1,17 @@
 # @guidekit/server
 
+<p align="center">
+  <a href="https://guidekit-docs.vercel.app">
+    <img src="../../assets/brand/wordmark.svg" alt="GuideKit" width="200" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://guidekit-docs.vercel.app/docs/server">Documentation</a>
+  ·
+  <a href="https://github.com/riaz37/guidekit">GitHub</a>
+</p>
+
 [![npm version](https://img.shields.io/npm/v/@guidekit/server?style=flat-square)](https://www.npmjs.com/package/@guidekit/server)
 
 Server-side utilities for the GuideKit SDK. Provides secure token generation and validation so API keys never reach the browser.

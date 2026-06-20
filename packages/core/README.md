@@ -1,5 +1,17 @@
 # @guidekit/core
 
+<p align="center">
+  <a href="https://guidekit-docs.vercel.app">
+    <img src="../../assets/brand/wordmark.svg" alt="GuideKit" width="200" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://guidekit-docs.vercel.app/docs/getting-started">Documentation</a>
+  ·
+  <a href="https://github.com/riaz37/guidekit">GitHub</a>
+</p>
+
 [![npm version](https://img.shields.io/npm/v/@guidekit/core?style=flat-square)](https://www.npmjs.com/package/@guidekit/core)
 
 Core engine for the GuideKit SDK. Provides DOM intelligence, LLM orchestration, context management, and the typed event system that powers all GuideKit integrations.

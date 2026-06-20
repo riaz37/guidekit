@@ -13,6 +13,7 @@ declare global {
       waitForEvent: (name: string, timeoutMs?: number) => Promise<BusEvent>;
       waitForReady: (timeoutMs?: number) => Promise<void>;
       getPageModel: () => unknown;
+      startTour: (sectionIds: string[], mode?: 'auto' | 'manual') => void;
       addKnowledgeDocument: (doc: KnowledgeDocument) => void;
       removeKnowledgeDocument: (documentId: string) => void;
       clear: () => void;
@@ -96,6 +97,9 @@ export function GuideKitTestBridge() {
           }, 50);
         }),
       getPageModel: () => core.pageModel,
+      startTour: (sectionIds, mode) => {
+        core.startTour(sectionIds, mode);
+      },
       addKnowledgeDocument: (doc) => {
         core.addKnowledgeDocument(doc);
       },

@@ -28,10 +28,11 @@ const DEFAULT_SPOTLIGHT_COLOR = '#4a9eed';
 const DEFAULT_ANIMATION_DURATION = 300;
 const DEFAULT_SPOTLIGHT_PADDING = 8;
 const AUTO_TOUR_INTERVAL_MS = 5000;
+const TOUR_SCROLL_GRACE_MS = 1500;
+/** Must match or exceed the GuideKit widget host (default 2147483647). */
+const TOUR_LAYER_Z_INDEX = 2147483647;
 const TOOLTIP_ARROW_SIZE = 8;
 const TOOLTIP_MARGIN = 12;
-const OVERLAY_Z_INDEX = 999998;
-const TOOLTIP_Z_INDEX = 999999;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -131,6 +132,7 @@ export class VisualGuidance {
   private tourMode: 'auto' | 'manual' = 'manual';
   private tourAutoTimer: ReturnType<typeof setTimeout> | null = null;
   private tourPausedByInteraction = false;
+  private tourScrollGraceUntil = 0;
 
   // Subscribers
   private spotlightChangeCallbacks: Array<(state: SpotlightState) => void> = [];
@@ -620,7 +622,7 @@ export class VisualGuidance {
     overlay.style.cssText = [
       'position: fixed',
       'inset: 0',
-      `z-index: ${OVERLAY_Z_INDEX}`,
+      `z-index: ${TOUR_LAYER_Z_INDEX}`,
       'pointer-events: none',
       'opacity: 0',
       `transition: opacity ${this.getTransitionDuration()}ms ease-out`,
@@ -644,7 +646,7 @@ export class VisualGuidance {
     const transitionDuration = this.getTransitionDuration();
     spotlight.style.cssText = [
       'position: fixed',
-      `z-index: ${OVERLAY_Z_INDEX}`,
+      `z-index: ${TOUR_LAYER_Z_INDEX}`,
       'pointer-events: none',
       'border-radius: 4px',
       `border: 2px solid ${this.spotlightColor}`,
@@ -681,6 +683,8 @@ export class VisualGuidance {
    */
   private showOverlay(): void {
     if (typeof document === 'undefined') return;
+
+    this.bringTourLayersToFront();
 
     // Force a reflow so the transition triggers
     if (this.overlayEl) {
@@ -725,6 +729,8 @@ export class VisualGuidance {
       this.floatingCleanup = null;
     }
 
+    const inTour = this.tourSectionIds.length > 0 && this.tourCurrentStep >= 0;
+
     // Create or reuse tooltip element
     if (!this.tooltipEl) {
       const tooltip = document.createElement('div');
@@ -734,7 +740,7 @@ export class VisualGuidance {
       const transitionDuration = this.getTransitionDuration();
       tooltip.style.cssText = [
         'position: fixed',
-        `z-index: ${TOOLTIP_Z_INDEX}`,
+        `z-index: ${TOUR_LAYER_Z_INDEX}`,
         'pointer-events: none',
         'background: var(--gk-bg, #ffffff)',
         'color: var(--gk-text-color, #1a1a2e)',
@@ -753,13 +759,21 @@ export class VisualGuidance {
       this.tooltipEl = tooltip;
     }
 
-    // Set text content (NEVER innerHTML to prevent XSS)
-    this.tooltipEl.textContent = text;
+    this.tooltipEl.replaceChildren();
+    this.tooltipEl.style.pointerEvents = inTour ? 'auto' : 'none';
 
-    // Add step indicator if in a tour
-    if (this.tourSectionIds.length > 0 && this.tourCurrentStep >= 0) {
+    const body = document.createElement('div');
+    body.setAttribute('data-guidekit-tooltip-body', 'true');
+    if (inTour) {
       const stepText = `Step ${this.tourCurrentStep + 1} of ${this.tourSectionIds.length}`;
-      this.tooltipEl.textContent = `${stepText}: ${text}`;
+      body.textContent = text ? `${stepText}: ${text}` : stepText;
+    } else {
+      body.textContent = text;
+    }
+    this.tooltipEl.appendChild(body);
+
+    if (inTour) {
+      this.appendTourControls();
     }
 
     // Set aria-describedby on the target
@@ -813,6 +827,86 @@ export class VisualGuidance {
     // Animate in
     void this.tooltipEl.offsetHeight;
     this.tooltipEl.style.opacity = '1';
+    this.bringTourLayersToFront();
+  }
+
+  /**
+   * Keep tour layers above the GuideKit widget (same z-index; DOM order wins).
+   */
+  private bringTourLayersToFront(): void {
+    if (typeof document === 'undefined') return;
+    for (const el of [this.overlayEl, this.spotlightEl, this.tooltipEl]) {
+      if (el?.parentNode === document.body) {
+        document.body.appendChild(el);
+      }
+    }
+  }
+
+  /**
+   * Append Back / Next / End controls to the active tour tooltip.
+   */
+  private appendTourControls(): void {
+    if (!this.tooltipEl) return;
+
+    const step = this.tourCurrentStep;
+    const total = this.tourSectionIds.length;
+    const isLast = step >= total - 1;
+
+    const controls = document.createElement('div');
+    controls.setAttribute('data-guidekit-tour-controls', 'true');
+    controls.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;';
+
+    const prevBtn = this.createTourButton('Back', 'data-guidekit-tour-prev', step <= 0);
+    prevBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this.prevTourStep();
+    });
+
+    const nextBtn = this.createTourButton(isLast ? 'Finish' : 'Next', 'data-guidekit-tour-next', false);
+    nextBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (isLast) {
+        this.stopTour();
+      } else {
+        this.nextTourStep();
+      }
+    });
+
+    const endBtn = this.createTourButton('End tour', 'data-guidekit-tour-end', false);
+    endBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this.stopTour();
+    });
+
+    controls.append(prevBtn, nextBtn, endBtn);
+    this.tooltipEl.appendChild(controls);
+  }
+
+  private createTourButton(label: string, testId: string, disabled: boolean): HTMLButtonElement {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = label;
+    button.setAttribute(testId, 'true');
+    button.disabled = disabled;
+    button.style.cssText = [
+      'pointer-events: auto',
+      'cursor: pointer',
+      'border: 1px solid var(--gk-border, #e2e8f0)',
+      'background: var(--gk-bg, #ffffff)',
+      'color: var(--gk-text-color, #1a1a2e)',
+      'border-radius: 6px',
+      'padding: 4px 10px',
+      'font-size: 13px',
+      'line-height: 1.2',
+      disabled ? 'opacity: 0.45; cursor: not-allowed;' : '',
+    ].join('; ');
+    return button;
+  }
+
+  private formatTourSectionLabel(sectionId: string): string {
+    return sectionId
+      .replace(/[-_]+/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
   }
 
   /**
@@ -867,8 +961,12 @@ export class VisualGuidance {
     const handleScroll = (): void => {
       this.updatePositions();
 
-      // In auto-tour mode, pause on user interaction
-      if (this.tourMode === 'auto' && !this.tourPausedByInteraction) {
+      // In auto-tour mode, pause on user interaction (not programmatic scroll)
+      if (
+        this.tourMode === 'auto'
+        && !this.tourPausedByInteraction
+        && Date.now() >= this.tourScrollGraceUntil
+      ) {
         this.tourPausedByInteraction = true;
         this.clearAutoTimer();
         // Resume after a delay
@@ -982,7 +1080,8 @@ export class VisualGuidance {
     const total = this.tourSectionIds.length;
     const step = this.tourCurrentStep;
 
-    // Scroll to the section first
+    // Scroll to the section first; ignore resulting scroll events briefly
+    this.tourScrollGraceUntil = Date.now() + TOUR_SCROLL_GRACE_MS;
     this.scrollToSection(sectionId);
 
     // Slight delay to let scroll settle, then highlight
@@ -990,7 +1089,7 @@ export class VisualGuidance {
     setTimeout(() => {
       if (this.destroyed) return;
 
-      const tooltipText = `Step ${step + 1} of ${total}`;
+      const tooltipText = this.formatTourSectionLabel(sectionId);
 
       this.highlight({
         sectionId,

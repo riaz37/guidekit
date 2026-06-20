@@ -710,8 +710,9 @@ export class ContextManager {
     const lines = [
       '# Guidelines',
       '- Always reference specific sections by their ID when guiding users',
-      '- Use highlight() to point at elements you are discussing',
-      '- Use scrollToSection() before highlighting offscreen elements',
+      '- Use highlight() for a single element; use startTour() when the user wants a tour, walkthrough, or to be shown around multiple sections',
+      '- For startTour(), pass sectionIds in visit order from the page context (2+ sections); mode defaults to auto',
+      '- Use scrollToSection() before highlighting a single offscreen element',
       '- Never make up information not present in the page context',
       '- If asked about content you cannot see, use readPageContent to access it',
       '- If cross-origin iframes are listed, explain you cannot read their content',

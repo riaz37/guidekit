@@ -25,6 +25,16 @@ const LOG_PREFIX = '[GuideKit:WebSpeech-STT]';
 /** Default language for speech recognition. */
 const DEFAULT_LANGUAGE = 'en-US';
 
+/** Max wait for the browser to acknowledge recognition start. */
+const CONNECT_TIMEOUT_MS = 12_000;
+
+/** Emit a final transcript after this much silence on interim results. */
+const FINALIZE_SILENCE_MS = 1800;
+
+const AUTO_RESTART_BASE_MS = 400;
+const AUTO_RESTART_MAX_MS = 5000;
+const MAX_EMPTY_RESTARTS = 6;
+
 // ---------------------------------------------------------------------------
 // Browser type declarations
 // ---------------------------------------------------------------------------
@@ -127,13 +137,24 @@ export class WebSpeechSTT {
   private readonly transcriptCallbacks: Set<(event: STTTranscriptEvent) => void> =
     new Set();
 
+  /** Latest interim transcript — finalized after a pause in speech. */
+  private lastInterimText = '';
+
+  private finalizeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private autoRestartTimer: ReturnType<typeof setTimeout> | null = null;
+  private restartDelayMs = AUTO_RESTART_BASE_MS;
+  private emptyRestartCount = 0;
+  private hadResultThisSession = false;
+
   // -------------------------------------------------------------------------
   // Constructor
   // -------------------------------------------------------------------------
 
   constructor(options: WebSpeechSTTOptions = {}) {
     this.language = options.language ?? DEFAULT_LANGUAGE;
-    this.continuous = options.continuous ?? true;
+    // Non-continuous avoids Chrome restart storms; mic stays open via VoicePipeline resume().
+    this.continuous = options.continuous ?? false;
     this.interimResultsEnabled = options.interimResults ?? true;
     this.debugEnabled = options.debug ?? false;
 
@@ -201,75 +222,74 @@ export class WebSpeechSTT {
     this.recognition.interimResults = this.interimResultsEnabled;
     this.recognition.maxAlternatives = 1;
 
-    // Wire event handlers
-    this.recognition.onstart = () => {
-      this._connected = true;
-      this._intentionalStop = false;
-      this.log('Recognition started');
-    };
-
-    this.recognition.onresult = (event: SpeechRecognitionEvent) => {
-      this.handleResult(event);
-    };
-
-    this.recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      this.handleError(event);
-    };
-
-    this.recognition.onend = () => {
-      this.log('Recognition ended');
-      const wasConnected = this._connected;
-      this._connected = false;
-
-      // In continuous mode, auto-restart if not intentionally stopped
-      // and we were previously connected (not an error during startup).
-      if (
-        this.continuous &&
-        !this._intentionalStop &&
-        !this._suspended &&
-        wasConnected
-      ) {
-        this.log('Auto-restarting continuous recognition');
-        setTimeout(() => {
-          if (this._intentionalStop || this._suspended) return;
-          if (!this.recognition) return;
-          try {
-            this.recognition.start();
-          } catch (err) {
-            console.warn(LOG_PREFIX, 'Auto-restart failed:', err);
-          }
-        }, 100);
-      }
-    };
-
-    // Start recognition
+    // Start recognition — resolve via onstart/onerror (Safari/Chrome often do not
+    // dispatch EventTarget "start"/"error" events; property handlers are reliable).
     return new Promise<void>((resolve, reject) => {
-      const onStart = (): void => {
-        cleanup();
-        resolve();
+      let settled = false;
+      const recognition = this.recognition!;
+
+      const settle = (action: () => void): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        action();
       };
 
-      const onError = (event: SpeechRecognitionErrorEvent): void => {
-        cleanup();
-        reject(new Error(`SpeechRecognition error: ${event.error} — ${event.message}`));
+      const timeoutId = setTimeout(() => {
+        settle(() => {
+          reject(
+            new Error(
+              'SpeechRecognition start timed out. Allow microphone access, use Chrome or Edge on localhost/HTTPS, and ensure network access (Web Speech uses cloud STT).',
+            ),
+          );
+        });
+      }, CONNECT_TIMEOUT_MS);
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        this.handleResult(event);
       };
 
-      const cleanup = (): void => {
-        if (this.recognition) {
-          // Remove the one-shot listeners (keep the persistent ones)
-          this.recognition.removeEventListener('start', onStart as unknown as EventListener);
-          this.recognition.removeEventListener('error', onError as unknown as EventListener);
+      recognition.onstart = () => {
+        this._connected = true;
+        this._intentionalStop = false;
+        this.hadResultThisSession = false;
+        this.log('Recognition started');
+        settle(() => resolve());
+      };
+
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        this.handleError(event);
+        if (settled) return;
+
+        const fatalErrors = new Set([
+          'not-allowed',
+          'service-not-allowed',
+          'language-not-supported',
+          'audio-capture',
+          'network',
+        ]);
+
+        if (fatalErrors.has(event.error)) {
+          settle(() => {
+            reject(new Error(`SpeechRecognition error: ${event.error} — ${event.message}`));
+          });
         }
       };
 
-      this.recognition!.addEventListener('start', onStart as unknown as EventListener, { once: true });
-      this.recognition!.addEventListener('error', onError as unknown as EventListener, { once: true });
+      recognition.onend = () => {
+        this.log('Recognition ended');
+        const wasConnected = this._connected;
+        this._connected = false;
+
+        this.scheduleAutoRestart(wasConnected);
+      };
 
       try {
-        this.recognition!.start();
+        recognition.start();
       } catch (err) {
-        cleanup();
-        reject(err);
+        settle(() => {
+          reject(err instanceof Error ? err : new Error(String(err)));
+        });
       }
     });
   }
@@ -328,6 +348,8 @@ export class WebSpeechSTT {
   /** Force-destroy the recognition without waiting for pending results. */
   destroy(): void {
     this.log('Destroying');
+    this.clearFinalizeTimer();
+    this.clearAutoRestartTimer();
     this._intentionalStop = true;
 
     if (this.recognition) {
@@ -355,6 +377,10 @@ export class WebSpeechSTT {
    */
   suspend(): void {
     if (this._suspended) return;
+
+    this.clearFinalizeTimer();
+    this.clearAutoRestartTimer();
+    this.lastInterimText = '';
 
     this._suspended = true;
     this._intentionalStop = true;
@@ -417,6 +443,18 @@ export class WebSpeechSTT {
       // Web Speech API confidence is 0 for interim results in some browsers
       const confidence = alternative.confidence > 0 ? alternative.confidence : 0.85;
 
+      this.hadResultThisSession = true;
+      this.emptyRestartCount = 0;
+      this.restartDelayMs = AUTO_RESTART_BASE_MS;
+
+      if (isFinal) {
+        this.clearFinalizeTimer();
+        this.lastInterimText = '';
+      } else {
+        this.lastInterimText = transcript;
+        this.scheduleInterimFinalize();
+      }
+
       const transcriptEvent: STTTranscriptEvent = {
         text: transcript,
         isFinal,
@@ -432,6 +470,89 @@ export class WebSpeechSTT {
 
       this.emitTranscript(transcriptEvent);
     }
+  }
+
+  /**
+   * Browsers often stay in interim mode until the user pauses. After silence,
+   * promote the latest interim text to a synthetic final transcript.
+   */
+  private scheduleInterimFinalize(): void {
+    this.clearFinalizeTimer();
+    this.finalizeTimer = setTimeout(() => {
+      const text = this.lastInterimText.trim();
+      if (!text) return;
+
+      this.lastInterimText = '';
+      this.log('Final transcript (silence timeout):', text);
+
+      this.hadResultThisSession = true;
+      this.emptyRestartCount = 0;
+      this.restartDelayMs = AUTO_RESTART_BASE_MS;
+
+      this.emitTranscript({
+        text,
+        isFinal: true,
+        confidence: 0.85,
+        timestamp: Date.now(),
+      });
+    }, FINALIZE_SILENCE_MS);
+  }
+
+  private clearFinalizeTimer(): void {
+    if (this.finalizeTimer !== null) {
+      clearTimeout(this.finalizeTimer);
+      this.finalizeTimer = null;
+    }
+  }
+
+  private clearAutoRestartTimer(): void {
+    if (this.autoRestartTimer !== null) {
+      clearTimeout(this.autoRestartTimer);
+      this.autoRestartTimer = null;
+    }
+  }
+
+  /**
+   * Restart recognition after session end, with backoff when sessions produce
+   * no transcripts (avoids tight restart loops in continuous mode).
+   */
+  private scheduleAutoRestart(wasConnected: boolean): void {
+    this.clearAutoRestartTimer();
+
+    if (
+      !wasConnected ||
+      this._intentionalStop ||
+      this._suspended ||
+      !this.recognition
+    ) {
+      return;
+    }
+
+    if (!this.hadResultThisSession) {
+      this.emptyRestartCount += 1;
+      if (this.emptyRestartCount >= MAX_EMPTY_RESTARTS) {
+        this._intentionalStop = true;
+        console.warn(
+          LOG_PREFIX,
+          'Speech recognition stopped after repeated empty sessions. Allow mic access and ensure network access to Web Speech STT.',
+        );
+        return;
+      }
+      this.restartDelayMs = Math.min(
+        Math.round(this.restartDelayMs * 1.5),
+        AUTO_RESTART_MAX_MS,
+      );
+    }
+
+    this.autoRestartTimer = setTimeout(() => {
+      this.autoRestartTimer = null;
+      if (this._intentionalStop || this._suspended || !this.recognition) return;
+      try {
+        this.recognition.start();
+      } catch (err) {
+        console.warn(LOG_PREFIX, 'Auto-restart failed:', err);
+      }
+    }, this.restartDelayMs);
   }
 
   // -------------------------------------------------------------------------
@@ -457,9 +578,10 @@ export class WebSpeechSTT {
       return;
     }
 
-    // 'network' errors may be transient
+    // 'network' errors — do not auto-restart (causes tight loops with no transcripts)
     if (errorType === 'network') {
-      this.log('Network error — recognition may auto-restart');
+      this._intentionalStop = true;
+      this.log('Network error — stopping auto-restart');
       return;
     }
 

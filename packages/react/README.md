@@ -1,5 +1,17 @@
 # @guidekit/react
 
+<p align="center">
+  <a href="https://guidekit-docs.vercel.app">
+    <img src="../../assets/brand/wordmark.svg" alt="GuideKit" width="200" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://guidekit-docs.vercel.app/docs/getting-started">Documentation</a>
+  ·
+  <a href="https://github.com/riaz37/guidekit">GitHub</a>
+</p>
+
 [![npm version](https://img.shields.io/npm/v/@guidekit/react?style=flat-square)](https://www.npmjs.com/package/@guidekit/react)
 
 React bindings for the GuideKit SDK. Provides the `GuideKitProvider`, split hooks, and a Shadow DOM widget for adding an AI assistant to any React application.

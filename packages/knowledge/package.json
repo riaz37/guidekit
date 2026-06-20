@@ -29,5 +29,15 @@
   },
   "devDependencies": {
     "@guidekit/core": "workspace:^"
+  },
+  "author": "Riazul Islam",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/riaz37/guidekit.git",
+    "directory": "packages/knowledge"
+  },
+  "homepage": "https://github.com/riaz37/guidekit#readme",
+  "bugs": {
+    "url": "https://github.com/riaz37/guidekit/issues"
   }
 }

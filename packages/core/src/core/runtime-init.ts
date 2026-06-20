@@ -176,6 +176,9 @@ export async function initializeGuideKitRuntime(host: RuntimeInitHost): Promise<
     spotlightColor: options.options?.spotlightColor,
     debug,
   });
+  visualGuidance.onTourStep((stepIndex, totalSteps, sectionId) => {
+    host.bus.emit('visual:tour-step', { stepIndex, totalSteps, sectionId });
+  });
   host.setVisualGuidance(visualGuidance);
   host.resourceManager.register({
     name: 'visual-guidance',
@@ -385,7 +388,7 @@ async function initVoicePipeline(host: RuntimeInitHost): Promise<void> {
     });
 
     voicePipeline.onTranscript((text, isFinal) => {
-      host.bus.emit('voice:transcript', { text, isFinal, confidence: 0.95 });
+      // Bus + widget updates are handled in VoicePipeline._handleTranscript
       if (isFinal && text.trim()) {
         void voicePipeline.processTranscript(text, (t) => host.sendText(t));
       }

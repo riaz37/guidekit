@@ -83,6 +83,7 @@ export function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetPro
   const voiceUserMsgIdRef = useRef<string | null>(null);
   const voiceAssistantMsgIdRef = useRef<string | null>(null);
   const lastVoiceStreamTextRef = useRef('');
+  const voiceGreetingShownRef = useRef(false);
 
   // i18n helper — get localized string from core
   const t = useCallback(
@@ -349,6 +350,20 @@ export function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetPro
       try {
         await core.startListening();
         setIsVoiceActive(true);
+
+        if (!voiceGreetingShownRef.current) {
+          voiceGreetingShownRef.current = true;
+          const greeting = core.greetingMessage;
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `msg-${++msgIdRef.current}`,
+              role: 'assistant',
+              content: greeting,
+              timestamp: Date.now(),
+            },
+          ]);
+        }
       } catch (err) {
         console.error('[GuideKit] Failed to start voice:', err);
         setIsVoiceActive(false);

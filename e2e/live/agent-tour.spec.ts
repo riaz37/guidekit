@@ -18,9 +18,10 @@ test.describe('Live agent tour', () => {
   test('startTour highlights the first tour section', async ({ page }) => {
     await sendChatMessage(
       page,
-      toolOnlyPrompt('startTour', 'sectionIds ["hero","pricing"] and mode "manual"'),
+      toolOnlyPrompt('startTour', 'sectionIds ["hero","pricing"] and mode "auto"'),
     );
     await waitForSpotlight(page, 60_000);
     await expect(page.locator('#hero')).toBeVisible();
+    await expect(page.locator('[data-guidekit-tooltip-body]')).toContainText('Step 1 of 2');
   });
 });

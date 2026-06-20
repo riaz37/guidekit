@@ -20,6 +20,21 @@ test.describe('Voice smoke', () => {
     await expect(mic).toBeVisible();
   });
 
+  test('voice greeting appears when mic is enabled', async ({ page }) => {
+    await openWidgetInput(page);
+    const mic = page.locator('.gk-mic-btn');
+    await mic.click();
+
+    await expect(page.locator('.gk-header-status')).toContainText(/Listening|Online/i, {
+      timeout: 45_000,
+    });
+
+    const assistant = page.locator('.gk-message[data-role="assistant"]').first();
+    await expect(assistant).toContainText('Hello! How can I help you today?', {
+      timeout: 10_000,
+    });
+  });
+
   test('voice transcript reaches LLM and appears in the widget', async ({ page }) => {
     await openWidgetInput(page);
 

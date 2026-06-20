@@ -36,6 +36,14 @@ export interface CognitiveEngineOptions {
 
 const STEP_PATTERNS: Array<{ pattern: RegExp; actions: string[] }> = [
   {
+    pattern: /\btour\b|\bwalkthrough\b|\bshow\s+me\s+around\b|\bguide\s+me\s+(?:through|around)\b/i,
+    actions: [
+      'Pick ordered section IDs from the page context for the tour',
+      'Call startTour with those sectionIds and mode "auto"',
+      'Briefly introduce the tour, then let the visual steps advance',
+    ],
+  },
+  {
     pattern: /\bcheckout\b/i,
     actions: [
       'Scan page for checkout or cart sections',

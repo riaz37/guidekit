@@ -158,26 +158,36 @@ export function getBuiltinToolSpecs(host: BuiltinToolsHost): BuiltinSpec[] {
     },
     {
       name: 'startTour',
-      description: 'Start a guided tour through multiple sections in sequence.',
+      description:
+        'Start a multi-step guided tour. REQUIRED when the user asks for a tour, walkthrough, or to be shown around the page. Highlights each section in order with step controls.',
       parameters: {
         sectionIds: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Section IDs in tour order',
+          description: 'Section IDs from the page context, in tour visit order (minimum 2)',
         },
         mode: {
           type: 'string',
           enum: ['auto', 'manual'],
-          description: 'auto advances automatically; manual waits for user',
+          description:
+            'auto advances every few seconds (default); manual waits for user to click Next on the tooltip',
         },
       },
       required: ['sectionIds'],
       schemaVersion: 1,
       execute: async (args) => {
-        const sectionIds = args.sectionIds as string[];
-        const mode = (args.mode as 'auto' | 'manual') ?? 'manual';
+        const rawIds = args.sectionIds;
+        const sectionIds = Array.isArray(rawIds)
+          ? rawIds.map((id) => String(id)).filter(Boolean)
+          : typeof rawIds === 'string' && rawIds.length > 0
+            ? [rawIds]
+            : [];
+        if (sectionIds.length === 0) {
+          return { success: false, error: 'startTour requires at least one sectionId' };
+        }
+        const mode = (args.mode as 'auto' | 'manual') ?? 'auto';
         host.startTour(sectionIds, mode);
-        return { success: true, steps: sectionIds.length };
+        return { success: true, steps: sectionIds.length, mode };
       },
     },
     {
