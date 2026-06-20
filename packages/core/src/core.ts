@@ -134,7 +134,7 @@ export class GuideKitCore {
       () => this.visualGuidance,
       () => this.navigationController,
     );
-    this.voiceControl = new VoiceController(this._debug, () => this.voicePipeline);
+    this.voiceControl = new VoiceController(() => this.voicePipeline);
     this.storeSync = new StoreSync(() => ({
       isReady: this._isReady,
       agentState: this._agentState,

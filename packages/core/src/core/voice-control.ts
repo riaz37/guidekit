@@ -2,7 +2,6 @@ import type { VoicePipeline } from '../voice/index.js';
 
 export class VoiceController {
   constructor(
-    private readonly debug: boolean,
     private getPipeline: () => VoicePipeline | null,
   ) {}
 
