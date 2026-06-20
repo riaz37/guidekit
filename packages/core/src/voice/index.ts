@@ -372,6 +372,12 @@ export class VoicePipeline {
       }
     }
 
+    // ── Wire STT transcript events (before connect — Web Speech can emit quickly) ─
+    this._unsubSTTTranscript?.();
+    this._unsubSTTTranscript = this._stt.onTranscript((event: STTTranscriptEvent) => {
+      this._handleTranscript(event);
+    });
+
     // ── Connect STT ─────────────────────────────────────────────────
     try {
       await this._stt.connect();
@@ -397,12 +403,6 @@ export class VoicePipeline {
         this._log('TTS pre-connect failed (will retry on speak):', err);
       }
     }
-
-    // ── Wire STT transcript events ──────────────────────────────────
-    this._unsubSTTTranscript?.();
-    this._unsubSTTTranscript = this._stt.onTranscript((event: STTTranscriptEvent) => {
-      this._handleTranscript(event);
-    });
 
     if (usesWebSpeechStt) {
       this._isForwardingToSTT = true;

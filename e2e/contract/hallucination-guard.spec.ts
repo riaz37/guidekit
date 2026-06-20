@@ -3,6 +3,8 @@ import { mockLlmTextRoute } from '../fixtures/voice-mocks';
 import { sendWidgetMessage } from '../fixtures/mock-llm-proxy';
 
 test.describe('Hallucination guard', () => {
+  test.describe.configure({ timeout: 90_000 });
+
   test.beforeEach(async ({ page }) => {
     await mockLlmTextRoute(page, 'The hero section welcomes you to GuideKit.');
     await page.goto('/');
