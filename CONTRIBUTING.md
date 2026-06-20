@@ -158,6 +158,8 @@ pnpm publish:packages:dry-run   # verify without upload
 pnpm publish:packages           # requires NPM_TOKEN in .env or ~/.npmrc
 ```
 
+**Important:** Always publish with `pnpm publish`, never `npm publish`. Only pnpm rewrites `workspace:^` internal deps to semver ranges in the tarball. Using `npm publish` ships literal `workspace:^` and breaks consumers outside the monorepo.
+
 Do not use `--provenance` locally; CI handles provenance via OIDC.
 
 ## License

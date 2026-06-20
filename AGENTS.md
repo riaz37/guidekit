@@ -106,7 +106,7 @@ Before release, run `pnpm check:release` (runs live suite twice for the flake bu
 Run `pnpm check:release` before publishing. It includes:
 
 - `pnpm check` (build, typecheck, lint, unit, size, contract E2E)
-- Package artifact verification (`scripts/verify-published-packages.mjs`)
+- Package artifact verification (`scripts/verify-published-packages.mjs`) — also asserts packed tarballs contain no `workspace:` deps
 - CLI subprocess smoke (`packages/cli/src/cli.smoke.test.ts`)
 - Live E2E twice (`pnpm test:e2e:live:full` ×2)
 
@@ -119,7 +119,7 @@ pnpm dev                  # Start docs + example apps
 pnpm build                # Build all packages
 pnpm check                # Full CI parity (build, typecheck, lint, test)
 pnpm check:release        # Production publish gate (includes live E2E x2)
-pnpm publish:packages:dry-run  # Dry-run npm publish locally
+pnpm publish:packages:dry-run  # Dry-run pnpm publish locally (rewrites workspace:^)
 pnpm stats                # Package LOC + core facade size
 pnpm llms:generate        # Regenerate llms.txt agent index
 pnpm changeset            # Version bump for published packages

@@ -39,7 +39,7 @@ fi
 cd "$ROOT"
 
 echo "==> Verify npm publish access"
-if ! (cd "$ROOT/packages/core" && npm publish --dry-run --access public --no-git-checks >/dev/null 2>&1); then
+if ! (cd "$ROOT/packages/core" && pnpm publish --dry-run --access public --no-git-checks >/dev/null 2>&1); then
   echo "Error: NPM token cannot publish to @guidekit." >&2
   echo "Create an Automation token with Read and Write permissions for @guidekit:" >&2
   echo "  https://www.npmjs.com/settings/~tokens" >&2
@@ -89,7 +89,9 @@ for pkg in "${PACKAGES[@]}"; do
     fi
   fi
 
-  (cd "$pkg_dir" && npm publish "${PUBLISH_FLAGS[@]}")
+  # pnpm publish rewrites workspace:^ to semver ranges in the tarball.
+  # npm publish does not — it ships literal "workspace:^" and breaks consumers.
+  (cd "$pkg_dir" && pnpm publish "${PUBLISH_FLAGS[@]}")
 done
 
 if [ "$DRY_RUN" = false ]; then

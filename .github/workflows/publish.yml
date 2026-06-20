@@ -98,3 +98,14 @@ jobs:
         run: |
           VERSION="$(node -p "require('./packages/react/package.json').version")"
           npm view "@guidekit/react@$VERSION" version
+
+      - name: Verify published react dependencies
+        if: ${{ !inputs.dry_run }}
+        run: |
+          VERSION="$(node -p "require('./packages/react/package.json').version")"
+          DEPS="$(npm view "@guidekit/react@$VERSION" dependencies --json)"
+          echo "$DEPS"
+          if echo "$DEPS" | grep -q 'workspace:'; then
+            echo "Error: @guidekit/react@$VERSION still publishes workspace: deps" >&2
+            exit 1
+          fi
