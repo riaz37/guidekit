@@ -1,5 +1,11 @@
 # @guidekit/core
 
+## 1.2.1
+
+### Patch Changes
+
+- cc5c2be: Fix publish pipeline to use `pnpm publish` instead of `npm publish`, so `workspace:^` internal dependencies are rewritten to semver ranges in published tarballs.
+
 ## 1.2.0
 
 ### Minor Changes

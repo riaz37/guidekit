@@ -1,5 +1,13 @@
 # @guidekit/react
 
+## 1.2.2
+
+### Patch Changes
+
+- cc5c2be: Fix publish pipeline to use `pnpm publish` instead of `npm publish`, so `workspace:^` internal dependencies are rewritten to semver ranges in published tarballs.
+- Updated dependencies [cc5c2be]
+  - @guidekit/core@1.2.1
+
 ## 1.2.1
 
 ### Patch Changes

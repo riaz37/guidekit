@@ -1,6 +1,6 @@
 {
   "name": "@guidekit/cli",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "CLI tools for GuideKit SDK — init, doctor, generate-secret",
   "type": "module",
   "main": "./dist/index.cjs",
