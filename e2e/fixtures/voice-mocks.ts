@@ -74,7 +74,7 @@ export async function installVoiceBrowserMocks(
               item: (index: number) => results[index],
             };
             this.onresult?.({ resultIndex: 0, results });
-          }, 400);
+          }, 1200);
         }, 50);
       }
 

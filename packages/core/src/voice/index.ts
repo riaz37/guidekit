@@ -378,6 +378,9 @@ export class VoicePipeline {
       this._handleTranscript(event);
     });
 
+    // Accept final transcripts during connect/TTS pre-connect (mock STT can emit early).
+    this._setState('listening');
+
     // ── Connect STT ─────────────────────────────────────────────────
     try {
       await this._stt.connect();
@@ -426,9 +429,6 @@ export class VoicePipeline {
       this._vad.start(this._mediaStream);
       this._log('VAD started');
     }
-
-    // ── Transition state ────────────────────────────────────────────
-    this._setState('listening');
   }
 
   // ────────────────────────────────────────────────────────────────────

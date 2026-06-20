@@ -388,7 +388,7 @@ async function initVoicePipeline(host: RuntimeInitHost): Promise<void> {
     });
 
     voicePipeline.onTranscript((text, isFinal) => {
-      // Bus + widget updates are handled in VoicePipeline._handleTranscript
+      host.bus.emit('voice:transcript', { text, isFinal, confidence: 0.85 });
       if (isFinal && text.trim()) {
         void voicePipeline.processTranscript(text, (t) => host.sendText(t));
       }
