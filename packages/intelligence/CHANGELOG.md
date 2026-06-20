@@ -1,5 +1,12 @@
 # @guidekit/intelligence
 
+## 2.0.0
+
+### Patch Changes
+
+- Updated dependencies [e504e76]
+  - @guidekit/core@1.1.0
+
 ## 1.0.0
 
 ### Patch Changes
