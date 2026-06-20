@@ -96,17 +96,19 @@ describe('ContextManager', () => {
       expect(prompt).toContain('# Current Page');
       expect(prompt).toContain('https://example.com');
       expect(prompt).toContain('Test Page');
-      // Sections
-      expect(prompt).toContain('# Page Sections');
+      // Incremental page memory (default)
+      expect(prompt).toContain('# Page Memory');
+      expect(prompt).toContain('[hero]');
+      expect(prompt).toContain('# Working Set');
       expect(prompt).toContain('[hero]');
       expect(prompt).toContain('Hero');
-      // Navigation
-      expect(prompt).toContain('# Navigation');
+      // Nav in page memory block
+      expect(prompt).toContain('## Navigation');
       expect(prompt).toContain('Home');
       expect(prompt).toContain('(current)');
     });
 
-    it('includes truncation metadata when sections are truncated', () => {
+    it('includes scan budget note when scan was exhausted', () => {
       const manyModel: PageModel = {
         ...mockPageModel,
         scanMetadata: {
@@ -118,8 +120,21 @@ describe('ContextManager', () => {
       };
 
       const prompt = cm.buildSystemPrompt(manyModel, []);
-      expect(prompt).toContain('10 of 50');
+      expect(prompt).toContain('Scan note');
       expect(prompt).toContain('readPageContent');
+    });
+
+    it('uses turn delta on second prompt for same page hash', () => {
+      cm.buildSystemPrompt(mockPageModel, []);
+      const prompt = cm.buildSystemPrompt(mockPageModel, []);
+      expect(prompt).toContain('# Page Delta');
+    });
+
+    it('legacy full prompt when incrementalContext is false', () => {
+      const legacy = new ContextManager({ incrementalContext: false });
+      const prompt = legacy.buildSystemPrompt(mockPageModel, mockTools);
+      expect(prompt).toContain('# Page Sections');
+      expect(prompt).toContain('# Navigation');
     });
 
     it('respects token budget (~6000 chars)', () => {

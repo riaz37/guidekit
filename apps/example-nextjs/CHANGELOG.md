@@ -4,6 +4,18 @@
 
 ### Patch Changes
 
+- Updated dependencies [e504e76]
+  - @guidekit/core@1.1.0
+  - @guidekit/react@1.2.0
+  - @guidekit/server@1.0.2
+  - @guidekit/intelligence@2.0.0
+  - @guidekit/knowledge@2.0.0
+  - @guidekit/plugins@2.0.0
+
+## 0.0.4
+
+### Patch Changes
+
 - Updated dependencies [2b44662]
   - @guidekit/core@1.0.0
   - @guidekit/react@1.0.0

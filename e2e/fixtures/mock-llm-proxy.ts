@@ -121,15 +121,40 @@ export async function mockLlmHighlightRoute(
   await mockLlmToolRoute(page, geminiHighlightToolSse(sectionId));
 }
 
-/** Open widget panel and return the text input locator. */
+/** Wait until the widget panel is fully open (React or vanilla Shadow DOM). */
+export async function waitForWidgetPanelOpen(page: Page) {
+  await page.waitForFunction(() => {
+    const host = document.getElementById('guidekit-widget');
+    const root = host?.shadowRoot;
+    if (!root) return false;
+
+    const reactPanel = root.querySelector('[data-testid="guidekit-panel"]');
+    if (reactPanel) {
+      return reactPanel.getAttribute('data-open') === 'true';
+    }
+
+    const vanillaPanel = root.querySelector('.gk-panel');
+    return vanillaPanel?.classList.contains('gk-open') ?? false;
+  }, undefined, { timeout: 15_000 });
+}
+
+/** Open widget panel and return the text input locator (React or vanilla). */
 export async function openWidgetInput(page: Page) {
   await page.waitForSelector('#guidekit-widget', { timeout: 15_000 });
   const fab = page.locator('.gk-fab');
   await fab.waitFor({ state: 'visible', timeout: 10_000 });
-  await fab.click();
+  await fab.click({ force: true });
+  await waitForWidgetPanelOpen(page);
   const input = page.locator('.gk-input');
   await input.waitFor({ state: 'visible', timeout: 10_000 });
   return input;
+}
+
+/** Open the widget, type a message, and send via Enter (avoids flaky send-button hit targets). */
+export async function sendWidgetMessage(page: Page, text: string) {
+  const input = await openWidgetInput(page);
+  await input.fill(text);
+  await input.press('Enter');
 }
 
 export function isElementInViewport(

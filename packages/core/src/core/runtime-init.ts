@@ -149,9 +149,13 @@ export async function initializeGuideKitRuntime(host: RuntimeInitHost): Promise<
     cleanup: () => connectionManager.stop(),
   });
 
-  const navigationController = new NavigationController({ debug });
+  const navigationController = new NavigationController({
+    debug,
+    router: options.navigation?.router,
+  });
   navigationController.onRouteChange((from, to) => {
     host.bus.emit('dom:route-change', { from, to });
+    host.contextManager.clearPageMemory();
     if (host.domScanner) {
       setTimeout(() => {
         const model = host.domScanner!.scan();

@@ -37,7 +37,7 @@ export function Providers({ children }: { children: ReactNode }) {
         debug: process.env.NODE_ENV === 'development',
         mode: voiceEnabled ? 'voice' : 'text',
         clickableSelectors: {
-          allow: ['#name', '#email', '#message', 'input', 'textarea'],
+          deny: ['[type="submit"]', '[data-guidekit-no-click]'],
         },
       }}
     >

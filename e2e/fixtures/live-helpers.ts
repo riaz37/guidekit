@@ -1,5 +1,5 @@
-import { expect, type APIRequestContext, type Page } from '@playwright/test';
-import { isElementInViewport } from './mock-llm-proxy';
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { isElementInViewport, waitForWidgetPanelOpen } from './mock-llm-proxy';
 
 export async function gotoHomeWithWidget(page: Page): Promise<void> {
   await page.goto('/');
@@ -31,6 +31,12 @@ export async function waitForAssistantReply(
   const assistant = page.locator('.gk-message[data-role="assistant"]').last();
   await expect(assistant).not.toHaveText('', { timeout });
   const text = (await assistant.textContent())?.trim() ?? '';
+  if (/(high demand|unavailable|503)/i.test(text)) {
+    test.skip(
+      true,
+      'Gemini returned a transient 503 (high demand). Retry later, or reduce parallelism/retries.',
+    );
+  }
   expect(text.length).toBeGreaterThanOrEqual(minLength);
   expect(text.toLowerCase()).not.toContain('error:');
   return text;
@@ -82,4 +88,65 @@ export async function fetchSessionToken(request: APIRequestContext): Promise<str
   const { token } = (await tokenRes.json()) as { token: string };
   expect(token.length).toBeGreaterThan(20);
   return token;
+}
+
+export async function openWidgetInput(page: Page) {
+  await page.waitForSelector('#guidekit-widget', { timeout: 15_000 });
+  const fab = page.locator('.gk-fab');
+  await fab.waitFor({ state: 'visible', timeout: 10_000 });
+  await fab.click();
+  await waitForWidgetPanelOpen(page);
+  const input = page.getByTestId('guidekit-input');
+  await input.waitFor({ state: 'visible', timeout: 10_000 });
+  return input;
+}
+
+export function toolOnlyPrompt(
+  tool: string,
+  argsDescription: string,
+): string {
+  return `Use the ${tool} tool with ${argsDescription}. Only call the tool.`;
+}
+
+export async function waitForGuidekitTestBridge(page: Page, timeout = 20_000): Promise<void> {
+  await page.waitForFunction(() => window.__guidekitTest != null, undefined, { timeout });
+}
+
+export async function waitForSpotlightDismissed(page: Page, timeout = 35_000): Promise<void> {
+  await page.waitForFunction(() => {
+    const el = document.querySelector('[data-guidekit-spotlight]');
+    if (!el) return true;
+    return el instanceof HTMLElement && el.style.opacity === '0';
+  }, undefined, { timeout });
+}
+
+export async function installClickListener(page: Page, selector: string, flagName: string): Promise<void> {
+  await page.evaluate(
+    ([sel, flag]) => {
+      (window as unknown as Record<string, boolean>)[flag] = false;
+      const el = document.querySelector(sel);
+      if (el) {
+        el.addEventListener('click', () => {
+          (window as unknown as Record<string, boolean>)[flag] = true;
+        });
+      }
+    },
+    [selector, flagName] as const,
+  );
+}
+
+export async function wasElementClicked(page: Page, flagName: string): Promise<boolean> {
+  return page.evaluate((flag) => Boolean((window as unknown as Record<string, boolean>)[flag]), flagName);
+}
+
+export async function invalidateSessionToken(
+  request: APIRequestContext,
+  token: string,
+): Promise<void> {
+  const res = await request.post('/api/guidekit/test/invalidate-session', {
+    data: { token },
+  });
+  expect(res.ok()).toBeTruthy();
+  const body = (await res.json()) as { ok?: boolean };
+  expect(body.ok).toBe(true);
 }

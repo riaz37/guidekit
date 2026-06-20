@@ -42,4 +42,8 @@ export interface GuideKitCoreOptions {
   hallucinationGuard?: boolean;
   /** Enable heuristic cognitive planning. Default: false. */
   cognitive?: boolean;
+  /** Optional SPA router for reliable client-side navigation. */
+  navigation?: {
+    router?: { push: (href: string) => void | Promise<void> };
+  };
 }

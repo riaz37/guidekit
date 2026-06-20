@@ -23,6 +23,27 @@ export interface EventMap {
 
   // -- Validation events ----------------------------------------------------
   'validation:complete': { confidence?: number; issues?: unknown[] };
+  'validation:corrected': { issues: unknown[] };
+
+  // -- Context events -------------------------------------------------------
+  'context:memory-rebuild': { pageKey: string; hash: string };
+  'context:delta': {
+    hashChanged: boolean;
+    added: string[];
+    removed: string[];
+  };
+  'context:memory-cleared': Record<string, never>;
+
+  // -- Element resolution ---------------------------------------------------
+  'element:resolve': {
+    tool: string;
+    selector: string;
+    confidence: number;
+    reason: string;
+  };
+
+  // -- Action safety --------------------------------------------------------
+  'action:confirmation-required': { selector: string; reason?: string };
 
   // -- Voice events ---------------------------------------------------------
   'voice:state-change': { from: string; to: string };

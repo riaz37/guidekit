@@ -596,16 +596,22 @@ export class DOMScanner {
   private isSectionCandidate(el: Element): boolean {
     const tag = el.tagName;
 
-    // Semantic section tags
     if (SECTION_TAGS.has(tag)) return true;
 
-    // Divs or other elements with role, aria-label, or id
     if (
       el.getAttribute('role') ||
       el.getAttribute('aria-label') ||
+      el.getAttribute('aria-labelledby') ||
+      el.hasAttribute('data-guidekit-target') ||
       el.id
     ) {
       return true;
+    }
+
+    // Generic layout blocks: div with a direct heading child (common on unannotated sites)
+    if (tag === 'DIV' || tag === 'LI') {
+      const heading = el.querySelector(':scope > h1, :scope > h2, :scope > h3, :scope > h4');
+      if (heading) return true;
     }
 
     return false;
@@ -742,9 +748,19 @@ export class DOMScanner {
       }
     }
 
-    if (params.hasHeading) score += 5;
+    if (params.hasHeading) score += 10;
 
-    // Depth penalty
+    if (params.el.hasAttribute('data-guidekit-target')) score += 25;
+
+    const labelledBy = params.el.getAttribute('aria-labelledby');
+    if (labelledBy && typeof document !== 'undefined') {
+      const labelEl = document.getElementById(labelledBy);
+      if (labelEl?.textContent?.trim()) score += 8;
+    }
+
+    const textLen = (params.el.textContent ?? '').trim().length;
+    if (textLen > 40 && textLen < 800) score += 6;
+
     score -= params.depth * 2;
 
     return score;

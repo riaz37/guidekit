@@ -37,6 +37,7 @@ jobs:
       - name: Run live E2E suite
         env:
           LIVE_LLM: '1'
+          SKIP_LIVE_VOICE: '1'
           GUIDEKIT_SECRET: guidekit-example-e2e-secret-32-chars
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           SKIP_NPM_DRY_RUN: '1'

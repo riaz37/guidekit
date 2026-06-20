@@ -2,6 +2,14 @@
  * Built-in tool specifications and registration for GuideKitCore.
  */
 
+import type { EventBus } from '../bus/index.js';
+import type { DOMScanner } from '../dom/index.js';
+import {
+  assessDangerousClick,
+  resolveElement,
+  resolveSectionSelector,
+} from '../dom/element-resolver.js';
+import { scrollAndRescan } from '../dom/rescan.js';
 import type {
   PageModel,
   ToolDefinition,
@@ -21,6 +29,8 @@ export const DEFAULT_CLICK_DENY = [
 
 export interface BuiltinToolsHost extends VisualGuidanceApi {
   getPageModel(): PageModel | null;
+  getDomScanner?: () => DOMScanner | null;
+  bus?: EventBus;
   contextManager: ContextManager;
   customActions: Map<
     string,
@@ -36,6 +46,19 @@ export interface BuiltinToolsHost extends VisualGuidanceApi {
 type BuiltinSpec = ToolDefinition & {
   execute: (args: Record<string, unknown>) => Promise<unknown>;
 };
+
+function emitResolve(
+  host: BuiltinToolsHost,
+  tool: string,
+  result: { selector: string; confidence: number; reason: string },
+): void {
+  host.bus?.emit('element:resolve', {
+    tool,
+    selector: result.selector,
+    confidence: result.confidence,
+    reason: result.reason,
+  });
+}
 
 export function getBuiltinToolSpecs(host: BuiltinToolsHost): BuiltinSpec[] {
   return [
@@ -56,13 +79,28 @@ export function getBuiltinToolSpecs(host: BuiltinToolsHost): BuiltinSpec[] {
       required: [],
       schemaVersion: 1,
       execute: async (args) => {
+        const model = host.getPageModel();
+        let sectionId = args.sectionId as string | undefined;
+        let selector = args.selector as string | undefined;
+
+        if (model) {
+          const resolved = resolveElement(model, { sectionId, selector, label: sectionId });
+          if (resolved) {
+            emitResolve(host, 'highlight', resolved);
+            if (!selector) selector = resolved.selector;
+            if (!sectionId && resolved.reason.startsWith('section:')) {
+              sectionId = resolved.reason.slice('section:'.length);
+            }
+          }
+        }
+
         const result = host.highlight({
-          sectionId: args.sectionId as string | undefined,
-          selector: args.selector as string | undefined,
+          sectionId,
+          selector,
           tooltip: args.tooltip as string | undefined,
           position: args.position as 'top' | 'bottom' | 'left' | 'right' | 'auto' | undefined,
         });
-        return { success: result };
+        return { success: result, selector, sectionId };
       },
     },
     {
@@ -86,8 +124,21 @@ export function getBuiltinToolSpecs(host: BuiltinToolsHost): BuiltinSpec[] {
       required: ['sectionId'],
       schemaVersion: 1,
       execute: async (args) => {
-        host.scrollToSection(args.sectionId as string, args.offset as number | undefined);
-        return { success: true };
+        const model = host.getPageModel();
+        const rawId = args.sectionId as string;
+        let sectionId = rawId;
+
+        if (model) {
+          const resolved = resolveSectionSelector(model, rawId);
+          if (resolved) {
+            emitResolve(host, 'scrollToSection', resolved);
+            const match = model.sections.find((s) => s.selector === resolved.selector);
+            if (match) sectionId = match.id;
+          }
+        }
+
+        host.scrollToSection(sectionId, args.offset as number | undefined);
+        return { success: true, sectionId };
       },
     },
     {
@@ -142,11 +193,18 @@ export function getBuiltinToolSpecs(host: BuiltinToolsHost): BuiltinSpec[] {
       execute: async (args) => {
         const sectionId = args.sectionId as string | undefined;
         const query = args.query as string | undefined;
-        const model = host.getPageModel();
+        let model = host.getPageModel();
         if (!model) return { error: 'No page model available' };
 
         if (sectionId) {
-          const section = model.sections.find((s) => s.id === sectionId);
+          let section = model.sections.find((s) => s.id === sectionId);
+          if (!section && model.scanMetadata.scanBudgetExhausted) {
+            const scanner = host.getDomScanner?.();
+            if (scanner) {
+              model = await scrollAndRescan(scanner, { steps: 2 });
+            }
+            section = model.sections.find((s) => s.id === sectionId);
+          }
           if (section) {
             const contentMapResult = await host.contextManager.getContent(sectionId);
             return {
@@ -189,12 +247,15 @@ export function getBuiltinToolSpecs(host: BuiltinToolsHost): BuiltinSpec[] {
         const model = host.getPageModel();
         if (!model) return { sections: [] };
         return {
-          sections: model.sections.slice(0, 10).map((s) => ({
-            id: s.id,
-            label: s.label,
-            selector: s.selector,
-            score: s.score,
-          })),
+          sections: model.sections
+            .filter((s) => s.isVisible)
+            .slice(0, 10)
+            .map((s) => ({
+              id: s.id,
+              label: s.label,
+              selector: s.selector,
+              score: s.score,
+            })),
         };
       },
     },
@@ -203,12 +264,29 @@ export function getBuiltinToolSpecs(host: BuiltinToolsHost): BuiltinSpec[] {
       description: 'Programmatically click an interactive element on the page.',
       parameters: {
         selector: { type: 'string', description: 'CSS selector of the element to click' },
+        label: { type: 'string', description: 'Semantic label to resolve when selector is omitted' },
       },
-      required: ['selector'],
+      required: [],
       schemaVersion: 1,
       execute: async (args) => {
         if (typeof document === 'undefined') return { success: false, error: 'Not in browser' };
-        const selector = args.selector as string;
+
+        const model = host.getPageModel();
+        let selector = args.selector as string | undefined;
+        const label = args.label as string | undefined;
+
+        if (!selector && model) {
+          const resolved = resolveElement(model, { label, sectionId: label });
+          if (resolved) {
+            emitResolve(host, 'clickElement', resolved);
+            selector = resolved.selector;
+          }
+        }
+
+        if (!selector) {
+          return { success: false, error: 'Provide selector or label' };
+        }
+
         const el = document.querySelector(selector);
         if (!el) return { success: false, error: `Element not found: ${selector}` };
         if (!(el instanceof HTMLElement)) {
@@ -224,6 +302,19 @@ export function getBuiltinToolSpecs(host: BuiltinToolsHost): BuiltinSpec[] {
               return selector === pattern;
             }
           }) ?? false;
+
+        if (rules?.deny?.length) {
+          const denied = rules.deny.some((pattern) => {
+            try {
+              return el.matches(pattern);
+            } catch {
+              return selector === pattern;
+            }
+          });
+          if (denied) {
+            return { success: false, error: `Selector "${selector}" is blocked by the deny list.` };
+          }
+        }
 
         if (!isInDevAllowList) {
           const defaultDenied = DEFAULT_CLICK_DENY.some((pattern) => {
@@ -241,23 +332,23 @@ export function getBuiltinToolSpecs(host: BuiltinToolsHost): BuiltinSpec[] {
           }
         }
 
-        if (rules?.deny?.length) {
-          const denied = rules.deny.some((pattern) => {
-            try {
-              return el.matches(pattern);
-            } catch {
-              return selector === pattern;
-            }
-          });
-          if (denied) {
-            return { success: false, error: `Selector "${selector}" is blocked by the deny list.` };
-          }
-        }
-
         if (rules?.allow?.length && !isInDevAllowList) {
           return {
             success: false,
             error: `Selector "${selector}" is not in the allowed clickable selectors list.`,
+          };
+        }
+
+        const danger = assessDangerousClick(selector, el);
+        if (danger.blocked) {
+          host.bus?.emit('action:confirmation-required', {
+            selector,
+            reason: danger.reason,
+          });
+          return {
+            success: false,
+            error: danger.reason ?? 'Dangerous action blocked pending user confirmation.',
+            confirmationRequired: true,
           };
         }
 

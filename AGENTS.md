@@ -77,27 +77,27 @@ e2e/
 └── env.ts        # .env.local + LIVE_LLM detection
 ```
 
-Voice E2E always mocks the browser Web Speech API — no Deepgram/ElevenLabs in Playwright.
+Voice E2E: contract tier mocks Web Speech in Playwright; live tier uses real Web Speech via Chromium fake-audio-capture (no Deepgram/ElevenLabs).
 
 ### E2E coverage matrix (user-facing flows)
 
 | Flow | Contract | Live |
 |------|:--------:|:----:|
-| Widget UI / a11y | yes | — |
+| Widget UI / a11y | yes | yes |
 | Proxy health / token / LLM | yes | yes |
 | Text chat + streaming | mocked | yes |
 | Multi-turn memory | — | yes |
 | Agent tools (scroll, highlight, navigate, tour, clickElement) | yes | yes |
 | Platform Mode (RAG, plugin, cognitive page) | yes | yes |
 | Session recovery 401 | yes | yes |
-| Voice (Web Speech mock → LLM) | yes | yes |
-| Custom actions / form / readPage / dismiss | yes | partial |
+| Voice (Web Speech → LLM) | mocked STT | real STT |
+| Custom actions / form / readPage / dismiss | yes | yes |
 | STT/TTS proxy key minting | yes | — |
-| Hallucination guard bus event | yes | — |
-| Vanilla IIFE widget | yes | — |
-| Headless custom UI | yes | — |
+| Hallucination guard bus event | yes | yes |
+| Vanilla IIFE widget | yes | yes |
+| Headless custom UI | yes | yes |
 
-Commands: `pnpm test:e2e:contract` (CI), `pnpm test:e2e:live` (local), `pnpm test:e2e:live:full` (publish gate).
+Commands: `pnpm test:e2e:contract` (CI), `pnpm test:e2e:live` (local), `pnpm test:e2e:live:full` (publish gate). Set `SKIP_LIVE_VOICE=1` to skip the headed real-Web-Speech live voice spec when STT is unavailable.
 
 Before release, run `pnpm check:release` (runs live suite twice for the flake budget). Publish workflow uploads Playwright artifacts on failure.
 

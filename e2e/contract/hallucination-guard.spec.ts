@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { mockLlmTextRoute } from '../fixtures/voice-mocks';
-import { openWidgetInput } from '../fixtures/mock-llm-proxy';
+import { sendWidgetMessage } from '../fixtures/mock-llm-proxy';
 
 test.describe('Hallucination guard', () => {
   test.beforeEach(async ({ page }) => {
@@ -15,9 +15,7 @@ test.describe('Hallucination guard', () => {
       window.__guidekitTest!.waitForEvent('validation:complete', 45_000),
     );
 
-    const input = await openWidgetInput(page);
-    await input.fill('Describe the hero section.');
-    await page.getByTestId('guidekit-send').click();
+    await sendWidgetMessage(page, 'Describe the hero section.');
 
     const event = await waitForValidation;
     expect(event.name).toBe('validation:complete');

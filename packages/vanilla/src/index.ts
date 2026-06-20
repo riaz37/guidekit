@@ -51,6 +51,13 @@ const WIDGET_CSS = /* css */ `
     z-index: 2147483647;
     bottom: 24px;
     right: 24px;
+    pointer-events: none;
+  }
+  .gk-mount {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
@@ -72,6 +79,7 @@ const WIDGET_CSS = /* css */ `
     box-shadow: 0 4px 16px rgba(99, 102, 241, 0.35);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     outline: none;
+    pointer-events: auto;
   }
   .gk-fab:hover {
     background: var(--gk-primary-hover);
@@ -213,6 +221,7 @@ const SVG_SEND = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><p
 class VanillaWidget {
   private host: HTMLDivElement;
   private shadow: ShadowRoot;
+  private mount!: HTMLDivElement;
   private panel!: HTMLDivElement;
   private transcript!: HTMLDivElement;
   private emptyState!: HTMLDivElement;
@@ -231,7 +240,7 @@ class VanillaWidget {
     this.host = document.createElement('div');
     this.host.id = 'guidekit-widget';
     this.host.style.cssText =
-      'position:fixed;z-index:2147483647;bottom:24px;right:24px;margin:0;padding:0;border:none;background:none;';
+      'position:fixed;z-index:2147483647;bottom:24px;right:24px;width:56px;height:56px;margin:0;padding:0;border:none;background:none;pointer-events:none;';
     document.body.appendChild(this.host);
 
     this.shadow = this.host.attachShadow({ mode: 'open' });
@@ -240,6 +249,11 @@ class VanillaWidget {
     const style = document.createElement('style');
     style.textContent = WIDGET_CSS;
     this.shadow.appendChild(style);
+
+    const mount = document.createElement('div');
+    mount.className = 'gk-mount';
+    this.shadow.appendChild(mount);
+    this.mount = mount;
 
     this.buildDOM();
     this.bindEvents();
@@ -315,7 +329,7 @@ class VanillaWidget {
     inputArea.appendChild(this.sendBtn);
 
     this.panel.appendChild(inputArea);
-    this.shadow.appendChild(this.panel);
+    this.mount.appendChild(this.panel);
 
     // FAB
     this.fab = document.createElement('button');
@@ -324,7 +338,7 @@ class VanillaWidget {
     this.fab.setAttribute('aria-expanded', 'false');
     this.fab.setAttribute('aria-haspopup', 'dialog');
     this.fab.innerHTML = SVG_CHAT;
-    this.shadow.appendChild(this.fab);
+    this.mount.appendChild(this.fab);
   }
 
   private bindEvents(): void {
@@ -347,6 +361,8 @@ class VanillaWidget {
   private togglePanel(open: boolean): void {
     this.isOpen = open;
     if (open) {
+      this.host.style.width = '380px';
+      this.host.style.height = '592px';
       this.panel.classList.add('gk-open');
       this.panel.setAttribute('aria-hidden', 'false');
       this.fab.setAttribute('aria-expanded', 'true');
@@ -354,6 +370,8 @@ class VanillaWidget {
       this.fab.setAttribute('aria-label', this.t('closeAssistant'));
       setTimeout(() => this.input.focus(), 100);
     } else {
+      this.host.style.width = '56px';
+      this.host.style.height = '56px';
       this.panel.classList.remove('gk-open');
       this.panel.setAttribute('aria-hidden', 'true');
       this.fab.setAttribute('aria-expanded', 'false');

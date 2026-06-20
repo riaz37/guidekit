@@ -12,6 +12,7 @@ declare global {
       events: BusEvent[];
       waitForEvent: (name: string, timeoutMs?: number) => Promise<BusEvent>;
       waitForReady: (timeoutMs?: number) => Promise<void>;
+      getPageModel: () => unknown;
       addKnowledgeDocument: (doc: KnowledgeDocument) => void;
       removeKnowledgeDocument: (documentId: string) => void;
       clear: () => void;
@@ -53,6 +54,10 @@ export function GuideKitTestBridge() {
     const unsubLlmEnd = core.bus.on('llm:response-end', (data) => {
       push('llm:response-end', data);
     });
+    const unsubAny = core.bus.onAny((data, name) => {
+      if (name === 'validation:complete' || name === 'llm:response-end') return;
+      push(name, data);
+    });
 
     window.__guidekitTest = {
       events,
@@ -90,6 +95,7 @@ export function GuideKitTestBridge() {
             }
           }, 50);
         }),
+      getPageModel: () => core.pageModel,
       addKnowledgeDocument: (doc) => {
         core.addKnowledgeDocument(doc);
       },
@@ -104,6 +110,7 @@ export function GuideKitTestBridge() {
     return () => {
       unsubValidation();
       unsubLlmEnd();
+      unsubAny();
       delete window.__guidekitTest;
     };
   }, [core]);

@@ -102,6 +102,19 @@ export class GuideKitCore {
       agent: options.agent,
       contentMap: options.contentMap,
       debug: this._debug,
+      onContextTelemetry: (event, data) => {
+        if (event === 'context:memory-rebuild') {
+          this.bus.emit('context:memory-rebuild', data as { pageKey: string; hash: string });
+        } else if (event === 'context:delta') {
+          this.bus.emit('context:delta', {
+            hashChanged: Boolean(data.hashChanged),
+            added: (data.added as string[]) ?? [],
+            removed: (data.removed as string[]) ?? [],
+          });
+        } else if (event === 'context:memory-cleared') {
+          this.bus.emit('context:memory-cleared', {});
+        }
+      },
     });
     const mode = options.options?.mode;
     if (mode === 'voice' || mode === 'text') {
@@ -366,6 +379,16 @@ export class GuideKitCore {
     return this.visualNav.navigate(href);
   }
 
+  /** Force a DOM rescan (call after client-side DOM swaps without navigation). */
+  rescanPage(): PageModel | null {
+    if (!this.domScanner) return null;
+    const model = this.domScanner.scan();
+    this._currentPageModel = model;
+    this.bus.emit('dom:scan-complete', { pageModel: model, durationMs: 0 });
+    this.notifyStoreListeners();
+    return model;
+  }
+
   setPageContext(context: Record<string, unknown>): void {
     this.contextManager.setPageContext(context);
     if (this._debug) console.debug('[GuideKit:Core] setPageContext', context);
@@ -450,6 +473,8 @@ export class GuideKitCore {
   private getToolsHost(): BuiltinToolsHost {
     return Object.assign(this.visualNav, {
       getPageModel: () => this._currentPageModel,
+      getDomScanner: () => this.domScanner,
+      bus: this.bus,
       contextManager: this.contextManager,
       customActions: this.customActions,
       clickableSelectors: this._options.options?.clickableSelectors,

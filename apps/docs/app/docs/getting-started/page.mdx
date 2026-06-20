@@ -167,6 +167,64 @@ For quick prototyping without server routes, pass API keys directly:
 | Create React App | Full |
 | Non-React (vanilla JS) | Via `@guidekit/vanilla` |
 
+## SPA navigation (Next.js App Router)
+
+GuideKit detects URL changes via the Navigation API, `popstate`, and polling. For client-side route changes that bypass full page loads, pass your App Router instance so `navigate()` and post-nav rescans stay reliable:
+
+```tsx
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { GuideKitProvider } from '@guidekit/react';
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+
+  return (
+    <GuideKitProvider
+      tokenEndpoint="/api/guidekit/token"
+      proxy={{ llm: '/api/guidekit/llm', health: '/api/guidekit/health' }}
+      llm={{ provider: 'gemini', model: 'gemini-2.5-flash-lite' }}
+      navigation={{ router: { push: (href) => router.push(href) } }}
+    >
+      {children}
+    </GuideKitProvider>
+  );
+}
+```
+
+On each route change, GuideKit clears **PageMemory**, rescans the DOM, and emits `dom:route-change` plus `context:memory-cleared`.
+
+For **in-page DOM swaps** (tabs, modals, virtual lists) without a URL change, call `core.rescanPage()` after updating the UI so the assistant sees fresh sections:
+
+```tsx
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useGuideKitCore } from '@guidekit/react';
+
+export function TabPanel({ activeTab }: { activeTab: string }) {
+  const core = useGuideKitCore();
+
+  useEffect(() => {
+    if (core?.isReady) core.rescanPage();
+  }, [activeTab, core]);
+
+  return <div>{/* tab content */}</div>;
+}
+```
+
+## Universal site checklist
+
+1. Proxy mode: `tokenEndpoint` + `/api/guidekit/llm` (never ship LLM keys to the browser)
+2. Optional `contentMap` for product facts the DOM cannot infer
+3. Optional `data-guidekit-target` on critical CTAs (improves accuracy, not required)
+4. `clickableSelectors.allow/deny` for production click boundaries
+5. Redis session store for multi-instance deployments
+6. `hallucinationGuard={true}` + `intelligence={true}` for Platform Mode on public sites
+
+See the example app routes `/plain`, `/spa-rescan`, and `/iframe-test` for unannotated page demos used in contract E2E.
+
 ## Next Steps
 
 - [Provider Setup](/docs/provider) — Configuration options in depth

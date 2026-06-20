@@ -25,7 +25,9 @@ test.describe('Custom actions', () => {
     await input.fill('Show alert');
     await input.press('Enter');
 
-    await expect(page.locator('.gk-message[data-role="assistant"]').last()).not.toHaveText('', {
+    await expect(
+      page.locator('.gk-msg-assistant, .gk-message[data-role="assistant"]').last(),
+    ).not.toHaveText('', {
       timeout: 20_000,
     });
   });

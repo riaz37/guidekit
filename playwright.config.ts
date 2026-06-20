@@ -1,10 +1,10 @@
 /**
  * Playwright E2E for the example-nextjs app.
  *
- * Voice tests intentionally mock the Web Speech API (see e2e/fixtures/voice-e2e.ts).
- * Contract tier (e2e/contract): mocked LLM, runs on every PR.
- * Live tier (e2e/live): real LLM when LIVE_LLM=1, publish gate only.
+ * Contract tier (e2e/contract): mocked LLM + Web Speech (see voice-e2e.ts).
+ * Live tier (e2e/live): real Gemini, no LLM/Web Speech JS mocks; publish gate only.
  */
+import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 import { resolveGuidekitSecret, resolveLlmApiKey } from './e2e/env';
 
@@ -14,6 +14,20 @@ const E2E_LLM_API_KEY = resolveLlmApiKey();
 const sharedUse = {
   ...devices['Desktop Chrome'],
   baseURL: 'http://localhost:3099',
+};
+
+const liveVoiceAudio = path.join(__dirname, 'e2e/fixtures/audio/voice-prompt.wav');
+
+const liveUse = {
+  ...sharedUse,
+  permissions: ['microphone'] as const,
+  launchOptions: {
+    args: [
+      '--use-fake-ui-for-media-stream',
+      '--use-fake-device-for-media-stream',
+      `--use-file-for-fake-audio-capture=${liveVoiceAudio}`,
+    ],
+  },
 };
 
 export default defineConfig({
@@ -43,7 +57,7 @@ export default defineConfig({
       testDir: './e2e/live',
       timeout: 120_000,
       retries: 2,
-      use: sharedUse,
+      use: liveUse,
     },
   ],
 

@@ -73,6 +73,7 @@ export interface PipelineContext {
   validation?: {
     confidence?: number;
     issues?: unknown[];
+    corrected?: boolean;
   };
   /** Arbitrary stage metadata for plugins / extensions. */
   metadata: Record<string, unknown>;

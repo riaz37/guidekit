@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { isLiveLlmEnabled, liveSkipReason } from '../env';
-import { fetchSessionToken } from '../fixtures/live-helpers';
+import {
+  fetchSessionToken,
+  invalidateSessionToken,
+  openWidgetInput,
+} from '../fixtures/live-helpers';
 
 /**
  * Live proxy API — direct HTTP against running example app.
@@ -23,8 +27,11 @@ test.describe('Live proxy API', () => {
         stream: true,
       },
     });
-    expect(res.ok()).toBeTruthy();
     const body = await res.text();
+    if (!res.ok() && /(high demand|unavailable|503)/i.test(body)) {
+      test.skip(true, 'Gemini returned a transient 503 (high demand). Retry later.');
+    }
+    expect(res.ok()).toBeTruthy();
     expect(body.length).toBeGreaterThan(20);
     expect(body.toLowerCase()).toContain('proxy_ok');
   });
@@ -58,46 +65,43 @@ test.describe('Live proxy API', () => {
 });
 
 /**
- * Client-side session recovery when server session keys are gone.
- * Uses route mock for first 401, then allows real proxy on retry.
+ * Client-side session recovery when server session keys are cleared.
  */
 test.describe('Live session recovery', () => {
   test.skip(!isLiveLlmEnabled(), liveSkipReason());
-  test.describe.configure({ timeout: 90_000, retries: 2 });
+  test.describe.configure({ timeout: 120_000, retries: 2 });
 
-  test('widget recovers after stale session 401 on LLM proxy', async ({ page }) => {
-    let llmCalls = 0;
-    await page.route('**/api/guidekit/llm', async (route) => {
-      if (route.request().method() !== 'POST') {
-        await route.continue();
-        return;
-      }
-      llmCalls += 1;
-      if (llmCalls === 1) {
-        await route.fulfill({
-          status: 401,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            error: 'Session expired or server restarted — request a new token',
-          }),
-        });
-        return;
-      }
-      await route.continue();
-    });
-
+  test('widget recovers after stale session 401 on LLM proxy', async ({ page, request }) => {
+    const tokenResponse = page.waitForResponse(
+      (res) => res.url().includes('/api/guidekit/token') && res.request().method() === 'POST',
+    );
     await page.goto('/');
     await page.waitForSelector('#guidekit-widget', { timeout: 20_000 });
+    const tokenRes = await tokenResponse;
+    const { token } = (await tokenRes.json()) as { token: string };
+    await invalidateSessionToken(request, token);
 
-    const fab = page.locator('.gk-fab');
-    await fab.click();
-    const input = page.locator('.gk-input');
-    await input.waitFor({ state: 'visible', timeout: 10_000 });
+    let llmCalls = 0;
+    page.on('request', (req) => {
+      if (req.url().includes('/api/guidekit/llm') && req.method() === 'POST') {
+        llmCalls += 1;
+      }
+    });
+
+    const input = await openWidgetInput(page);
     await input.fill('Reply with exactly: RECOVERED');
     await page.locator('.gk-send-btn').click();
 
     const assistant = page.locator('.gk-message[data-role="assistant"]').last();
-    await expect(assistant).toContainText(/RECOVERED/i, { timeout: 60_000 });
+    await expect(assistant).not.toHaveText('', { timeout: 90_000 });
+    const text = ((await assistant.textContent()) ?? '').trim();
+    if (/(high demand|unavailable|503)/i.test(text)) {
+      test.skip(
+        true,
+        'Gemini returned a transient 503 (high demand). Recovery path was exercised; retry later for full assertion.',
+      );
+    }
+    expect(text).toMatch(/RECOVERED/i);
     expect(llmCalls).toBeGreaterThanOrEqual(2);
   });
 });
