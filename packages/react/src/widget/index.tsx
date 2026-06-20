@@ -116,6 +116,7 @@ export function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetPro
 
     // Create a container div for React to portal into (we render imperatively)
     const container = document.createElement('div');
+    container.className = 'gk-mount';
     shadow.appendChild(container);
     shadowContainerRef.current = container;
     setShadowReady(true);
@@ -699,11 +700,15 @@ export function GuideKitWidget({ theme, consentRequired, instanceId }: WidgetPro
         zIndex: theme?.zIndex ?? 2147483647,
         bottom: '24px',
         right: '24px',
+        // Size the host to the full widget footprint so panel clicks are not lost to page content beneath.
+        width: isOpen ? '380px' : '56px',
+        height: isOpen ? '592px' : '56px',
         // Ensure the host doesn't interfere with page layout
         margin: 0,
         padding: 0,
         border: 'none',
         background: 'none',
+        pointerEvents: 'none',
       }}
     >
       {shadowReady && portalReady && shadowContainerRef.current && createPortalRef.current

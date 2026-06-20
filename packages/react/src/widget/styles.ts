@@ -21,6 +21,14 @@ export const WIDGET_STYLES = /* css */ `
     z-index: var(--gk-z-index, 2147483647);
     bottom: 24px;
     right: 24px;
+    pointer-events: none;
+  }
+
+  .gk-mount {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -47,6 +55,7 @@ export const WIDGET_STYLES = /* css */ `
     transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.15s ease;
     outline: none;
     position: relative;
+    pointer-events: auto;
   }
 
   .gk-fab:hover {

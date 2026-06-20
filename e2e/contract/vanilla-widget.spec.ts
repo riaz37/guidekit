@@ -55,7 +55,7 @@ test.describe('@guidekit/vanilla IIFE', () => {
     await expect(fab).toBeVisible();
 
     await fab.click();
-    await expect(page.locator('.gk-panel.gk-open')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.gk-panel.gk-open, [data-testid="guidekit-panel"][data-open="true"]')).toBeVisible({ timeout: 10_000 });
   });
 });
 

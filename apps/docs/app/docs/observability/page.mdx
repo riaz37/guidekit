@@ -56,6 +56,27 @@ GuideKit guarantees these attribute keys when applicable:
 
 Additional attributes may be added over time, but existing keys are stable.
 
+## Reliability scorecard (Universal Assistant targets)
+
+Track these signals in contract and live E2E suites when rolling out to production:
+
+| Metric | Contract target | Live target |
+|--------|-----------------|-------------|
+| Claim grounding (hallucination guard clean) | ≥ 90% | ≥ 85% |
+| Highlight accuracy on plain pages | ≥ 85% | ≥ 85% |
+| Tool success (`highlight`, `scroll`, `readPageContent`) | ≥ 95% | ≥ 90% |
+| Prompt tokens per turn (after PageMemory) | −40% vs full prompt | −40% |
+
+**Bus events for context and grounding:**
+
+- `context:memory-rebuild` — PageMemory rebuilt after route or hash change
+- `context:delta` — incremental TurnDelta sent on subsequent turns
+- `element:resolve` — semantic ref resolved to selector (`confidence`, `reason`)
+- `action:confirmation-required` — dangerous click blocked pending user confirmation
+- `validation:corrected` — high-severity hallucination issues appended to response
+
+Use DevTools **Events** or `window.__guidekitTest` in the example app to capture these during E2E debugging.
+
 ## Debugging workflow
 
 1. Reproduce the slow or failed message in dev with `options={{ debug: true }}`.

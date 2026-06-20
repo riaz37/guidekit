@@ -2,12 +2,10 @@ import type { BrowserContext, Page } from '@playwright/test';
 import { installVoiceBrowserMocks } from './voice-mocks';
 
 /**
- * E2E voice policy: always use mocked Web Speech API (STT + mic).
+ * Contract-tier voice setup only — mocks Web Speech API (STT + mic).
  *
- * We do not run Playwright against Deepgram, ElevenLabs, or server STT/TTS
- * proxies — those need paid keys, real audio, and are flaky in CI. Contract
- * and live voice specs exercise the same browser path the example app uses by
- * default (web-speech provider + @guidekit/vad).
+ * Do not import this from e2e/live specs. Live tier uses Chromium fake-audio-capture
+ * with real Web Speech + real LLM (no Deepgram/ElevenLabs in Playwright).
  */
 export async function setupVoiceE2e(
   page: Page,

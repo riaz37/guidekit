@@ -20,6 +20,13 @@ import type {
 } from '../types/index.js';
 import { TieredMemory } from './memory.js';
 import { TokenBudgetManager, type TokenizerProvider } from './token-budget.js';
+import {
+  PageMemoryStore,
+  formatCrossOriginIframeNotice,
+  formatPageMemory,
+  formatTurnDelta,
+  formatWorkingSet,
+} from './page-memory.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -156,7 +163,18 @@ export interface ContextManagerOptions {
   tokenBudget?: number;
   /** Tokenizer for budget enforcement. Default: heuristic (CJK-aware). */
   tokenizerProvider?: TokenizerProvider;
+  /** Use PageMemory + TurnDelta instead of full page lists. Default: true. */
+  incrementalContext?: boolean;
   debug?: boolean;
+  onContextTelemetry?: (event: string, data: Record<string, unknown>) => void;
+}
+
+export interface ContextTelemetrySnapshot {
+  strategy: 'full-rebuild' | 'delta';
+  tokensBefore?: number;
+  tokensAfter?: number;
+  hash: string;
+  rebuilt: boolean;
 }
 
 export class ContextManager {
@@ -172,6 +190,13 @@ export class ContextManager {
   private readonly tieredMemory: TieredMemory;
   private readonly tokenBudgetManager: TokenBudgetManager;
   private tokenBudgetReady = false;
+  private readonly incrementalContext: boolean;
+  private readonly pageMemoryStore = new PageMemoryStore();
+  private readonly onContextTelemetry?: (
+    event: string,
+    data: Record<string, unknown>,
+  ) => void;
+  private lastContextTelemetry: ContextTelemetrySnapshot | null = null;
 
   // Session preferences (persisted across navigations)
   private _userPreference: 'voice' | 'text' = 'text';
@@ -186,6 +211,8 @@ export class ContextManager {
       options?.maxSessionSizeBytes ?? DEFAULT_MAX_SESSION_SIZE_BYTES;
     this.tokenBudget = options?.tokenBudget ?? DEFAULT_TOKEN_BUDGET;
     this.debug = options?.debug ?? false;
+    this.incrementalContext = options?.incrementalContext !== false;
+    this.onContextTelemetry = options?.onContextTelemetry;
     this.tieredMemory = new TieredMemory({ maxWorkingTurns: this.maxTurns, maxSessionTurns: 50 });
     this.tokenBudgetManager = new TokenBudgetManager({
       maxTokens: this.tokenBudget,
@@ -205,6 +232,17 @@ export class ContextManager {
     return this.tokenBudgetManager.count(text);
   }
 
+  /** Clear cached page memory (e.g. on route change). */
+  clearPageMemory(): void {
+    this.pageMemoryStore.clear();
+    this.onContextTelemetry?.('context:memory-cleared', {});
+  }
+
+  /** Last context assembly telemetry from the most recent buildSystemPrompt call. */
+  getLastContextTelemetry(): ContextTelemetrySnapshot | null {
+    return this.lastContextTelemetry;
+  }
+
   // -------------------------------------------------------------------------
   // System prompt
   // -------------------------------------------------------------------------
@@ -217,56 +255,81 @@ export class ContextManager {
   buildSystemPrompt(pageModel: PageModel | SemanticPageModel, tools: ToolDefinition[]): string {
     const parts: string[] = [];
 
-    // -- Role ----------------------------------------------------------------
     parts.push(this.buildRoleSection());
-
-    // -- Current Page --------------------------------------------------------
     parts.push(this.buildCurrentPageSection(pageModel));
 
-    // -- Semantic intelligence (when available) --------------------------------
+    const iframeNotice = formatCrossOriginIframeNotice(pageModel);
+    if (iframeNotice) parts.push(iframeNotice);
+
+    if (pageModel.scanMetadata.scanBudgetExhausted) {
+      parts.push(
+        '# Scan note\nPage scan budget was exhausted — use readPageContent or scrollToSection to inspect off-screen content.',
+      );
+    }
+
     if (isSemanticPageModel(pageModel)) {
       const semantic = this.buildSemanticSections(pageModel);
       if (semantic) parts.push(semantic);
     }
 
-    // -- Page Sections (with contentMap facts inlined) -----------------------
-    parts.push(this.buildPageSectionsSection(pageModel));
+    let strategy: ContextTelemetrySnapshot['strategy'] = 'full-rebuild';
+    let rebuilt = true;
 
-    // -- Navigation ----------------------------------------------------------
-    if (pageModel.navigation.length > 0) {
-      parts.push(this.buildNavigationSection(pageModel));
+    if (this.incrementalContext) {
+      const prepared = this.pageMemoryStore.prepare(pageModel);
+      rebuilt = prepared.rebuilt;
+      strategy = prepared.rebuilt ? 'full-rebuild' : 'delta';
+
+      if (prepared.rebuilt) {
+        parts.push(formatPageMemory(prepared.memory));
+        this.onContextTelemetry?.('context:memory-rebuild', {
+          pageKey: prepared.memory.pageKey,
+          hash: prepared.memory.hash,
+        });
+      } else {
+        parts.push(formatTurnDelta(prepared.delta));
+        this.onContextTelemetry?.('context:delta', {
+          hashChanged: prepared.delta.hashChanged,
+          added: prepared.delta.addedSectionIds,
+          removed: prepared.delta.removedSectionIds,
+        });
+      }
+
+      parts.push(formatWorkingSet(prepared.workingSet));
+
+      const siteSummary = this.pageMemoryStore.getSiteIndexSummary();
+      if (siteSummary) parts.push(siteSummary);
+    } else {
+      parts.push(this.buildPageSectionsSection(pageModel));
+      if (pageModel.navigation.length > 0) {
+        parts.push(this.buildNavigationSection(pageModel));
+      }
+      if (pageModel.interactiveElements.length > 0) {
+        parts.push(this.buildInteractiveElementsSection(pageModel));
+      }
     }
 
-    // -- Interactive Elements ------------------------------------------------
-    if (pageModel.interactiveElements.length > 0) {
-      parts.push(this.buildInteractiveElementsSection(pageModel));
-    }
-
-    // -- Forms ---------------------------------------------------------------
     if (pageModel.forms.length > 0) {
       parts.push(this.buildFormsSection(pageModel));
     }
 
-    // -- User Viewport -------------------------------------------------------
     parts.push(this.buildViewportSection(pageModel));
 
-    // -- Available Actions ---------------------------------------------------
     if (tools.length > 0) {
       parts.push(this.buildToolsSection(tools));
     }
 
-    // -- Developer Context ---------------------------------------------------
     const pageCtxKeys = Object.keys(this._pageContext);
     if (pageCtxKeys.length > 0) {
       parts.push(this.buildPageContextSection());
     }
 
-    // -- Guidelines ----------------------------------------------------------
     parts.push(this.buildGuidelinesSection());
 
-    // Join and enforce budget via TokenBudgetManager
     const sections = parts.filter(Boolean);
     let prompt = sections.join('\n\n');
+    const tokensBefore = this.countTokens(prompt);
+
     if (this.countTokens(prompt) > this.tokenBudget) {
       const compressed = this.tokenBudgetManager.compress(prompt, sections);
       prompt = compressed.text;
@@ -276,6 +339,15 @@ export class ContextManager {
         );
       }
     }
+
+    const tokensAfter = this.countTokens(prompt);
+    this.lastContextTelemetry = {
+      strategy,
+      tokensBefore,
+      tokensAfter,
+      hash: pageModel.hash,
+      rebuilt,
+    };
 
     return prompt;
   }
@@ -642,6 +714,8 @@ export class ContextManager {
       '- Use scrollToSection() before highlighting offscreen elements',
       '- Never make up information not present in the page context',
       '- If asked about content you cannot see, use readPageContent to access it',
+      '- If cross-origin iframes are listed, explain you cannot read their content',
+      '- Prefer working-set sections and interactives; use tools to expand context',
     ];
 
     if (this._userPreference === 'voice') {

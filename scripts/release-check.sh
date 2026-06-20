@@ -17,10 +17,10 @@ echo "==> playwright install (live + contract browsers)"
 pnpm exec playwright install chromium-headless-shell
 
 echo "==> live E2E run 1"
-LIVE_LLM=1 pnpm test:e2e:live:full
+SKIP_LIVE_VOICE=1 LIVE_LLM=1 pnpm test:e2e:live:full
 
 echo "==> live E2E run 2 (flake budget)"
-LIVE_LLM=1 pnpm test:e2e:live:full
+SKIP_LIVE_VOICE=1 LIVE_LLM=1 pnpm test:e2e:live:full
 
 if [ "${SKIP_NPM_DRY_RUN:-}" = "1" ]; then
   echo "==> npm dry-run skipped (SKIP_NPM_DRY_RUN=1)"

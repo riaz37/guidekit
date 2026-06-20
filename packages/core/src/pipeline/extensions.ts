@@ -200,11 +200,38 @@ export async function createPlatformExtensions(
       const pageModel = ctx.pageModel;
       if (!pageModel || !ctx.responseText) return ctx;
       const result = hallucinationGuard!.validate(ctx.responseText, pageModel);
+      let responseText = ctx.responseText;
+      let corrected = false;
+
+      const highIssues = result.issues.filter(
+        (issue) =>
+          typeof issue === 'object' &&
+          issue !== null &&
+          'severity' in issue &&
+          (issue as { severity: string }).severity === 'high',
+      );
+
+      if (highIssues.length > 0) {
+        const suggestions = highIssues
+          .map((issue) =>
+            typeof issue === 'object' && issue !== null && 'suggestion' in issue
+              ? String((issue as { suggestion: string }).suggestion)
+              : '',
+          )
+          .filter(Boolean)
+          .join(' ');
+        responseText = `${responseText}\n\n(I could not verify every UI reference on this page. ${suggestions})`;
+        corrected = true;
+        options.bus?.emit('validation:corrected', { issues: highIssues });
+      }
+
       return {
         ...ctx,
+        responseText,
         validation: {
           confidence: result.confidence,
           issues: result.issues,
+          corrected,
         },
       };
     };

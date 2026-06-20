@@ -43,7 +43,18 @@ export function scanSameOriginIframes(
       });
       continue;
     }
-    if (!doc?.body) continue;
+
+    if (!doc?.body) {
+      if (!doc) {
+        crossOriginIframes.push({
+          index: crossOriginIframes.length + 1,
+          src: iframe.src || null,
+          title: iframe.title || iframe.getAttribute('aria-label'),
+          sandbox: iframe.getAttribute('sandbox'),
+        });
+      }
+      continue;
+    }
     if (count >= maxIframes) break;
 
     count += 1;

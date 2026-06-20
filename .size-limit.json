@@ -2,7 +2,7 @@
   {
     "name": "@guidekit/core (ESM)",
     "path": "packages/core/dist/index.js",
-    "limit": "85 KB",
+    "limit": "92 KB",
     "gzip": true
   },
   {

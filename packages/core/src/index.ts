@@ -147,7 +147,33 @@ export type { DOMScannerOptions } from './dom/index.js';
 
 // Context
 export { ContextManager, estimateTokens } from './context/index.js';
-export type { ContextManagerOptions } from './context/index.js';
+export type { ContextManagerOptions, ContextTelemetrySnapshot } from './context/index.js';
+export {
+  PageMemoryStore,
+  buildPageMemory,
+  computeTurnDelta,
+  buildWorkingSet,
+  formatPageMemory,
+  formatTurnDelta,
+  formatWorkingSet,
+  formatCrossOriginIframeNotice,
+  pageKeyFromModel,
+} from './context/page-memory.js';
+export type { PageMemory, TurnDelta, WorkingSet, SiteMemoryIndex } from './context/page-memory.js';
+
+export {
+  resolveElement,
+  resolveSectionSelector,
+  resolveInteractiveByLabel,
+  assessDangerousClick,
+} from './dom/element-resolver.js';
+export type {
+  ElementResolveRequest,
+  ElementResolveResult,
+  DangerousClickAssessment,
+} from './dom/element-resolver.js';
+export { scrollAndRescan } from './dom/rescan.js';
+export type { ScrollAndRescanOptions } from './dom/rescan.js';
 
 // LLM
 export { LLMOrchestrator, GeminiAdapter, OpenAIAdapter, AnthropicAdapter } from './llm/index.js';

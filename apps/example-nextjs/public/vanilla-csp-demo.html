@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GuideKit Vanilla CSP Demo</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        padding: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Vanilla CSP Demo</h1>
+    <p>Widget loaded under a strict Content-Security-Policy (self-hosted scripts only).</p>
+
+    <script>
+      window.module = window.module || { exports: {} };
+      window.module$1 = window.module$1 || window.module;
+    </script>
+    <script src="/vanilla/guidekit-global"></script>
+    <script>
+      if (window.GuideKit && typeof window.GuideKit.init === 'function') {
+        window.GuideKit.init({
+          tokenEndpoint: '/api/guidekit/token',
+          proxy: {
+            llm: '/api/guidekit/llm',
+            health: '/api/guidekit/health',
+          },
+          llm: { provider: 'gemini', model: 'gemini-2.5-flash-lite' },
+          agent: { name: 'GuideKit Assistant', greeting: 'Hello under CSP!' },
+          options: { debug: true, mode: 'text' },
+        });
+      }
+    </script>
+  </body>
+</html>
