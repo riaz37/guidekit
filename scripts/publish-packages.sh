@@ -36,6 +36,11 @@ if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
   exit 1
 fi
 
+# Use an isolated npmrc so a stale ~/.npmrc token cannot override NODE_AUTH_TOKEN.
+GUIDEKIT_NPMRC="${TMPDIR:-/tmp}/guidekit-publish.npmrc"
+printf '//registry.npmjs.org/:_authToken=%s\n' "$NODE_AUTH_TOKEN" > "$GUIDEKIT_NPMRC"
+export NPM_CONFIG_USERCONFIG="$GUIDEKIT_NPMRC"
+
 cd "$ROOT"
 
 echo "==> Verify npm publish access"
