@@ -1,5 +1,16 @@
 # @guidekit/example-nextjs
 
+## 0.0.5
+
+### Patch Changes
+
+- Updated dependencies [65cab89]
+  - @guidekit/core@1.2.0
+  - @guidekit/react@1.2.1
+  - @guidekit/intelligence@3.0.0
+  - @guidekit/knowledge@3.0.0
+  - @guidekit/plugins@3.0.0
+
 ## 0.0.4
 
 ### Patch Changes

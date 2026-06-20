@@ -1,5 +1,13 @@
 # @guidekit/intelligence
 
+## 3.0.0
+
+### Patch Changes
+
+- 65cab89: Brand assets and docs site SEO (icons, OG image, sitemap, llms.txt). Web Speech STT reliability: silence-based finalization, connect timeout, smarter auto-restart, and non-continuous default to avoid Chrome restart storms. Visual guidance and builtin-tools polish. Widget styling updates. Package metadata for Tier B extensions.
+- Updated dependencies [65cab89]
+  - @guidekit/core@1.2.0
+
 ## 2.0.0
 
 ### Patch Changes
