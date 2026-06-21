@@ -14,6 +14,7 @@ test.describe('Contract Platform Mode', () => {
 
   test('platform mode pipeline completes without demo footer', async ({ page }) => {
     await page.waitForFunction(() => window.__guidekitTest != null, undefined, { timeout: 20_000 });
+    await page.evaluate(() => window.__guidekitTest!.waitForReady(20_000));
 
     const validationPromise = page.evaluate(() =>
       window.__guidekitTest!.waitForEvent('validation:complete', 45_000),

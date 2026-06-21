@@ -7,6 +7,12 @@ description: Enable intelligence, knowledge RAG, plugins, and hallucination guar
 
 GuideKit **Platform Mode** wires the optional intelligence, knowledge, and plugins packages into the v2 pipeline — semantic page enrichment, RAG retrieval, plugin hooks, and hallucination validation.
 
+For full-site assistance, Platform Mode now composes three layers:
+
+- **Site knowledge**: server-backed search across indexed website documents via `/api/guidekit/site-search`
+- **Live page model**: current route sections, forms, overlays, and interactive elements from the DOM scanner
+- **Autonomy policy**: guided action rules for navigation, safe clicks, and confirmation-required actions
+
 ## Minimal vs Platform Mode
 
 | Mode | Packages | Use case |
@@ -36,8 +42,17 @@ const myPlugin = definePlugin({
   llm={{ provider: 'gemini', model: 'gemini-2.5-flash' }}
   intelligence={true}
   knowledge={{ documents: docs, engine: 'bm25', topK: 5 }}
+  siteKnowledge={{ endpoint: '/api/guidekit/site-search', topK: 5 }}
   plugins={[myPlugin]}
   hallucinationGuard
+  options={{
+    autonomy: {
+      level: 'guided',
+      allowNavigation: true,
+      allowSafeClicks: true,
+      requireConfirmationFor: ['submit', 'purchase', 'destructive', 'auth'],
+    },
+  }}
 >
   {children}
 </GuideKitProvider>
@@ -47,7 +62,7 @@ const myPlugin = definePlugin({
 
 1. **scan** — DOM page model
 2. **enrich** — `SemanticScanner` → `SemanticPageModel`
-3. **retrieve** — BM25/TF-IDF knowledge search
+3. **retrieve** — BM25/TF-IDF knowledge search plus optional server site search
 4. **context** — System prompt with semantic sections + RAG
 5. **cognize** — Optional cognitive planning when `cognitive={true}` (Tier C experimental)
 6. **llm** — Proxy-backed streaming (includes tool execution)
@@ -74,6 +89,11 @@ Use `getExtraContextSections()` on a plugin to inject additional system-prompt s
 - Documents are held **in memory** on the client for the session — there is no IndexedDB persistence in 1.0.
 - Use `addKnowledgeDocument` / `removeKnowledgeDocument` on the core instance (or React context) for runtime updates.
 - Large corpora should live server-side; pass a curated subset via `knowledge.documents` at init time.
+- Use `siteKnowledge.endpoint` for full-site context. The server route validates the GuideKit JWT, `site:read` permission, and allowed origins before returning attributed website chunks.
+
+## Agent Runtime v1
+
+The built-in agent can search indexed website content with `searchSite`, navigate same-origin routes, rescan after route changes, and act on current-page elements. Interactive elements are classified as `safe`, `submit`, `purchase`, `destructive`, `auth`, or `unknown`; guided autonomy allows safe clicks and requires confirmation for risky classes by default.
 
 ## Reference integration
 

@@ -66,6 +66,21 @@ Prevents hallucination by providing factual content the LLM can reference:
 >
 ```
 
+### Site Knowledge
+
+Use `siteKnowledge` when the assistant should answer from indexed content across the website, not only the current page. The endpoint is served by `@guidekit/server` and requires a valid GuideKit session token with `site:read`.
+
+```tsx
+<GuideKitProvider
+  tokenEndpoint="/api/guidekit/token"
+  proxy={{ llm: '/api/guidekit/llm' }}
+  llm={{ provider: 'gemini' }}
+  siteKnowledge={{ endpoint: '/api/guidekit/site-search', topK: 5 }}
+>
+  {children}
+</GuideKitProvider>
+```
+
 ### Options
 
 ```tsx
@@ -75,6 +90,12 @@ options={{
   greetOnFirstVisit: true,    // Visual greeting for new visitors
   spotlightColor: '#4a9eed',  // Spotlight highlight color
   debug: false,               // Enable debug logging
+  autonomy: {
+    level: 'guided',
+    allowNavigation: true,
+    allowSafeClicks: true,
+    requireConfirmationFor: ['submit', 'purchase', 'destructive', 'auth'],
+  },
 }}
 ```
 

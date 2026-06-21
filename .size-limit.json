@@ -2,7 +2,7 @@
   {
     "name": "@guidekit/core (ESM)",
     "path": "packages/core/dist/index.js",
-    "limit": "92 KB",
+    "limit": "96 KB",
     "gzip": true
   },
   {
@@ -56,7 +56,7 @@
   {
     "name": "@guidekit/cli",
     "path": "packages/cli/dist/index.js",
-    "limit": "9 KB",
+    "limit": "15 KB",
     "gzip": true
   }
 ]

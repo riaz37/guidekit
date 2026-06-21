@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import {
   platformDemoPlugin,
@@ -18,6 +19,8 @@ const GuideKitProvider = dynamic(
 const voiceEnabled = process.env.NEXT_PUBLIC_GUIDEKIT_VOICE !== '0';
 
 export function Providers({ children }: { children: ReactNode }) {
+  const router = useRouter();
+
   return (
     <GuideKitProvider
       tokenEndpoint="/api/guidekit/token"
@@ -30,14 +33,22 @@ export function Providers({ children }: { children: ReactNode }) {
       llm={{ provider: 'gemini', model: 'gemini-2.5-flash-lite' }}
       intelligence={true}
       knowledge={{ documents: platformKnowledgeDocuments, engine: 'bm25', topK: 3 }}
+      siteKnowledge={{ endpoint: '/api/guidekit/site-search', topK: 5 }}
       plugins={[platformDemoPlugin]}
       hallucinationGuard
       agent={{ name: 'GuideKit Assistant', greeting: 'Hello! How can I help you today?' }}
+      navigation={{ router }}
       options={{
         debug: process.env.NODE_ENV === 'development',
         mode: voiceEnabled ? 'voice' : 'text',
         clickableSelectors: {
-          deny: ['[type="submit"]', '[data-guidekit-no-click]'],
+          deny: ['[data-guidekit-no-click]'],
+        },
+        autonomy: {
+          level: 'guided',
+          allowNavigation: true,
+          allowSafeClicks: true,
+          requireConfirmationFor: ['submit', 'purchase', 'destructive', 'auth'],
         },
       }}
     >

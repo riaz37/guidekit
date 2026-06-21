@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 export const metadata: Metadata = {
@@ -18,10 +19,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body>
         <nav aria-label="Main navigation" style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>
-          <a href="/" style={{ marginRight: '16px' }}>Home</a>
-          <a href="/about" style={{ marginRight: '16px' }}>About</a>
-          <a href="/demo">Demo</a>
-          <a href="/headless" style={{ marginLeft: '16px' }}>Headless</a>
+          <Link href="/" style={{ marginRight: '16px' }}>Home</Link>
+          <Link href="/about" style={{ marginRight: '16px' }}>About</Link>
+          <Link href="/demo">Demo</Link>
+          <Link href="/headless" style={{ marginLeft: '16px' }}>Headless</Link>
         </nav>
         <main>{children}</main>
       </body>

@@ -25,10 +25,12 @@ import { resolveLLMConfig } from './core/llm-config.js';
 import { initializeGuideKitRuntime } from './core/runtime-init.js';
 import { buildRuntimeInitHost } from './core/runtime-host.js';
 import { setupPipelineOrchestrator } from './core/pipeline-setup.js';
+import { SiteKnowledgeClient, composeSiteKnowledgePipelineHooks } from './core/site-knowledge.js';
 import { VisualNavController } from './core/visual-nav.js';
 import { VoiceController } from './core/voice-control.js';
 import { StoreSync } from './core/store-sync.js';
 import type { GuideKitCoreOptions } from './core/options.js';
+import type { PipelineStageHooks } from './pipeline/index.js';
 import type {
   ToolDefinition,
   AgentState,
@@ -64,6 +66,7 @@ export class GuideKitCore {
   private platformExtensions: PlatformExtensionResult | null = null;
   private extraToolDefinitions: ToolDefinition[] = [];
   private readonly pipelineTelemetry = new PipelineTelemetry();
+  private readonly siteKnowledgeClient: SiteKnowledgeClient;
   private readonly visualNav: VisualNavController;
   private readonly voiceControl: VoiceController;
   private readonly storeSync: StoreSync;
@@ -78,6 +81,7 @@ export class GuideKitCore {
   private _streamingText = '';
   private _instanceAbortController = new AbortController();
   private _initPromise: Promise<void> | null = null;
+  private _destroyPromise: Promise<void> | null = null;
   private _busUnsubs: Array<() => void> = [];
 
   private customActions = new Map<
@@ -116,6 +120,10 @@ export class GuideKitCore {
         }
       },
     });
+    this.siteKnowledgeClient = new SiteKnowledgeClient({
+      config: options.siteKnowledge,
+      getToken: () => this.tokenManager?.token ?? null,
+    });
     const mode = options.options?.mode;
     if (mode === 'voice' || mode === 'text') {
       this.contextManager.userPreference = mode;
@@ -142,6 +150,10 @@ export class GuideKitCore {
       streamingText: this._streamingText,
     }));
 
+    this._subscribeToBusEvents(options);
+  }
+
+  private _subscribeToBusEvents(options: GuideKitCoreOptions): void {
     if (options.onError) {
       this._busUnsubs.push(
         this.bus.on('error', (err) => {
@@ -154,7 +166,10 @@ export class GuideKitCore {
         this.bus.onAny((data, eventName) => {
           options.onEvent!({
             type: eventName,
-            data: typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : {},
+            data:
+              typeof data === 'object' && data !== null
+                ? (data as Record<string, unknown>)
+                : {},
             timestamp: Date.now(),
           });
         }),
@@ -164,8 +179,30 @@ export class GuideKitCore {
 
   async init(): Promise<void> {
     if (typeof window === 'undefined') return;
+
+    // If a destroy is in flight (e.g. React StrictMode remount), wait for it
+    // and reset state so this instance can be safely re-initialized.
+    if (this._destroyPromise) {
+      await this._destroyPromise;
+    }
+
     if (this._isReady) return;
     if (this._initPromise) return this._initPromise;
+
+    // Defensive: if the ResourceManager was torn down (or teardown is still
+    // finishing), acquire a fresh one. This prevents "manager is tearing_down"
+    // errors when a remount races the tail end of destroy().
+    if (
+      !this.resourceManager ||
+      this.resourceManager.state === 'torn_down' ||
+      this.resourceManager.state === 'tearing_down'
+    ) {
+      this.resourceManager = SingletonGuard.acquire(
+        this.instanceId,
+        () => new ResourceManager(this.instanceId),
+      );
+    }
+
     this._initPromise = this._doInit();
     try {
       await this._initPromise;
@@ -435,17 +472,69 @@ export class GuideKitCore {
   }
 
   async destroy(): Promise<void> {
-    for (const unsub of this._busUnsubs) unsub();
-    this._busUnsubs = [];
-    this.bus.removeAll();
-    this._instanceAbortController.abort();
-    this._initPromise = null;
-    this.contextManager.saveSession();
-    await this.resourceManager.destroy();
-    SingletonGuard.release(this.instanceId);
+    if (this._destroyPromise) return this._destroyPromise;
+
+    // Mark not ready immediately so concurrent init() calls restart rather
+    // than returning early while teardown is in progress.
     this._isReady = false;
     this.notifyStoreListeners();
-    if (this._debug) console.debug('[GuideKit:Core] Destroyed instance', this.instanceId);
+
+    // Capture the manager to destroy and set the destroy promise synchronously
+    // so any init() call that races in while we await _initPromise below will
+    // wait for teardown instead of trying to register into a dying manager.
+    const managerToDestroy = this.resourceManager;
+    this._destroyPromise = (async () => {
+      // If init() is still running, wait for it before tearing down. Otherwise
+      // runtime-init could try to register resources on a manager that is now
+      // tearing_down and throw.
+      if (this._initPromise) {
+        try {
+          await this._initPromise;
+        } catch {
+          // Ignore init errors; we still need to clean up.
+        }
+        // init() may have marked the instance ready while we were waiting.
+        // Force it back to not-ready before tearing down resources.
+        this._isReady = false;
+        this.notifyStoreListeners();
+      }
+      this._initPromise = null;
+
+      for (const unsub of this._busUnsubs) unsub();
+      this._busUnsubs = [];
+      this.bus.removeAll();
+      this._instanceAbortController.abort();
+      this.contextManager.saveSession();
+
+      // Release the singleton reference BEFORE the async destroy so that a
+      // re-mount (React StrictMode) or new instance can acquire a fresh
+      // ResourceManager while this one tears down.
+      SingletonGuard.release(this.instanceId);
+
+      await managerToDestroy.destroy();
+      this._resetForReinit();
+    })();
+
+    return this._destroyPromise;
+  }
+
+  private _resetForReinit(): void {
+    // After a full destroy, reset the fields that init() relies on so the
+    // same GuideKitCore instance can be reused (React StrictMode remount).
+    this.resourceManager = SingletonGuard.acquire(
+      this.instanceId,
+      () => new ResourceManager(this.instanceId),
+    );
+    this._instanceAbortController = new AbortController();
+    this._destroyPromise = null;
+
+    // Bus listeners were unsubscribed during destroy; re-register the
+    // developer-facing callbacks so they still fire after re-initialization.
+    this._subscribeToBusEvents(this._options);
+
+    if (this._debug) {
+      console.debug('[GuideKit:Core] Destroyed instance', this.instanceId);
+    }
   }
 
   getTelemetrySpans(): ReturnType<PipelineTelemetry['toJSON']> {
@@ -469,7 +558,7 @@ export class GuideKitCore {
       getPageModel: () => this._currentPageModel,
       getToolDefinitions: () => this.getToolDefinitions(),
       platformExtensions: this.platformExtensions,
-      pipelineHooks: this._options.pipelineHooks,
+      pipelineHooks: this.getPipelineHooks(),
       onBeforeLLMCall: this._options.onBeforeLLMCall,
       setAgentState: (s) => this.setAgentState(s),
       getAgentState: () => this._agentState,
@@ -490,6 +579,21 @@ export class GuideKitCore {
       contextManager: this.contextManager,
       customActions: this.customActions,
       clickableSelectors: this._options.options?.clickableSelectors,
+      autonomy: this._options.options?.autonomy,
+      siteKnowledge: this.siteKnowledgeClient.isConfigured
+        ? {
+            search: (query: string, options?: { topK?: number }) =>
+              this.siteKnowledgeClient.search(query, options),
+          }
+        : undefined,
+    });
+  }
+
+  private getPipelineHooks(): PipelineStageHooks | undefined {
+    return composeSiteKnowledgePipelineHooks({
+      client: this.siteKnowledgeClient,
+      bus: this.bus,
+      baseHooks: this._options.pipelineHooks,
     });
   }
 

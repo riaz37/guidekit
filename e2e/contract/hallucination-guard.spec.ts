@@ -10,6 +10,7 @@ test.describe('Hallucination guard', () => {
     await page.goto('/');
     await page.waitForSelector('#guidekit-widget', { timeout: 15_000 });
     await page.waitForFunction(() => window.__guidekitTest != null, undefined, { timeout: 20_000 });
+    await page.evaluate(() => window.__guidekitTest!.waitForReady(20_000));
   });
 
   test('validation:complete bus event fires after response', async ({ page }) => {

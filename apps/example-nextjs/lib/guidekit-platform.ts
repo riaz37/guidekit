@@ -1,5 +1,6 @@
 import { definePlugin } from '@guidekit/plugins';
 import type { KnowledgeDocument, PluginDefinition } from '@guidekit/core';
+import type { SiteKnowledgeDocument } from '@guidekit/server';
 
 /** Sample knowledge base for Platform Mode demo. */
 export const platformKnowledgeDocuments: KnowledgeDocument[] = [
@@ -18,6 +19,45 @@ export const platformKnowledgeDocuments: KnowledgeDocument[] = [
       'In production, API keys are stored server-side only. The client receives a short-lived JWT ' +
       'and sends requests through the LLM proxy at /api/guidekit/llm.',
     metadata: { tags: ['security', 'proxy'] },
+  },
+];
+
+/** Server-backed website index for Agent Runtime / full-site context demo. */
+export const platformSiteDocuments: SiteKnowledgeDocument[] = [
+  {
+    id: 'site-home',
+    title: 'GuideKit Home',
+    content:
+      'GuideKit is an embeddable AI guide for websites. It understands page structure, answers questions, highlights UI, navigates same-origin pages, and can run developer-defined actions.',
+    metadata: { url: '/' },
+  },
+  {
+    id: 'site-about',
+    title: 'About GuideKit',
+    content:
+      'GuideKit helps every web application become easier to navigate and understand. The assistant can explain product areas, guide users between pages, and stay beside the user as a website guide.',
+    metadata: { url: '/about' },
+  },
+  {
+    id: 'site-security',
+    title: 'Security Model',
+    content:
+      'Production GuideKit integrations keep provider API keys server-side. The browser receives a short-lived JWT and sends LLM and site-search requests through protected proxy routes.',
+    metadata: { url: '/demo', sectionId: 'security' },
+  },
+  {
+    id: 'site-agent-runtime',
+    title: 'Agent Runtime',
+    content:
+      'The Agent Runtime combines server-backed site knowledge, a live page model, and guided autonomy. Safe clicks, scrolling, highlighting, and same-origin navigation can run automatically, while submit, purchase, destructive, and auth actions require confirmation.',
+    metadata: { url: '/demo', sectionId: 'agent-runtime' },
+  },
+  {
+    id: 'site-pricing',
+    title: 'Pricing',
+    content:
+      'GuideKit offers a Free plan at $0/month and a Pro plan at $29/month. Choose the plan that works for you.',
+    metadata: { url: '/', sectionId: 'pricing' },
   },
 ];
 

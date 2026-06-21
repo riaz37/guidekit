@@ -5,6 +5,7 @@
 import type { CreateSessionTokenOptions } from './auth.js';
 import { createSessionToken, validateSessionToken } from './auth.js';
 import { handleLLMProxy, type LLMProxyOptions } from './proxy/llm.js';
+import { handleSiteSearch, type SiteSearchOptions } from './proxy/site-search.js';
 import { handleVoiceProxy } from './proxy/voice.js';
 import type { SessionStore } from './session-store.js';
 import { defaultSessionStore } from './session-store.js';
@@ -17,13 +18,14 @@ export interface GuideKitHandlerOptions {
     request: Request,
   ) => Omit<CreateSessionTokenOptions, 'signingSecret' | 'sessionStore'> | Promise<Omit<CreateSessionTokenOptions, 'signingSecret' | 'sessionStore'>>;
   llmProxy?: Omit<LLMProxyOptions, 'signingSecret' | 'sessionStore'>;
+  siteKnowledge?: Omit<SiteSearchOptions, 'signingSecret' | 'sessionStore'>;
   rateLimit?: {
     windowMs?: number;
     maxRequests?: number;
   };
 }
 
-export type GuideKitRoute = 'token' | 'llm' | 'health' | 'stt' | 'tts';
+export type GuideKitRoute = 'token' | 'llm' | 'health' | 'stt' | 'tts' | 'site-search';
 
 export function createGuideKitHandler(options: GuideKitHandlerOptions) {
   const store = options.sessionStore ?? defaultSessionStore;
@@ -57,6 +59,12 @@ export function createGuideKitHandler(options: GuideKitHandlerOptions) {
           signingSecret: options.signingSecret,
           sessionStore: store,
           kind: 'tts',
+        });
+      case 'site-search':
+        return handleSiteSearch(request, {
+          signingSecret: options.signingSecret,
+          sessionStore: store,
+          ...options.siteKnowledge,
         });
       case 'health':
         return new Response(JSON.stringify({ status: 'ok' }), {

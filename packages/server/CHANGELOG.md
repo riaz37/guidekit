@@ -1,5 +1,11 @@
 # @guidekit/server
 
+## 1.1.0
+
+### Minor Changes
+
+- Add Agent Runtime v1 foundations: server-backed site knowledge search, `searchSite` tooling, guided autonomy policy, and action-risk classification for interactive elements.
+
 ## 1.0.2
 
 ### Patch Changes

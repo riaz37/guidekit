@@ -29,10 +29,11 @@ test.describe('Voice smoke', () => {
       timeout: 45_000,
     });
 
-    const assistant = page.locator('.gk-message[data-role="assistant"]').first();
-    await expect(assistant).toContainText('Hello! How can I help you today?', {
-      timeout: 10_000,
-    });
+    await expect(
+      page.locator('.gk-message[data-role="assistant"]', {
+        hasText: 'Hello! How can I help you today?',
+      }),
+    ).toBeVisible({ timeout: 10_000 });
   });
 
   test('voice transcript reaches LLM and appears in the widget', async ({ page }) => {

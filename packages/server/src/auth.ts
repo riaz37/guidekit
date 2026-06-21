@@ -210,7 +210,7 @@ export async function createSessionToken(
     llmApiKey,
     expiresIn = '15m',
     allowedOrigins,
-    permissions = ['stt', 'tts', 'llm'],
+    permissions = ['stt', 'tts', 'llm', 'site:read'],
     userId,
     sessionId = crypto.randomUUID(),
     metadata,

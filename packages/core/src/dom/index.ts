@@ -14,6 +14,7 @@
  */
 
 import type {
+  ActionRisk,
   PageModel,
   PageSection,
   NavItem,
@@ -67,6 +68,13 @@ const INTERACTIVE_SELECTOR =
 
 /** Tags whose text value must never be captured. */
 const SENSITIVE_INPUT_TYPES = new Set(['password', 'tel', 'email']);
+
+const DESTRUCTIVE_ACTION_RE =
+  /\b(delete|remove|destroy|cancel subscription|close account|deactivate)\b/i;
+const PURCHASE_ACTION_RE =
+  /\b(pay|pay now|checkout|buy|purchase|place order|submit order|confirm payment|upgrade)\b/i;
+const AUTH_ACTION_RE =
+  /\b(log out|logout|sign out|sign in|login|log in|register|create account)\b/i;
 
 /** PII regex patterns stripped from text content. */
 const PII_PATTERNS: RegExp[] = [
@@ -264,6 +272,30 @@ function generateSectionId(el: Element): string {
 
   sectionCounter += 1;
   return `section-${sectionCounter}`;
+}
+
+function classifyActionRisk(el: Element, label: string, type?: string): ActionRisk {
+  const text = [
+    label,
+    el.getAttribute('aria-label') ?? '',
+    el.getAttribute('title') ?? '',
+    el.getAttribute('data-guidekit-target') ?? '',
+    el.id ?? '',
+    el.getAttribute('name') ?? '',
+  ].join(' ');
+
+  const tag = el.tagName.toLowerCase();
+  const role = el.getAttribute('role') ?? '';
+  const href = el.getAttribute('href') ?? '';
+
+  if (tag === 'input' && (type === 'password' || type === 'email')) return 'auth';
+  if (type === 'submit' || type === 'reset') return 'submit';
+  if (DESTRUCTIVE_ACTION_RE.test(text)) return 'destructive';
+  if (PURCHASE_ACTION_RE.test(text)) return 'purchase';
+  if (AUTH_ACTION_RE.test(text) || /\/(logout|login|signin|signout|auth)\b/i.test(href)) return 'auth';
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') return 'safe';
+  if (tag === 'button' || tag === 'a' || role === 'button' || role === 'link') return 'safe';
+  return 'unknown';
 }
 
 // ---------------------------------------------------------------------------
@@ -859,6 +891,7 @@ export class DOMScanner {
         role,
         isDisabled,
         guideKitTarget,
+        actionRisk: classifyActionRisk(el, label, type),
       });
     });
 

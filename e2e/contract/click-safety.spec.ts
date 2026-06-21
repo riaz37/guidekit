@@ -32,23 +32,39 @@ test.describe('Click safety', () => {
     expect(clicked).toBe(false);
   });
 
-  test('submit buttons blocked by default deny list', async ({ page }) => {
+  test('purchase actions require confirmation by autonomy policy', async ({ page }) => {
     await page.evaluate(() => {
-      const form = document.createElement('form');
-      form.id = 'gk-test-form';
-      form.innerHTML = '<button type="submit" id="gk-submit">Pay now</button>';
-      document.body.appendChild(form);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.id = 'gk-pay-now';
+      button.textContent = 'Pay now';
+      document.body.appendChild(button);
     });
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const model = window.__guidekitTest!.getPageModel() as {
+              interactiveElements?: Array<{ selector?: string; actionRisk?: string }>;
+            } | null;
+            return model?.interactiveElements?.some(
+              (element) => element.selector === '#gk-pay-now' && element.actionRisk === 'purchase',
+            ) ?? false;
+          }),
+        { timeout: 10_000 },
+      )
+      .toBe(true);
 
-    await mockLlmToolSequenceRoute(page, [geminiClickElementSse('#gk-submit')]);
+    await mockLlmToolSequenceRoute(page, [geminiClickElementSse('#gk-pay-now')]);
 
-    const waitForTool = page.evaluate(() =>
-      window.__guidekitTest!.waitForEvent('llm:tool-call', 25_000),
+    const waitForConfirmation = page.evaluate(() =>
+      window.__guidekitTest!.waitForEvent('action:confirmation-required', 25_000),
     );
 
-    await sendWidgetMessage(page, 'Submit the payment form.');
+    await sendWidgetMessage(page, 'Click pay now.');
 
-    const toolEvent = await waitForTool;
-    expect((toolEvent.data as { name?: string }).name).toBe('clickElement');
+    const event = await waitForConfirmation;
+    expect((event.data as { selector?: string; risk?: string }).selector).toBe('#gk-pay-now');
+    expect((event.data as { selector?: string; risk?: string }).risk).toBe('purchase');
   });
 });

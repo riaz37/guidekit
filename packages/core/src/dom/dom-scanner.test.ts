@@ -230,6 +230,29 @@ describe('DOMScanner', () => {
     expect(typeof passwordField!.label).toBe('string');
   });
 
+  it('classifies interactive elements by action risk', () => {
+    document.body.innerHTML = `
+      <main>
+        <button id="learn-more">Learn more</button>
+        <button id="delete-account">Delete account</button>
+        <button id="checkout">Checkout</button>
+        <button type="submit" id="submit-contact">Submit</button>
+        <input id="name" type="text" aria-label="Name">
+        <a id="logout" href="/logout">Log out</a>
+      </main>
+    `;
+
+    const scanner = new DOMScanner();
+    const model = scanner.scan();
+
+    expect(model.interactiveElements.find((el) => el.selector === '#learn-more')?.actionRisk).toBe('safe');
+    expect(model.interactiveElements.find((el) => el.selector === '#delete-account')?.actionRisk).toBe('destructive');
+    expect(model.interactiveElements.find((el) => el.selector === '#checkout')?.actionRisk).toBe('purchase');
+    expect(model.interactiveElements.find((el) => el.selector === '#submit-contact')?.actionRisk).toBe('submit');
+    expect(model.interactiveElements.find((el) => el.selector === '#name')?.actionRisk).toBe('safe');
+    expect(model.interactiveElements.find((el) => el.selector === '#logout')?.actionRisk).toBe('auth');
+  });
+
   // ---- maxNodes budget ----------------------------------------------------
 
   it('respects maxNodes budget', () => {

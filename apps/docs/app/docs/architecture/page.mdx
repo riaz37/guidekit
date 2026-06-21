@@ -189,6 +189,17 @@ All allocated resources tracked via ResourceManager:
 | `getVisibleSections` | What's in viewport |
 | `clickElement` | Programmatic click (whitelisted) |
 | `executeCustomAction` | Developer-defined actions |
+| `searchSite` | Search server-backed full-site knowledge |
+
+## Agent Runtime
+
+Agent Runtime v1 combines:
+
+1. **Site knowledge**: token-protected server search over indexed website documents.
+2. **Live page model**: current DOM sections, forms, overlays, navigation, and action-aware interactives.
+3. **Guided autonomy**: same-origin navigation and safe clicks can run automatically; submit, purchase, destructive, and auth actions require confirmation unless handled by developer-defined actions.
+
+`PageMemory` remains session/current-page memory. Whole-site context comes from `siteKnowledge`, which keeps large or private indexes server-side.
 
 ## Technology Stack
 

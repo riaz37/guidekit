@@ -1,5 +1,15 @@
 # @guidekit/core
 
+## 1.3.0
+
+### Minor Changes
+
+- Add Agent Runtime v1 foundations: server-backed site knowledge search, `searchSite` tooling, guided autonomy policy, and action-risk classification for interactive elements.
+
+### Patch Changes
+
+- Fix `ResourceManager is tearing_down` error and session reset when a `GuideKitCore` instance is destroyed and re-initialized (React StrictMode remount or navigation). `destroy()` now sets its shutdown promise synchronously, waits for any in-flight `init()` inside that promise, and forces the instance back to not-ready if init completes mid-teardown. `init()` also defensively acquires a fresh `ResourceManager` when the existing one is still tearing down, and bus listeners are re-registered so `onError`/`onEvent` continue to fire after re-init.
+
 ## 1.2.1
 
 ### Patch Changes

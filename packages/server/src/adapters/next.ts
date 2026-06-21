@@ -12,6 +12,7 @@ export interface NextGuideKitRoutes {
   POST_llm: (request: Request) => Promise<Response>;
   POST_stt: (request: Request) => Promise<Response>;
   POST_tts: (request: Request) => Promise<Response>;
+  POST_siteSearch: (request: Request) => Promise<Response>;
   GET_health: () => Promise<Response>;
 }
 
@@ -25,6 +26,7 @@ export function createNextAppRouterRoutes(
     POST_llm: (request: Request) => handler(request, 'llm'),
     POST_stt: (request: Request) => handler(request, 'stt'),
     POST_tts: (request: Request) => handler(request, 'tts'),
+    POST_siteSearch: (request: Request) => handler(request, 'site-search'),
     GET_health: () => handler(new Request('http://localhost/health'), 'health'),
   };
 }

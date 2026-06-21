@@ -190,7 +190,16 @@ export function Providers({ children }: { children: React.ReactNode }) {
       tokenEndpoint="/api/guidekit/token"
       proxy={{ llm: '/api/guidekit/llm', health: '/api/guidekit/health' }}
       llm={{ provider: 'gemini', model: 'gemini-2.5-flash-lite' }}
+      siteKnowledge={{ endpoint: '/api/guidekit/site-search', topK: 5 }}
       navigation={{ router: { push: (href) => router.push(href) } }}
+      options={{
+        autonomy: {
+          level: 'guided',
+          allowNavigation: true,
+          allowSafeClicks: true,
+          requireConfirmationFor: ['submit', 'purchase', 'destructive', 'auth'],
+        },
+      }}
     >
       {children}
     </GuideKitProvider>
@@ -225,8 +234,10 @@ export function TabPanel({ activeTab }: { activeTab: string }) {
 2. Optional `contentMap` for product facts the DOM cannot infer
 3. Optional `data-guidekit-target` on critical CTAs (improves accuracy, not required)
 4. `clickableSelectors.allow/deny` for production click boundaries
-5. Redis session store for multi-instance deployments
-6. `hallucinationGuard={true}` + `intelligence={true}` for Platform Mode on public sites
+5. `siteKnowledge={{ endpoint: '/api/guidekit/site-search' }}` for full-site context
+6. `options.autonomy` for guided navigation/click policy
+7. Redis session store for multi-instance deployments
+8. `hallucinationGuard={true}` + `intelligence={true}` for Platform Mode on public sites
 
 See the example app routes `/plain`, `/spa-rescan`, and `/iframe-test` for unannotated page demos used in contract E2E.
 

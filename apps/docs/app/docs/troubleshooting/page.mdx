@@ -158,9 +158,9 @@ Visual/rendering exports live under `@guidekit/core/rendering` to keep the vanil
 
 ### Permission denied (403)
 
-**Symptom:** STT/TTS/LLM proxy returns `403` with *Permission "llm" not granted* (or `stt` / `tts`).
+**Symptom:** STT/TTS/LLM/site-search proxy returns `403` with *Permission "llm" not granted* (or `stt` / `tts` / `site:read`).
 
-**Fix:** Mint tokens with the required `permissions` array, e.g. `['stt', 'tts', 'llm']` (default).
+**Fix:** Mint tokens with the required `permissions` array, e.g. `['stt', 'tts', 'llm', 'site:read']` (default).
 
 ## Recoverable vs non-recoverable errors
 

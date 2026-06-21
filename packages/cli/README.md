@@ -41,6 +41,8 @@ Scaffolds GuideKit into your project. Detects your framework (Next.js App Router
 ```bash
 npx guidekit init
 npx guidekit init --platform   # also scaffolds STT/TTS routes and Platform Mode props
+npx guidekit init --yes        # non-interactive defaults
+npx guidekit init --json       # machine-readable output
 ```
 
 ### `guidekit doctor`
@@ -55,6 +57,8 @@ Checks your environment for common issues:
 
 ```bash
 npx guidekit doctor
+npx guidekit doctor --fix      # apply safe fixes automatically
+npx guidekit doctor --json     # machine-readable output
 ```
 
 ### `guidekit generate-secret`
@@ -63,9 +67,12 @@ Generates a cryptographically secure signing secret for token generation.
 
 ```bash
 npx guidekit generate-secret
+npx guidekit generate-secret --write-env   # write GUIDEKIT_SECRET to .env.local
+npx guidekit generate-secret --copy        # copy the secret to the clipboard
+npx guidekit generate-secret --json        # machine-readable output
 ```
 
-Copy the output into your `.env.local` as `GUIDEKIT_SECRET`.
+Or run `npx guidekit` on its own to open an interactive menu.
 
 ## Documentation
 

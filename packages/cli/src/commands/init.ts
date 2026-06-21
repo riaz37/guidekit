@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import * as path from 'node:path';
+import { generateSecret } from '@guidekit/server';
 import {
   c,
   log,
@@ -10,20 +11,49 @@ import {
   warn,
   info,
   heading,
-  confirm,
-  select,
   fileExists,
   readFile,
   writeFile,
   findProjectRoot,
   detectFramework,
 } from '../utils.js';
+import { intro, outro, confirm, select } from '../prompts.js';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export type AuthMode = 'token' | 'direct';
+export type GuidanceMode = 'text' | 'voice' | 'platform';
+
+export interface FileOperationResult {
+  createdFiles: string[];
+  skippedFiles: string[];
+  warnings: string[];
+  nextSteps: string[];
+}
+
+export type InitOptions = {
+  platformMode?: boolean;
+  authMode?: AuthMode;
+  nonInteractive?: boolean;
+  cwd?: string;
+  outputFormat?: 'human' | 'json';
+  silent?: boolean;
+};
+
+export interface InitResult extends FileOperationResult {
+  framework: string;
+  authMode: AuthMode;
+  platformMode: boolean;
+  guidanceMode: GuidanceMode;
+}
 
 // ---------------------------------------------------------------------------
 // Templates
 // ---------------------------------------------------------------------------
 
-function tokenEndpointTemplate(framework: string, routesImportPath?: string): string {
+export function tokenEndpointTemplate(framework: string, routesImportPath?: string): string {
   if (framework === 'nextjs-app' && routesImportPath) {
     return `// app/api/guidekit/token/route.ts
 import { guidekitRoutes } from '${routesImportPath}';
@@ -94,7 +124,7 @@ export async function handleTokenRequest(req: any, res: any) {
 `;
 }
 
-function nextProxyRoutesTemplate(): string {
+export function nextProxyRoutesTemplate(): string {
   return `// lib/guidekit-routes.ts
 import { createNextAppRouterRoutes, getSharedSessionStore } from '@guidekit/server/next';
 
@@ -111,7 +141,7 @@ export const guidekitRoutes = createNextAppRouterRoutes({
 `;
 }
 
-function proxyRouteTemplate(
+export function proxyRouteTemplate(
   handler: 'POST_llm' | 'GET_health' | 'POST_stt' | 'POST_tts',
   routesImportPath: string,
 ): string {
@@ -122,7 +152,11 @@ export const ${exportName} = guidekitRoutes.${handler};
 `;
 }
 
-function providerTemplate(framework: string, platformMode = false): string {
+export function providerTemplate(
+  framework: string,
+  platformMode: boolean,
+  guidanceMode: GuidanceMode,
+): string {
   const platformProps = platformMode
     ? `
       proxy={{ llm: '/api/guidekit/llm', health: '/api/guidekit/health', stt: '/api/guidekit/stt', tts: '/api/guidekit/tts' }}
@@ -150,7 +184,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         greeting: 'Hi! How can I help you today?',
       }}
       options={{
-        mode: 'text',
+        mode: '${guidanceMode}',
         debug: process.env.NODE_ENV === 'development',
       }}
     >
@@ -173,7 +207,7 @@ function App({ children }) {
         greeting: 'Hi! How can I help you today?',
       }}
       options={{
-        mode: 'text',
+        mode: '${guidanceMode}',
         debug: process.env.NODE_ENV === 'development',
       }}
     >
@@ -184,7 +218,7 @@ function App({ children }) {
 `;
 }
 
-function envTemplate(): string {
+export function envTemplate(): string {
   return `# GuideKit SDK Configuration
 # Generate a signing secret: npx guidekit generate-secret
 GUIDEKIT_SECRET=
@@ -204,35 +238,35 @@ TTS_API_KEY=
 // File path helpers
 // ---------------------------------------------------------------------------
 
-function usesSrcApp(root: string): boolean {
+export function usesSrcApp(root: string): boolean {
   return fileExists(path.join(root, 'src', 'app'));
 }
 
-function getAppDir(root: string): string {
+export function getAppDir(root: string): string {
   return usesSrcApp(root)
     ? path.join(root, 'src', 'app')
     : path.join(root, 'app');
 }
 
-function getGuidekitRoutesImportPath(root: string): string {
+export function getGuidekitRoutesImportPath(root: string): string {
   return usesSrcApp(root)
     ? '../../../../../lib/guidekit-routes'
     : '../../../../lib/guidekit-routes';
 }
 
-function getProxyRoutesLibPath(root: string): string {
+export function getProxyRoutesLibPath(root: string): string {
   return path.join(root, 'lib', 'guidekit-routes.ts');
 }
 
-function getApiRoutePath(root: string, segment: string): string {
+export function getApiRoutePath(root: string, segment: string): string {
   return path.join(getAppDir(root), 'api', 'guidekit', segment, 'route.ts');
 }
 
-function getLayoutPath(root: string): string {
+export function getLayoutPath(root: string): string {
   return path.join(getAppDir(root), 'layout.tsx');
 }
 
-function getTokenEndpointPath(root: string, framework: string): string {
+export function getTokenEndpointPath(root: string, framework: string): string {
   if (framework === 'nextjs-app') {
     return getApiRoutePath(root, 'token');
   }
@@ -245,31 +279,134 @@ function getTokenEndpointPath(root: string, framework: string): string {
   return path.join(root, 'server', 'guidekit-token.ts');
 }
 
-function getProviderPath(root: string, framework: string): string {
+export function getProviderPath(root: string, framework: string): string {
   if (framework === 'nextjs-app') {
     return path.join(getAppDir(root), 'providers.tsx');
   }
   return '';  // No file created for other frameworks — just show instructions
 }
 
-async function scaffoldFile(
+// ---------------------------------------------------------------------------
+// Package / env helpers
+// ---------------------------------------------------------------------------
+
+function getMissingPackages(root: string, platformMode: boolean): string[] {
+  const pkgPath = path.join(root, 'package.json');
+  if (!fileExists(pkgPath)) return [];
+
+  const pkg = JSON.parse(readFile(pkgPath));
+  const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+
+  const missing: string[] = [];
+  if (!deps['@guidekit/core']) missing.push('@guidekit/core');
+  if (!deps['@guidekit/react']) missing.push('@guidekit/react');
+  if (!deps['@guidekit/server']) missing.push('@guidekit/server');
+  if (deps['@guidekit/react'] && !deps['@guidekit/vad']) {
+    missing.push('@guidekit/vad');
+  }
+  if (platformMode) {
+    if (!deps['@guidekit/intelligence']) missing.push('@guidekit/intelligence');
+    if (!deps['@guidekit/knowledge']) missing.push('@guidekit/knowledge');
+    if (!deps['@guidekit/plugins']) missing.push('@guidekit/plugins');
+  }
+
+  return missing;
+}
+
+export function updateEnvFile(envPath: string, key: string, value: string): void {
+  if (!fileExists(envPath)) return;
+  const content = readFile(envPath);
+  const regex = new RegExp(`^${key}=.*$`, 'm');
+  const line = `${key}=${value}`;
+  if (regex.test(content)) {
+    writeFile(envPath, content.replace(regex, line));
+  } else {
+    writeFile(envPath, `${content.trimEnd()}\n${line}\n`);
+  }
+}
+
+async function ensureEnvFile(
+  root: string,
+  result: InitResult,
+  nonInteractive: boolean,
+): Promise<void> {
+  const envPath = path.join(root, '.env.local');
+  const hasEnv = fileExists(envPath) || fileExists(path.join(root, '.env'));
+
+  if (!hasEnv) {
+    const shouldCreate = nonInteractive || await confirm('Create .env.local with GuideKit variables?');
+    if (shouldCreate) {
+      writeFile(envPath, envTemplate());
+      result.createdFiles.push(path.relative(root, envPath));
+      if (!nonInteractive) {
+        success(`Created ${c.dim}${path.relative(root, envPath)}${c.reset}`);
+      }
+    } else {
+      result.skippedFiles.push('.env.local');
+      result.nextSteps.push('Create a .env.local file with GUIDEKIT_SECRET and LLM_API_KEY');
+    }
+  }
+
+  // Generate a signing secret if one is not already configured.
+  if (fileExists(envPath)) {
+    const content = readFile(envPath);
+    const hasSecret = content.includes('GUIDEKIT_SECRET=') && !content.match(/GUIDEKIT_SECRET=\s*$/m);
+    if (!hasSecret) {
+      const secret = generateSecret();
+      updateEnvFile(envPath, 'GUIDEKIT_SECRET', secret);
+      if (!result.createdFiles.includes(path.relative(root, envPath))) {
+        result.createdFiles.push(path.relative(root, envPath));
+      }
+      if (!nonInteractive) {
+        success('Generated a signing secret and wrote it to .env.local');
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Scaffolding helpers
+// ---------------------------------------------------------------------------
+
+export async function scaffoldFile(
   filePath: string,
   content: string,
   label: string,
   root: string,
+  result: FileOperationResult,
+  nonInteractive: boolean,
 ): Promise<void> {
   if (fileExists(filePath)) {
-    info(`${label} already exists`);
-    return;
+    if (nonInteractive) {
+      result.skippedFiles.push(path.relative(root, filePath));
+      info(`${label} already exists — skipping`);
+      return;
+    }
+
+    const overwrite = await confirm(
+      `${label} already exists at ${c.dim}${path.relative(root, filePath)}${c.reset}. Overwrite?`,
+      { defaultValue: false },
+    );
+    if (!overwrite) {
+      result.skippedFiles.push(path.relative(root, filePath));
+      return;
+    }
   }
-  const create = await confirm(`Create ${label} at ${c.dim}${path.relative(root, filePath)}${c.reset}?`);
-  if (create) {
-    writeFile(filePath, content);
-    success(`Created ${c.dim}${path.relative(root, filePath)}${c.reset}`);
+
+  writeFile(filePath, content);
+  const rel = path.relative(root, filePath);
+  result.createdFiles.push(rel);
+  if (!nonInteractive) {
+    success(`Created ${c.dim}${rel}${c.reset}`);
   }
 }
 
-async function scaffoldNextProxyRoutes(root: string, platformMode: boolean): Promise<void> {
+export async function scaffoldNextProxyRoutes(
+  root: string,
+  platformMode: boolean,
+  result: FileOperationResult,
+  nonInteractive: boolean,
+): Promise<void> {
   const routesImportPath = getGuidekitRoutesImportPath(root);
 
   await scaffoldFile(
@@ -277,6 +414,8 @@ async function scaffoldNextProxyRoutes(root: string, platformMode: boolean): Pro
     nextProxyRoutesTemplate(),
     'proxy routes helper',
     root,
+    result,
+    nonInteractive,
   );
 
   await scaffoldFile(
@@ -284,18 +423,24 @@ async function scaffoldNextProxyRoutes(root: string, platformMode: boolean): Pro
     tokenEndpointTemplate('nextjs-app', routesImportPath),
     'token endpoint',
     root,
+    result,
+    nonInteractive,
   );
   await scaffoldFile(
     getApiRoutePath(root, 'llm'),
     proxyRouteTemplate('POST_llm', routesImportPath),
     'LLM proxy route',
     root,
+    result,
+    nonInteractive,
   );
   await scaffoldFile(
     getApiRoutePath(root, 'health'),
     proxyRouteTemplate('GET_health', routesImportPath),
     'health route',
     root,
+    result,
+    nonInteractive,
   );
 
   if (platformMode) {
@@ -304,17 +449,67 @@ async function scaffoldNextProxyRoutes(root: string, platformMode: boolean): Pro
       proxyRouteTemplate('POST_stt', routesImportPath),
       'STT proxy route',
       root,
+      result,
+      nonInteractive,
     );
     await scaffoldFile(
       getApiRoutePath(root, 'tts'),
       proxyRouteTemplate('POST_tts', routesImportPath),
       'TTS proxy route',
       root,
+      result,
+      nonInteractive,
     );
   }
 }
 
-async function maybeWireProvidersInLayout(root: string): Promise<void> {
+async function scaffoldTokenAuth(
+  root: string,
+  framework: string,
+  result: InitResult,
+  nonInteractive: boolean,
+): Promise<void> {
+  if (framework === 'nextjs-app') {
+    await scaffoldNextProxyRoutes(root, result.platformMode, result, nonInteractive);
+  } else {
+    const tokenPath = getTokenEndpointPath(root, framework);
+    await scaffoldFile(
+      tokenPath,
+      tokenEndpointTemplate(framework),
+      'token endpoint',
+      root,
+      result,
+      nonInteractive,
+    );
+  }
+}
+
+export async function scaffoldProvider(
+  root: string,
+  result: FileOperationResult,
+  framework: string,
+  platformMode: boolean,
+  guidanceMode: GuidanceMode,
+  nonInteractive: boolean,
+): Promise<void> {
+  const providerPath = getProviderPath(root, framework);
+  if (!providerPath) return;
+
+  await scaffoldFile(
+    providerPath,
+    providerTemplate(framework, platformMode, guidanceMode),
+    'provider component',
+    root,
+    result,
+    nonInteractive,
+  );
+}
+
+export async function maybeWireProvidersInLayout(
+  root: string,
+  result: FileOperationResult,
+  nonInteractive: boolean,
+): Promise<void> {
   const layoutPath = getLayoutPath(root);
   if (!fileExists(layoutPath)) return;
 
@@ -322,14 +517,22 @@ async function maybeWireProvidersInLayout(root: string): Promise<void> {
   if (
     layoutContent.includes('GuideKitProvider') ||
     layoutContent.includes('<Providers') ||
-    layoutContent.includes('from \'./providers\'') ||
+    layoutContent.includes("from './providers'") ||
     layoutContent.includes('from "./providers"')
   ) {
     return;
   }
 
+  if (nonInteractive) {
+    result.nextSteps.push(
+      `Import Providers from ./providers in ${path.relative(root, layoutPath)} and wrap {children}`,
+    );
+    return;
+  }
+
   const patch = await confirm(
     `Wrap ${c.dim}${path.relative(root, layoutPath)}${c.reset} with the Providers component?`,
+    { defaultValue: true },
   );
   if (!patch) return;
 
@@ -348,122 +551,117 @@ async function maybeWireProvidersInLayout(root: string): Promise<void> {
   }
 
   writeFile(layoutPath, updated);
+  result.createdFiles.push(path.relative(root, layoutPath));
   success(`Updated ${c.dim}${path.relative(root, layoutPath)}${c.reset}`);
+}
+
+// ---------------------------------------------------------------------------
+// Summary
+// ---------------------------------------------------------------------------
+
+function printSummary(result: InitResult, nonInteractive: boolean): void {
+  if (nonInteractive) return;
+
+  heading('Next steps');
+  log(`  ${c.bold}1.${c.reset} Add your API keys to ${c.cyan}.env.local${c.reset}`);
+
+  for (let i = 0; i < result.nextSteps.length; i++) {
+    log(`  ${c.bold}${i + 2}.${c.reset} ${result.nextSteps[i]}`);
+  }
+
+  log('');
+  log(`Run ${c.cyan}npx guidekit doctor${c.reset} to verify your setup.`);
+  log('');
 }
 
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
-export async function runInit(platformMode = false): Promise<void> {
-  heading('GuideKit — Project Setup');
+export async function runInit(options: InitOptions = {}): Promise<InitResult> {
+  const cwd = options.cwd ?? findProjectRoot();
+  const framework = detectFramework(cwd);
+  const nonInteractive = options.nonInteractive ?? false;
+  const silent = options.silent ?? false;
 
-  const root = findProjectRoot();
-  const framework = detectFramework(root);
+  const result: InitResult = {
+    framework,
+    authMode: options.authMode ?? 'token',
+    platformMode: options.platformMode ?? false,
+    guidanceMode: 'text',
+    createdFiles: [],
+    skippedFiles: [],
+    warnings: [],
+    nextSteps: [],
+  };
 
-  info(`Project root: ${c.dim}${root}${c.reset}`);
-  info(`Detected framework: ${c.bold}${framework}${c.reset}`);
-  log('');
+  if (!nonInteractive && !silent) {
+    intro('GuideKit — Project Setup', `Detected framework: ${framework}`);
+  }
 
-  // Step 1: Check if packages are installed
-  const pkgPath = path.join(root, 'package.json');
-  if (fileExists(pkgPath)) {
-    const pkg = JSON.parse(readFile(pkgPath));
-    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+  // Step 1: Check packages
+  const missing = getMissingPackages(cwd, result.platformMode);
+  if (missing.length > 0) {
+    result.warnings.push(`Missing packages: ${missing.join(', ')}`);
+    result.nextSteps.push(`Install missing packages: npm install ${missing.join(' ')}`);
+  } else if (!nonInteractive && !silent) {
+    success('All GuideKit packages are installed');
+    log('');
+  }
 
-    const missing: string[] = [];
-    if (!deps['@guidekit/core']) missing.push('@guidekit/core');
-    if (!deps['@guidekit/react']) missing.push('@guidekit/react');
-    if (!deps['@guidekit/server']) missing.push('@guidekit/server');
-    if (deps['@guidekit/react'] && !deps['@guidekit/vad']) {
-      missing.push('@guidekit/vad');
-    }
-    if (platformMode) {
-      if (!deps['@guidekit/intelligence']) missing.push('@guidekit/intelligence');
-      if (!deps['@guidekit/knowledge']) missing.push('@guidekit/knowledge');
-      if (!deps['@guidekit/plugins']) missing.push('@guidekit/plugins');
-    }
+  // Step 2: Choose guidance mode
+  if (!nonInteractive) {
+    const guidanceMode = await select<GuidanceMode>('What kind of guidance do you want?', [
+      { value: 'text', label: 'Text guidance', hint: 'Chat-based help widget' },
+      { value: 'voice', label: 'Voice guidance', hint: 'Speech input + output (requires @guidekit/vad)' },
+      { value: 'platform', label: 'Platform Mode', hint: 'RAG, plugins, cognitive page analysis' },
+    ]);
+    result.guidanceMode = guidanceMode;
+    result.platformMode = result.platformMode || guidanceMode === 'platform';
 
-    if (missing.length > 0) {
-      warn(`Missing packages: ${missing.join(', ')}`);
-      log(`  Run: ${c.cyan}npm install ${missing.join(' ')}${c.reset}`);
-      log('');
-    } else {
-      success('All GuideKit packages are installed');
+    if (guidanceMode === 'voice' && !missing.includes('@guidekit/vad')) {
+      result.warnings.push('Voice mode requires @guidekit/vad. Make sure to install it.');
     }
   }
 
-  // Step 2: Auth mode selection
-  const authMode = await select('How do you want to authenticate?', [
-    'Token endpoint (recommended for production)',
-    'Direct API keys (quick prototyping only)',
-  ]);
+  // Step 3: Choose auth mode
+  if (!nonInteractive) {
+    result.authMode = await select<AuthMode>('How do you want to authenticate?', [
+      { value: 'token', label: 'Token endpoint (recommended)', hint: 'Server holds API keys; client gets JWT tokens' },
+      { value: 'direct', label: 'Direct API keys', hint: 'Quick prototyping only — keys live in the browser' },
+    ]);
+  }
 
-  log('');
+  // Step 4: Environment file + secret
+  await ensureEnvFile(cwd, result, nonInteractive);
 
-  // Step 3: Create .env file
-  const envPath = path.join(root, '.env.local');
-  if (!fileExists(envPath) && !fileExists(path.join(root, '.env'))) {
-    const createEnv = await confirm('Create .env.local with GuideKit variables?');
-    if (createEnv) {
-      writeFile(envPath, envTemplate());
-      success(`Created ${c.dim}${path.relative(root, envPath)}${c.reset}`);
-    }
+  // Step 5: Scaffold routes / provider
+  if (result.authMode === 'token') {
+    await scaffoldTokenAuth(cwd, framework, result, nonInteractive);
   } else {
-    info('.env file already exists — make sure GUIDEKIT_SECRET and LLM_API_KEY are set');
+    result.warnings.push(
+      'Direct API key mode selected. You must set llm.apiKey in your provider manually.',
+    );
   }
-
-  // Step 4: Create proxy routes (if token auth)
-  if (authMode === 0) {
-    if (framework === 'nextjs-app') {
-      await scaffoldNextProxyRoutes(root, platformMode);
-    } else {
-      const tokenPath = getTokenEndpointPath(root, framework);
-      await scaffoldFile(
-        tokenPath,
-        tokenEndpointTemplate(framework),
-        'token endpoint',
-        root,
-      );
-    }
-  }
-
-  // Step 5: Create provider wrapper (for Next.js App Router)
-  if (framework === 'nextjs-app') {
-    const providerPath = getProviderPath(root, framework);
-    if (providerPath && !fileExists(providerPath)) {
-      const createProvider = await confirm(`Create provider component at ${c.dim}${path.relative(root, providerPath)}${c.reset}?`);
-      if (createProvider) {
-        writeFile(providerPath, providerTemplate(framework, platformMode));
-        success(`Created ${c.dim}${path.relative(root, providerPath)}${c.reset}`);
-      }
-    } else if (providerPath) {
-      info('Provider component already exists');
-    }
-
-    await maybeWireProvidersInLayout(root);
-  }
-
-  // Step 6: Summary
-  log('');
-  heading('Next steps');
-
-  log(`  ${c.bold}1.${c.reset} Generate a signing secret:`);
-  log(`     ${c.cyan}npx guidekit generate-secret${c.reset}`);
-  log('');
-  log(`  ${c.bold}2.${c.reset} Add your API keys to ${c.cyan}.env.local${c.reset}`);
-  log('');
-  log(`  ${c.bold}3.${c.reset} Wrap your app in ${c.cyan}<GuideKitProvider>${c.reset}`);
 
   if (framework === 'nextjs-app') {
-    log(`     Import ${c.cyan}Providers${c.reset} from ${c.cyan}./providers${c.reset} in your ${c.cyan}layout.tsx${c.reset}`);
-    log(`     (or run init again — it can patch layout.tsx for you)`);
+    await scaffoldProvider(cwd, result, framework, result.platformMode, result.guidanceMode, nonInteractive);
+    await maybeWireProvidersInLayout(cwd, result, nonInteractive);
+  } else {
+    result.nextSteps.push('Wrap your app root in <GuideKitProvider> with tokenEndpoint="/api/guidekit/token"');
   }
 
-  log('');
-  log(`  ${c.bold}4.${c.reset} Run the doctor to verify your setup:`);
-  log(`     ${c.cyan}npx guidekit doctor${c.reset}`);
-  log('');
+  // Step 6: Warnings + summary
+  if (!silent) {
+    for (const warning of result.warnings) {
+      warn(warning);
+    }
+    if (result.warnings.length > 0) {
+      log('');
+    }
+    outro('Setup complete');
+  }
+  printSummary(result, silent);
 
-  success('Setup complete!');
+  return result;
 }

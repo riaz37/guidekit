@@ -441,13 +441,13 @@ describe('token payload integrity', () => {
     expect(p.iat).toBeLessThanOrEqual(Math.floor(Date.now() / 1000));
   });
 
-  it('default permissions are [stt, tts, llm]', async () => {
+  it('default permissions are [stt, tts, llm, site:read]', async () => {
     const { token } = await createSessionToken({
       signingSecret: TEST_SECRET,
     });
 
     const payload = decodePayload(token);
-    expect(payload.permissions).toEqual(['stt', 'tts', 'llm']);
+    expect(payload.permissions).toEqual(['stt', 'tts', 'llm', 'site:read']);
   });
 
   it('default expiresIn is 15m (900s)', async () => {

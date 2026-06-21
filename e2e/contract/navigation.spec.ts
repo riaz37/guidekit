@@ -51,4 +51,18 @@ test.describe('Page Navigation', () => {
     await page.waitForSelector('#guidekit-widget', { timeout: 15_000 });
     await expect(page.locator('.gk-fab')).toBeVisible({ timeout: 10_000 });
   });
+
+  test('open assistant session survives client-side page navigation', async ({ page }) => {
+    await page.locator('.gk-fab').click();
+    await expect(page.locator('[data-testid="guidekit-panel"]')).toHaveAttribute('data-open', 'true');
+
+    await page.locator('.gk-input').fill('Keep this session open');
+
+    await page.click('a[href="/about"]');
+    await expect(page).toHaveURL('/about');
+    await expect(page.locator('h1')).toContainText('About GuideKit');
+
+    await expect(page.locator('[data-testid="guidekit-panel"]')).toHaveAttribute('data-open', 'true');
+    await expect(page.locator('.gk-input')).toHaveValue('Keep this session open');
+  });
 });

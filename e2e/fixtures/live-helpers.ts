@@ -96,7 +96,8 @@ export async function openWidgetInput(page: Page) {
   await fab.waitFor({ state: 'visible', timeout: 10_000 });
   await fab.click();
   await waitForWidgetPanelOpen(page);
-  const input = page.getByTestId('guidekit-input');
+  // React widget exposes data-testid; vanilla widget uses class .gk-input.
+  const input = page.locator('.gk-input');
   await input.waitFor({ state: 'visible', timeout: 10_000 });
   return input;
 }

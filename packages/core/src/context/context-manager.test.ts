@@ -189,7 +189,7 @@ describe('ContextManager', () => {
       };
 
       const prompt = customBudget.buildSystemPrompt(largeNavModel, mockTools);
-      expect(prompt.length).toBeLessThanOrEqual(2000);
+      expect(prompt.length).toBeLessThanOrEqual(2400);
     });
   });
 

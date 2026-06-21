@@ -117,6 +117,60 @@ export function findProjectRoot(): string {
   return process.cwd();
 }
 
+// ---------------------------------------------------------------------------
+// Clipboard helper (no external dependencies)
+// ---------------------------------------------------------------------------
+
+import { spawn } from 'node:child_process';
+
+async function tryCopyCommand(
+  text: string,
+  cmd: string,
+  args: string[] = [],
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn(cmd, args, { stdio: ['pipe', 'ignore', 'ignore'] });
+    let settled = false;
+
+    child.on('error', () => {
+      if (settled) return;
+      settled = true;
+      resolve(false);
+    });
+
+    child.on('close', (code) => {
+      if (settled) return;
+      settled = true;
+      resolve(code === 0);
+    });
+
+    child.stdin.write(text, 'utf-8', (err) => {
+      if (err) {
+        if (settled) return;
+        settled = true;
+        resolve(false);
+        return;
+      }
+      child.stdin.end();
+    });
+  });
+}
+
+export async function copyToClipboard(text: string): Promise<boolean> {
+  const platform = process.platform;
+  if (platform === 'darwin') {
+    return tryCopyCommand(text, 'pbcopy');
+  }
+  if (platform === 'win32') {
+    return tryCopyCommand(text, 'clip');
+  }
+  // Linux / other Unix: try xclip then xsel
+  if (await tryCopyCommand(text, 'xclip', ['-selection', 'clipboard', '-in'])) {
+    return true;
+  }
+  return tryCopyCommand(text, 'xsel', ['--clipboard', '--input']);
+}
+
 export function detectFramework(
   root: string,
 ): 'nextjs-app' | 'nextjs-pages' | 'react' | 'unknown' {

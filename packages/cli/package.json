@@ -1,6 +1,6 @@
 {
   "name": "@guidekit/cli",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "CLI tools for GuideKit SDK — init, doctor, generate-secret",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -31,13 +31,15 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@guidekit/server": "workspace:^"
+    "@guidekit/server": "workspace:^",
+    "prompts": "^2.4.2"
   },
   "devDependencies": {
-    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0",
+    "@types/prompts": "^2.4.9",
     "tsup": "^8.4.0",
-    "vitest": "^3.0.0",
-    "@types/node": "^22.0.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
   },
   "sideEffects": false,
   "license": "MIT",

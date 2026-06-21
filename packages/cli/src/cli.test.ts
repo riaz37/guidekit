@@ -126,7 +126,8 @@ describe('run() — CLI entry point', () => {
     await run(['--help']);
     const output = allOutput();
     expect(output).toContain('Commands');
-    expect(output).toContain('Options');
+    expect(output).toContain('Init options');
+    expect(output).toContain('Global options');
   });
 
   it('shows help with -h flag', async () => {
@@ -477,27 +478,27 @@ describe('generate-secret command', () => {
 
   it('calls generateSecret from @guidekit/server', async () => {
     const { runGenerateSecret } = await import('./commands/generate-secret.js');
-    await runGenerateSecret();
+    await runGenerateSecret({ nonInteractive: true });
     expect(generateSecret).toHaveBeenCalledOnce();
   });
 
   it('outputs the generated secret', async () => {
     const { runGenerateSecret } = await import('./commands/generate-secret.js');
-    await runGenerateSecret();
+    await runGenerateSecret({ nonInteractive: true });
     const output = allOutput();
     expect(output).toContain('mock-secret-abcdefghijklmnopqrstuvwxyz123456');
   });
 
   it('outputs heading', async () => {
     const { runGenerateSecret } = await import('./commands/generate-secret.js');
-    await runGenerateSecret();
+    await runGenerateSecret({ nonInteractive: true });
     const output = allOutput();
     expect(output).toContain('Generate Signing Secret');
   });
 
-  it('shows .env instructions', async () => {
+  it('shows .env instructions when not writing to file', async () => {
     const { runGenerateSecret } = await import('./commands/generate-secret.js');
-    await runGenerateSecret();
+    await runGenerateSecret({ nonInteractive: true });
     const output = allOutput();
     expect(output).toContain('GUIDEKIT_SECRET=');
     expect(output).toContain('.env');
@@ -505,10 +506,25 @@ describe('generate-secret command', () => {
 
   it('shows warning about version control', async () => {
     const { runGenerateSecret } = await import('./commands/generate-secret.js');
-    await runGenerateSecret();
+    await runGenerateSecret({ nonInteractive: true });
     const output = allOutput();
     expect(output).toContain('Warning');
     expect(output).toContain('version control');
+  });
+
+  it('writes GUIDEKIT_SECRET to .env.local when writeEnv is true', async () => {
+    const { runGenerateSecret } = await import('./commands/generate-secret.js');
+    await runGenerateSecret({ nonInteractive: true, writeEnv: true });
+    const output = allOutput();
+    expect(output).toContain('Saved GUIDEKIT_SECRET');
+    expect(mockWriteFileSync).toHaveBeenCalled();
+  });
+
+  it('returns the secret and write path when writing to .env.local', async () => {
+    const { runGenerateSecret } = await import('./commands/generate-secret.js');
+    const result = await runGenerateSecret({ nonInteractive: true, writeEnv: true });
+    expect(result.secret).toBe('mock-secret-abcdefghijklmnopqrstuvwxyz123456');
+    expect(result.writtenTo).toContain('.env.local');
   });
 });
 
@@ -1091,7 +1107,7 @@ describe('doctor — summary output', () => {
     expect(output).toContain('All checks passed');
   });
 
-  it('shows Results heading', async () => {
+  it('shows Environment section heading', async () => {
     mockExistsSync.mockImplementation((p) => {
       if (String(p) === path.join('/project', 'package.json')) return true;
       return false;
@@ -1102,7 +1118,7 @@ describe('doctor — summary output', () => {
     const { runDoctor } = await import('./commands/doctor.js');
     await runDoctor();
     const output = allOutput();
-    expect(output).toContain('Results');
+    expect(output).toContain('Environment');
   });
 
   it('shows project root info', async () => {
@@ -1338,7 +1354,7 @@ describe('init — template generation', () => {
     await runInit();
     const output = allOutput();
     expect(output).toContain('GuideKit');
-    expect(output).toContain('Project root');
+    expect(output).toContain('Detected framework');
     expect(output).toContain('react');
   });
 
@@ -1425,7 +1441,7 @@ describe('init — template generation', () => {
     await runInit();
     const output = allOutput();
     expect(output).toContain('Next steps');
-    expect(output).toContain('generate-secret');
+    expect(output).toContain('Add your API keys to .env.local');
     expect(output).toContain('GuideKitProvider');
     expect(output).toContain('Setup complete');
   });
@@ -1541,5 +1557,106 @@ describe('run() — command dispatching', () => {
     await run(['doctor']);
     const output = allOutput();
     expect(output).toContain('GuideKit Doctor');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test Suite: init — non-interactive options
+// ---------------------------------------------------------------------------
+
+describe('init — non-interactive options', () => {
+  beforeEach(() => {
+    captureConsole();
+    resetFsMocks();
+    vi.spyOn(process, 'cwd').mockReturnValue('/project');
+    mockExistsSync.mockImplementation((p) => {
+      if (String(p) === path.join('/project', 'package.json')) return true;
+      return false;
+    });
+    mockReadFileSync.mockReturnValue(
+      JSON.stringify({ dependencies: { react: '^18.0.0' } }),
+    );
+  });
+
+  afterEach(() => {
+    restoreConsole();
+    process.env = { ...originalEnv };
+  });
+
+  it('runInit returns an InitResult', async () => {
+    const { runInit } = await import('./commands/init.js');
+    const result = await runInit({ nonInteractive: true });
+    expect(result.framework).toBe('react');
+    expect(result.authMode).toBe('token');
+    expect(result.guidanceMode).toBe('text');
+    expect(result.createdFiles.length).toBeGreaterThan(0);
+  });
+
+  it('runInit with platformMode enables Platform Mode', async () => {
+    const { runInit } = await import('./commands/init.js');
+    const result = await runInit({ nonInteractive: true, platformMode: true });
+    expect(result.platformMode).toBe(true);
+  });
+
+  it('runInit with authMode direct warns about manual setup', async () => {
+    const { runInit } = await import('./commands/init.js');
+    const result = await runInit({ nonInteractive: true, authMode: 'direct' });
+    expect(result.authMode).toBe('direct');
+    expect(result.warnings.some((w) => w.includes('Direct API key'))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test Suite: run() — init flags
+// ---------------------------------------------------------------------------
+
+describe('run() — init flags', () => {
+  beforeEach(() => {
+    captureConsole();
+    resetFsMocks();
+    vi.spyOn(process, 'cwd').mockReturnValue('/project');
+    mockExistsSync.mockImplementation((p) => {
+      if (String(p) === path.join('/project', 'package.json')) return true;
+      return false;
+    });
+    mockReadFileSync.mockReturnValue(
+      JSON.stringify({ dependencies: { react: '^18.0.0' } }),
+    );
+  });
+
+  afterEach(() => {
+    restoreConsole();
+    process.env = { ...originalEnv };
+  });
+
+  it('init --yes runs non-interactively', async () => {
+    const { run } = await import('./cli.js');
+    await run(['init', '--yes']);
+    const output = allOutput();
+    expect(output).toContain('Setup complete');
+  });
+
+  it('init --json outputs JSON', async () => {
+    const { run } = await import('./cli.js');
+    await run(['init', '--json']);
+    const output = allOutput().trim();
+    const result = JSON.parse(output);
+    expect(result.framework).toBe('react');
+    expect(result.authMode).toBe('token');
+    expect(result.createdFiles.length).toBeGreaterThan(0);
+  });
+
+  it('init --yes --platform enables Platform Mode', async () => {
+    const { run } = await import('./cli.js');
+    await run(['init', '--yes', '--platform']);
+    const output = allOutput();
+    expect(output).toContain('Setup complete');
+  });
+
+  it('init --yes --auth-mode direct selects direct auth', async () => {
+    const { run } = await import('./cli.js');
+    await run(['init', '--yes', '--auth-mode', 'direct']);
+    const output = allOutput();
+    expect(output).toContain('Direct API key');
   });
 });

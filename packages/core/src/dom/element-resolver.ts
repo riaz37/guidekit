@@ -57,6 +57,25 @@ export function resolveSectionSelector(
   };
 }
 
+export function resolveFormFieldByLabel(
+  model: PageModel,
+  label: string,
+): ElementResolveResult | null {
+  const allFields = model.forms.flatMap((f) => f.fields);
+  const labels = allFields.map((f) => f.label);
+  const matched = fuzzyMatchLabel(label, labels.filter(Boolean));
+  if (!matched) return null;
+
+  const field = allFields.find((f) => f.label === matched);
+  if (!field) return null;
+
+  return {
+    selector: field.selector,
+    confidence: 0.8,
+    reason: `form-field:${matched}`,
+  };
+}
+
 export function resolveInteractiveByLabel(
   model: PageModel,
   label: string,
@@ -94,7 +113,9 @@ export function resolveElement(
   if (request.label) {
     const bySection = resolveSectionSelector(model, request.label);
     if (bySection) return bySection;
-    return resolveInteractiveByLabel(model, request.label);
+    const byInteractive = resolveInteractiveByLabel(model, request.label);
+    if (byInteractive) return byInteractive;
+    return resolveFormFieldByLabel(model, request.label);
   }
 
   return null;

@@ -1,5 +1,17 @@
 # @guidekit/react
 
+## 1.3.0
+
+### Minor Changes
+
+- Add Agent Runtime v1 foundations: server-backed site knowledge search, `searchSite` tooling, guided autonomy policy, and action-risk classification for interactive elements.
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+  - @guidekit/core@1.3.0
+
 ## 1.2.2
 
 ### Patch Changes

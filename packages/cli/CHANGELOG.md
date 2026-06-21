@@ -1,5 +1,23 @@
 # @guidekit/cli
 
+## 1.1.0
+
+### Minor Changes
+
+- Make the CLI fully interactive while keeping it the canonical interface.
+
+  - Added a TTY/CI prompt abstraction (`prompts` with readline fallback).
+  - Reworked `guidekit init` as a wizard with `--yes`, `--platform`, `--auth-mode`, and `--json` flags.
+  - Reworked `guidekit doctor` to return structured results, added safe auto-fixes (`--fix`), and `--json` output.
+  - Improved `guidekit generate-secret` with `--write-env`, `--copy`, and `--json` options.
+  - Added an interactive top-level menu when `guidekit` is run without a command in a TTY.
+  - Updated CLI documentation and README.
+
+### Patch Changes
+
+- Updated dependencies
+  - @guidekit/server@1.1.0
+
 ## 1.0.2
 
 ### Patch Changes

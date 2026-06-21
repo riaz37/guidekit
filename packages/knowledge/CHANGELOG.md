@@ -1,5 +1,13 @@
 # @guidekit/knowledge
 
+## 4.0.0
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+  - @guidekit/core@1.3.0
+
 ## 3.0.0
 
 ### Patch Changes

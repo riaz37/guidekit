@@ -1,5 +1,6 @@
 import { createNextAppRouterRoutes } from '@guidekit/server/next';
 import { guidekitSessionStore } from './guidekit-session-store';
+import { platformSiteDocuments } from './guidekit-platform';
 
 function parseAllowedOrigins(): string[] | undefined {
   const raw = process.env.GUIDEKIT_ALLOWED_ORIGINS;
@@ -22,4 +23,8 @@ export const guidekitRoutes = createNextAppRouterRoutes({
     expiresIn: '15m',
     allowedOrigins: parseAllowedOrigins(),
   }),
+  siteKnowledge: {
+    documents: platformSiteDocuments,
+    topK: 5,
+  },
 });

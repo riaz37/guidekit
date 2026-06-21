@@ -22,6 +22,16 @@ const routes = createNextAppRouterRoutes({
     ttsApiKey: process.env.TTS_API_KEY,
     expiresIn: '15m',
   }),
+  siteKnowledge: {
+    documents: [
+      {
+        id: 'pricing',
+        title: 'Pricing',
+        content: 'The Pro plan includes guided autonomy and priority support.',
+        metadata: { url: '/pricing' },
+      },
+    ],
+  },
 });
 
 export const POST = routes.POST_token;
@@ -31,6 +41,9 @@ export const POST = routes.POST_llm;
 
 // app/api/guidekit/health/route.ts
 export const GET = routes.GET_health;
+
+// app/api/guidekit/site-search/route.ts
+export const POST = routes.POST_siteSearch;
 ```
 
 ## Client configuration (zero browser keys)
@@ -40,6 +53,7 @@ export const GET = routes.GET_health;
   tokenEndpoint="/api/guidekit/token"
   proxy={{ llm: '/api/guidekit/llm', health: '/api/guidekit/health' }}
   llm={{ provider: 'gemini', model: 'gemini-2.5-flash' }}
+  siteKnowledge={{ endpoint: '/api/guidekit/site-search', topK: 5 }}
 />
 ```
 
@@ -101,7 +115,7 @@ const handler = createGuideKitHandler({
   }),
 });
 
-// Route dispatch: 'token' | 'llm' | 'health' | 'stt' | 'tts'
+// Route dispatch: 'token' | 'llm' | 'health' | 'stt' | 'tts' | 'site-search'
 export async function onRequest(request: Request, route: string) {
   return handler(request, route as 'token');
 }
@@ -115,9 +129,10 @@ export async function onRequest(request: Request, route: string) {
 | `/llm` | POST | Stream LLM requests with server-side key |
 | `/stt` | POST | Mint STT credentials for voice |
 | `/tts` | POST | Mint TTS credentials for voice |
+| `/site-search` | POST | Search server-backed website knowledge |
 | `/health` | GET | Health check |
 
-All proxy routes require `Authorization: Bearer <session-token>` except `/token`.
+All proxy routes require `Authorization: Bearer <session-token>` except `/token`. The default token permissions are `stt`, `tts`, `llm`, and `site:read`.
 
 ## Rate limiting
 

@@ -8,9 +8,9 @@ export default function SpaRescanPage() {
   const [variant, setVariant] = useState<'a' | 'b'>('a');
 
   useEffect(() => {
-    if (!core?.isReady || typeof core.rescanPage !== 'function') return;
-    core.rescanPage();
-  }, [variant, core?.isReady, core]);
+    if (core === null || !core.isReady) return;
+    void core.rescanPage();
+  }, [variant, core]);
 
   return (
     <main style={{ maxWidth: '720px', margin: '0 auto', padding: '32px 16px' }}>

@@ -238,6 +238,42 @@ describe('GuideKitCore.sendText()', () => {
 
       await core.destroy();
     });
+
+    it('adds server site knowledge to the system prompt during retrieval', async () => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: 'security',
+                title: 'Security',
+                url: '/security',
+                excerpt: 'Provider API keys stay on the server.',
+                score: 4,
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ) as typeof fetch;
+
+      const core = await createInitializedCore({
+        tokenEndpoint: '/api/guidekit/token',
+        siteKnowledge: { endpoint: '/api/guidekit/site-search', topK: 3 },
+      });
+
+      await core.sendText('Where are API keys stored?');
+
+      expect(mockToolExecutor.executeWithToolsStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          systemPrompt: expect.stringContaining('Provider API keys stay on the server.'),
+        }),
+      );
+
+      globalThis.fetch = originalFetch;
+      await core.destroy();
+    });
   });
 
   // -----------------------------------------------------------------------

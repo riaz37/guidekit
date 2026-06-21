@@ -47,6 +47,14 @@ export function geminiClickElementSse(selector: string): string {
   return geminiToolCallSse('clickElement', { selector });
 }
 
+export function geminiSearchSiteSse(query: string, topK?: number): string {
+  return geminiToolCallSse('searchSite', topK === undefined ? { query } : { query, topK });
+}
+
+export function geminiNavigateSse(href: string): string {
+  return geminiToolCallSse('navigate', { href });
+}
+
 export function geminiExecuteCustomActionSse(actionId: string, params: Record<string, unknown>): string {
   return geminiToolCallSse('executeCustomAction', { actionId, params });
 }

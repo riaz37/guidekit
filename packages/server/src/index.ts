@@ -29,6 +29,14 @@ export type { ProviderKeys, SessionStore, SessionEntry } from './session-store.j
 export { handleLLMProxy } from './proxy/llm.js';
 export type { LLMProxyOptions, LLMProxyRequestBody } from './proxy/llm.js';
 
+export { handleSiteSearch } from './proxy/site-search.js';
+export type {
+  SiteKnowledgeDocument,
+  SiteSearchOptions,
+  SiteSearchRequestBody,
+  SiteSearchResult,
+} from './proxy/site-search.js';
+
 export { handleVoiceProxy } from './proxy/voice.js';
 export type { VoiceProxyOptions, VoiceProxyKind } from './proxy/voice.js';
 

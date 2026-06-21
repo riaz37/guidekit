@@ -7,11 +7,15 @@ import type { DOMScanner } from '../dom/index.js';
 import {
   assessDangerousClick,
   resolveElement,
+  resolveFormFieldByLabel,
   resolveSectionSelector,
 } from '../dom/element-resolver.js';
 import { scrollAndRescan } from '../dom/rescan.js';
 import type {
+  AutonomyPolicy,
+  ActionRisk,
   PageModel,
+  SiteSearchResponse,
   ToolDefinition,
   ToolParameterSchema,
 } from '../types/index.js';
@@ -41,6 +45,10 @@ export interface BuiltinToolsHost extends VisualGuidanceApi {
     }
   >;
   clickableSelectors?: { allow?: string[]; deny?: string[] };
+  autonomy?: AutonomyPolicy;
+  siteKnowledge?: {
+    search: (query: string, options?: { topK?: number }) => Promise<SiteSearchResponse>;
+  };
 }
 
 type BuiltinSpec = ToolDefinition & {
@@ -58,6 +66,78 @@ function emitResolve(
     confidence: result.confidence,
     reason: result.reason,
   });
+}
+
+const DEFAULT_AUTONOMY: Required<AutonomyPolicy> = {
+  level: 'guided',
+  allowNavigation: true,
+  allowSafeClicks: true,
+  requireConfirmationFor: ['submit', 'purchase', 'destructive', 'auth'],
+};
+
+function resolveAutonomy(policy?: AutonomyPolicy): Required<AutonomyPolicy> {
+  return {
+    ...DEFAULT_AUTONOMY,
+    ...policy,
+    requireConfirmationFor:
+      policy?.requireConfirmationFor ?? DEFAULT_AUTONOMY.requireConfirmationFor,
+  };
+}
+
+function findInteractiveRisk(model: PageModel | null, selector: string): ActionRisk {
+  return (
+    model?.interactiveElements.find((el) => el.selector === selector)?.actionRisk ?? 'unknown'
+  );
+}
+
+function confirmationRequiredForRisk(policy: Required<AutonomyPolicy>, risk: ActionRisk): boolean {
+  if (policy.level === 'ask-every-action') return true;
+  if (policy.level === 'broad') return policy.requireConfirmationFor.includes(risk);
+  if (risk === 'safe') return !policy.allowSafeClicks;
+  return policy.requireConfirmationFor.includes(risk);
+}
+
+function setNativeInputValue(el: HTMLElement, value: string): void {
+  const tag = el.tagName.toLowerCase();
+  if (tag === 'input' || tag === 'textarea') {
+    const input = el as HTMLInputElement | HTMLTextAreaElement;
+    const proto = Object.getPrototypeOf(input);
+    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+    if (setter) {
+      setter.call(input, value);
+    } else {
+      input.value = value;
+    }
+    input.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    return;
+  }
+  if (el.isContentEditable) {
+    el.textContent = value;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    return;
+  }
+}
+
+function findFormFromChild(
+  selector: string | undefined,
+  label: string | undefined,
+  model: PageModel | null,
+): HTMLFormElement | null {
+  if (typeof document === 'undefined') return null;
+  if (selector) {
+    const el = document.querySelector(selector);
+    if (el instanceof HTMLFormElement) return el;
+    if (el) return el.closest('form');
+  }
+  if (label && model) {
+    const resolved = resolveFormFieldByLabel(model, label);
+    if (resolved) {
+      const el = document.querySelector(resolved.selector);
+      if (el) return el.closest('form');
+    }
+  }
+  return null;
 }
 
 export function getBuiltinToolSpecs(host: BuiltinToolsHost): BuiltinSpec[] {
@@ -151,9 +231,34 @@ export function getBuiltinToolSpecs(host: BuiltinToolsHost): BuiltinSpec[] {
       required: ['href'],
       schemaVersion: 1,
       execute: async (args) => {
+        const autonomy = resolveAutonomy(host.autonomy);
+        if (!autonomy.allowNavigation) {
+          return { success: false, error: 'Navigation is disabled by autonomy policy.' };
+        }
         const href = args.href as string;
         const result = await host.navigate(href);
         return { success: result, navigatedTo: result ? href : null };
+      },
+    },
+    {
+      name: 'searchSite',
+      description:
+        'Search server-backed website knowledge for content from any indexed page on the site.',
+      parameters: {
+        query: { type: 'string', description: 'Search query for website content' },
+        topK: { type: 'number', description: 'Maximum number of results to return' },
+      },
+      required: ['query'],
+      schemaVersion: 1,
+      execute: async (args) => {
+        const query = args.query as string | undefined;
+        if (!query || query.trim().length === 0) {
+          return { success: false, error: 'searchSite requires a query' };
+        }
+        if (!host.siteKnowledge) {
+          return { success: false, error: 'Site knowledge is not configured.' };
+        }
+        return host.siteKnowledge.search(query, { topK: args.topK as number | undefined });
       },
     },
     {
@@ -326,6 +431,10 @@ export function getBuiltinToolSpecs(host: BuiltinToolsHost): BuiltinSpec[] {
           }
         }
 
+        const autonomy = resolveAutonomy(host.autonomy);
+        const risk = findInteractiveRisk(model, selector);
+        const requiresConfirmation = confirmationRequiredForRisk(autonomy, risk);
+
         if (!isInDevAllowList) {
           const defaultDenied = DEFAULT_CLICK_DENY.some((pattern) => {
             try {
@@ -335,6 +444,19 @@ export function getBuiltinToolSpecs(host: BuiltinToolsHost): BuiltinSpec[] {
             }
           });
           if (defaultDenied) {
+            if (requiresConfirmation) {
+              host.bus?.emit('action:confirmation-required', {
+                selector,
+                risk,
+                reason: `Action risk "${risk}" requires confirmation by autonomy policy.`,
+              });
+              return {
+                success: false,
+                error: `Action risk "${risk}" requires confirmation by autonomy policy.`,
+                confirmationRequired: true,
+                risk,
+              };
+            }
             return {
               success: false,
               error: `Selector "${selector}" matches the default deny list. Add it to clickableSelectors.allow to override.`,
@@ -349,10 +471,25 @@ export function getBuiltinToolSpecs(host: BuiltinToolsHost): BuiltinSpec[] {
           };
         }
 
+        if (requiresConfirmation) {
+          host.bus?.emit('action:confirmation-required', {
+            selector,
+            risk,
+            reason: `Action risk "${risk}" requires confirmation by autonomy policy.`,
+          });
+          return {
+            success: false,
+            error: `Action risk "${risk}" requires confirmation by autonomy policy.`,
+            confirmationRequired: true,
+            risk,
+          };
+        }
+
         const danger = assessDangerousClick(selector, el);
         if (danger.blocked) {
           host.bus?.emit('action:confirmation-required', {
             selector,
+            risk,
             reason: danger.reason,
           });
           return {
@@ -363,6 +500,209 @@ export function getBuiltinToolSpecs(host: BuiltinToolsHost): BuiltinSpec[] {
         }
 
         el.click();
+        return { success: true };
+      },
+    },
+    {
+      name: 'fillInput',
+      description:
+        'Fill an input field, textarea, or contenteditable element with a text value. Use this when the user wants to type into a form field. Dispatches native input and change events so JavaScript frameworks detect the change.',
+      parameters: {
+        selector: { type: 'string', description: 'CSS selector of the input to fill' },
+        label: { type: 'string', description: 'Semantic label to resolve when selector is omitted (e.g. "email", "name", "message")' },
+        value: { type: 'string', description: 'Text value to set on the field' },
+      },
+      required: ['value'],
+      schemaVersion: 1,
+      execute: async (args) => {
+        if (typeof document === 'undefined') return { success: false, error: 'Not in browser' };
+
+        const model = host.getPageModel();
+        let selector = args.selector as string | undefined;
+        const label = args.label as string | undefined;
+        const value = (args.value as string) ?? '';
+
+        if (!selector && model) {
+          const resolved = label
+            ? resolveElement(model, { label })
+            : null;
+          if (!resolved) {
+            const fieldResolved = label ? resolveFormFieldByLabel(model, label) : null;
+            if (fieldResolved) {
+              emitResolve(host, 'fillInput', fieldResolved);
+              selector = fieldResolved.selector;
+            }
+          } else {
+            emitResolve(host, 'fillInput', resolved);
+            selector = resolved.selector;
+          }
+        }
+
+        if (!selector) return { success: false, error: 'Provide selector or label' };
+
+        const el = document.querySelector(selector);
+        if (!el) return { success: false, error: `Element not found: ${selector}` };
+        if (!(el instanceof HTMLElement)) return { success: false, error: 'Element is not an HTML element' };
+
+        const tag = el.tagName.toLowerCase();
+        const isInput = tag === 'input' || tag === 'textarea';
+        const isContentEditable = el.isContentEditable;
+        if (!isInput && !isContentEditable) {
+          return { success: false, error: `Element is not a fillable input: ${tag}` };
+        }
+
+        if (isInput) {
+          const input = el as HTMLInputElement | HTMLTextAreaElement;
+          if (input.disabled) return { success: false, error: 'Input is disabled' };
+          if (input.readOnly) return { success: false, error: 'Input is read-only' };
+        }
+
+        el.focus();
+        setNativeInputValue(el, value);
+        el.blur();
+
+        return { success: true, selector, filled: true };
+      },
+    },
+    {
+      name: 'selectOption',
+      description:
+        'Select an option from a <select> dropdown element by option value or visible text. Dispatches a native change event so JavaScript frameworks detect the selection.',
+      parameters: {
+        selector: { type: 'string', description: 'CSS selector of the select element' },
+        label: { type: 'string', description: 'Semantic label to resolve when selector is omitted (e.g. "country", "category")' },
+        option: { type: 'string', description: 'Value or visible text of the option to select' },
+      },
+      required: ['option'],
+      schemaVersion: 1,
+      execute: async (args) => {
+        if (typeof document === 'undefined') return { success: false, error: 'Not in browser' };
+
+        const model = host.getPageModel();
+        let selector = args.selector as string | undefined;
+        const label = args.label as string | undefined;
+        const option = (args.option as string) ?? '';
+
+        if (!selector && model) {
+          const resolved = label
+            ? resolveElement(model, { label })
+            : null;
+          if (!resolved) {
+            const fieldResolved = label ? resolveFormFieldByLabel(model, label) : null;
+            if (fieldResolved) {
+              emitResolve(host, 'selectOption', fieldResolved);
+              selector = fieldResolved.selector;
+            }
+          } else {
+            emitResolve(host, 'selectOption', resolved);
+            selector = resolved.selector;
+          }
+        }
+
+        if (!selector) return { success: false, error: 'Provide selector or label' };
+
+        const el = document.querySelector(selector);
+        if (!el) return { success: false, error: `Element not found: ${selector}` };
+        if (!(el instanceof HTMLSelectElement)) {
+          return { success: false, error: 'Element is not a <select>' };
+        }
+        if (el.disabled) return { success: false, error: 'Select is disabled' };
+
+        const optionNorm = option.trim().toLowerCase();
+        let foundIndex = -1;
+
+        for (let i = 0; i < el.options.length; i++) {
+          const opt = el.options[i];
+          if (!opt) continue;
+          if (
+            opt.value.toLowerCase() === optionNorm ||
+            opt.text.trim().toLowerCase() === optionNorm ||
+            opt.label.trim().toLowerCase() === optionNorm
+          ) {
+            foundIndex = i;
+            break;
+          }
+        }
+
+        if (foundIndex === -1) {
+          return {
+            success: false,
+            error: `Option "${option}" not found. Available: ${Array.from(el.options).map((o) => `"${o.text}"`).join(', ')}`,
+          };
+        }
+
+        el.selectedIndex = foundIndex;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+
+        return { success: true, selector, selected: el.options[foundIndex]!.value };
+      },
+    },
+    {
+      name: 'submitForm',
+      description:
+        'Submit a form. Finds the nearest form from a selector or label, or submit button. Uses the native form submission API (requestSubmit when available) which triggers validation and submit events. Respects the autonomy policy and may require user confirmation.',
+      parameters: {
+        selector: { type: 'string', description: 'CSS selector for the form or a button/input inside the form' },
+        label: { type: 'string', description: 'Semantic label to resolve (e.g. "contact form", "sign up form")' },
+      },
+      required: [],
+      schemaVersion: 1,
+      execute: async (args) => {
+        if (typeof document === 'undefined') return { success: false, error: 'Not in browser' };
+
+        const model = host.getPageModel();
+        const selector = args.selector as string | undefined;
+        const label = args.label as string | undefined;
+
+        let form: HTMLFormElement | null = null;
+
+        if (selector) {
+          const el = document.querySelector(selector);
+          if (el instanceof HTMLFormElement) {
+            form = el;
+          } else if (el) {
+            form = el.closest('form');
+          }
+        }
+
+        if (!form && label && model) {
+          form = findFormFromChild(undefined, label, model);
+        }
+
+        if (!form) {
+          if (model && model.forms.length > 0) {
+            const firstForm = document.querySelector(model.forms[0]!.selector);
+            if (firstForm instanceof HTMLFormElement) {
+              form = firstForm;
+            }
+          }
+        }
+
+        if (!form) return { success: false, error: 'No form found. Provide a selector or label.' };
+
+        const autonomy = resolveAutonomy(host.autonomy);
+        const requiresConfirmation = confirmationRequiredForRisk(autonomy, 'submit');
+
+        if (requiresConfirmation) {
+          host.bus?.emit('action:confirmation-required', {
+            selector: model?.forms.find((f) => f.selector === selector)?.selector ?? form.id ?? 'unknown',
+            risk: 'submit',
+            reason: 'Form submission requires confirmation by autonomy policy.',
+          });
+          return {
+            success: false,
+            error: 'Form submission requires confirmation by autonomy policy.',
+            confirmationRequired: true,
+            risk: 'submit',
+          };
+        }
+
+        if (typeof form.requestSubmit === 'function') {
+          form.requestSubmit();
+        } else {
+          form.submit();
+        }
+
         return { success: true };
       },
     },

@@ -635,7 +635,7 @@ export class ContextManager {
           ? ` [error: ${field.errorMessage || 'invalid'}]`
           : '';
         lines.push(
-          `  - ${field.label || field.name} (${field.type})${req}${err}`,
+          `  - ${field.label || field.name} (${field.type})${req}${err} (${field.selector})`,
         );
       }
     }
@@ -717,6 +717,10 @@ export class ContextManager {
       '- If asked about content you cannot see, use readPageContent to access it',
       '- If cross-origin iframes are listed, explain you cannot read their content',
       '- Prefer working-set sections and interactives; use tools to expand context',
+      '- Use fillInput() to type into form fields (input, textarea, contenteditable); pass the selector from the Forms section or use label for fuzzy matching',
+      '- Use selectOption() to pick from a <select> dropdown; pass the option value or visible text',
+      '- Use submitForm() when the user asks to submit a form; alternatively, clickElement() can click a submit button if allowed',
+      '- After filling form fields, ask the user to review before submitting if autonomy policy requires confirmation',
     ];
 
     if (this._userPreference === 'voice') {

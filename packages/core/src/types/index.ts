@@ -73,6 +73,19 @@ export interface InteractiveElement {
   role?: string;
   isDisabled: boolean;
   guideKitTarget?: string;
+  /** Risk class used by autonomy policy before programmatic clicks. */
+  actionRisk?: ActionRisk;
+}
+
+/** Action risk classification for interactive elements and agent tools. */
+export type ActionRisk = 'safe' | 'submit' | 'purchase' | 'destructive' | 'auth' | 'unknown';
+
+/** Policy that controls what the agent may do without asking the user. */
+export interface AutonomyPolicy {
+  level?: 'guided' | 'ask-every-action' | 'broad';
+  allowNavigation?: boolean;
+  allowSafeClicks?: boolean;
+  requireConfirmationFor?: ActionRisk[];
 }
 
 /** A single field inside a form. */
@@ -328,6 +341,26 @@ export interface SearchResult {
   source: SourceAttribution;
 }
 
+/** Attributed result returned by server-backed website search. */
+export interface SiteSearchResult {
+  id: string;
+  title: string;
+  url: string;
+  excerpt: string;
+  score: number;
+  sectionId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface SiteSearchResponse {
+  results: SiteSearchResult[];
+}
+
+export interface SiteKnowledgeConfig {
+  endpoint: string;
+  topK?: number;
+}
+
 /** Attribution metadata linking a search result to its source document. */
 export interface SourceAttribution {
   documentId: string;
@@ -458,6 +491,7 @@ export interface GuideKitOptions {
     allow?: string[];
     deny?: string[];
   };
+  autonomy?: AutonomyPolicy;
   safetySettings?: Record<string, string>;
   /** Maximum character length for user messages. Default: 10000. */
   maxMessageLength?: number;
@@ -582,6 +616,8 @@ export interface GuideKitProviderProps {
     engine?: 'bm25' | 'tfidf';
     topK?: number;
   };
+  /** Server-backed whole-site retrieval endpoint. */
+  siteKnowledge?: SiteKnowledgeConfig;
   /** Plugin definitions (@guidekit/plugins). */
   plugins?: PluginDefinition[];
   /** Enable heuristic cognitive planning (@guidekit/core/cognitive). Default: false. */

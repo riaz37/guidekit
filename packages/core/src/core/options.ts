@@ -10,6 +10,7 @@ import type {
   KnowledgeDocument,
   PluginDefinition,
   GuideKitEvent,
+  SiteKnowledgeConfig,
 } from '../types/index.js';
 import type { GuideKitError } from '../errors/index.js';
 import type { BeforeLLMCallContext } from '../pipeline/types.js';
@@ -38,6 +39,7 @@ export interface GuideKitCoreOptions {
     engine?: 'bm25' | 'tfidf';
     topK?: number;
   };
+  siteKnowledge?: SiteKnowledgeConfig;
   plugins?: PluginDefinition[];
   hallucinationGuard?: boolean;
   /** Enable heuristic cognitive planning. Default: false. */

@@ -2,24 +2,68 @@
 // guidekit doctor — Validate API keys and provider connectivity
 // ---------------------------------------------------------------------------
 
-import { c, log, success, warn, error, info, heading, fileExists, readFile, findProjectRoot, detectFramework } from '../utils.js';
 import * as path from 'node:path';
+import { generateSecret } from '@guidekit/server';
+import {
+  c,
+  log,
+  success,
+  warn,
+  error,
+  info,
+  fileExists,
+  readFile,
+  writeFile,
+  findProjectRoot,
+  detectFramework,
+} from '../utils.js';
+import {
+  envTemplate,
+  getApiRoutePath,
+  getLayoutPath,
+  getProviderPath,
+  getProxyRoutesLibPath,
+  maybeWireProvidersInLayout,
+  scaffoldNextProxyRoutes,
+  scaffoldProvider,
+  updateEnvFile,
+  type FileOperationResult,
+} from './init.js';
+import { intro, outro, confirm } from '../prompts.js';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-interface CheckResult {
+export type DoctorCheckStatus = 'ok' | 'warn' | 'error' | 'skip';
+
+export type DoctorCheck = {
   name: string;
-  status: 'ok' | 'warn' | 'error' | 'skip';
+  status: DoctorCheckStatus;
   message: string;
-}
+  fix?: () => Promise<void>;
+  fixLabel?: string;
+};
+
+export type DoctorOptions = {
+  fix?: boolean;
+  json?: boolean;
+  cwd?: string;
+  silent?: boolean;
+};
+
+export type DoctorResult = {
+  checks: DoctorCheck[];
+  errors: number;
+  warnings: number;
+  fixesApplied: string[];
+};
 
 // ---------------------------------------------------------------------------
-// Individual checks
+// Environment checks
 // ---------------------------------------------------------------------------
 
-function checkEnvFile(root: string): CheckResult {
+function checkEnvFile(root: string): DoctorCheck {
   const envPath = path.join(root, '.env');
   const envLocalPath = path.join(root, '.env.local');
 
@@ -33,16 +77,28 @@ function checkEnvFile(root: string): CheckResult {
     name: '.env file',
     status: 'warn',
     message: 'No .env or .env.local found. API keys should be in environment variables.',
+    fix: async () => {
+      writeFile(envLocalPath, envTemplate());
+    },
+    fixLabel: 'Create .env.local with GuideKit variables',
   };
 }
 
-function checkGuidekitSecret(): CheckResult {
+function checkGuidekitSecret(root: string): DoctorCheck {
   const secret = process.env.GUIDEKIT_SECRET;
   if (!secret) {
     return {
       name: 'GUIDEKIT_SECRET',
       status: 'warn',
       message: 'Not set. Run `npx guidekit generate-secret` to create one.',
+      fix: async () => {
+        const envLocalPath = path.join(root, '.env.local');
+        if (!fileExists(envLocalPath)) {
+          writeFile(envLocalPath, envTemplate());
+        }
+        updateEnvFile(envLocalPath, 'GUIDEKIT_SECRET', generateSecret());
+      },
+      fixLabel: 'Generate signing secret in .env.local',
     };
   }
   if (secret.length < 32) {
@@ -50,12 +106,20 @@ function checkGuidekitSecret(): CheckResult {
       name: 'GUIDEKIT_SECRET',
       status: 'error',
       message: 'Secret is too short (< 32 chars). Generate a new one with `npx guidekit generate-secret`.',
+      fix: async () => {
+        const envLocalPath = path.join(root, '.env.local');
+        if (!fileExists(envLocalPath)) {
+          writeFile(envLocalPath, envTemplate());
+        }
+        updateEnvFile(envLocalPath, 'GUIDEKIT_SECRET', generateSecret());
+      },
+      fixLabel: 'Regenerate signing secret in .env.local',
     };
   }
   return { name: 'GUIDEKIT_SECRET', status: 'ok', message: 'Set and valid length' };
 }
 
-function checkLlmApiKey(): CheckResult {
+function checkLlmApiKey(): DoctorCheck {
   const key = process.env.LLM_API_KEY || process.env.GEMINI_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
   if (!key) {
     return {
@@ -74,7 +138,7 @@ function checkLlmApiKey(): CheckResult {
   return { name: 'LLM API Key', status: 'ok', message: 'Found' };
 }
 
-function checkSttApiKey(): CheckResult {
+function checkSttApiKey(): DoctorCheck {
   const key = process.env.STT_API_KEY || process.env.DEEPGRAM_KEY || process.env.DEEPGRAM_API_KEY;
   if (!key) {
     return {
@@ -87,7 +151,7 @@ function checkSttApiKey(): CheckResult {
   return { name: 'STT API Key', status: 'ok', message: 'Found' };
 }
 
-function checkTtsApiKey(): CheckResult {
+function checkTtsApiKey(): DoctorCheck {
   const key = process.env.TTS_API_KEY || process.env.ELEVENLABS_KEY || process.env.ELEVENLABS_API_KEY;
   if (!key) {
     return {
@@ -98,6 +162,53 @@ function checkTtsApiKey(): CheckResult {
     };
   }
   return { name: 'TTS API Key', status: 'ok', message: 'Found' };
+}
+
+function checkGitignore(root: string): DoctorCheck {
+  const gitignorePath = path.join(root, '.gitignore');
+  if (!fileExists(gitignorePath)) {
+    return {
+      name: '.gitignore',
+      status: 'warn',
+      message: 'No .gitignore found. Ensure .env files are not committed.',
+      fix: async () => {
+        writeFile(gitignorePath, '.env\n.env.local\n');
+      },
+      fixLabel: 'Create .gitignore ignoring .env files',
+    };
+  }
+  const content = readFile(gitignorePath);
+  if (!content.includes('.env')) {
+    return {
+      name: '.gitignore',
+      status: 'warn',
+      message: '.env is not in .gitignore. API keys could be accidentally committed.',
+      fix: async () => {
+        writeFile(gitignorePath, `${content.trimEnd()}\n.env\n.env.local\n`);
+      },
+      fixLabel: 'Add .env to .gitignore',
+    };
+  }
+  return { name: '.gitignore', status: 'ok', message: '.env files are ignored' };
+}
+
+// ---------------------------------------------------------------------------
+// Package checks
+// ---------------------------------------------------------------------------
+
+function checkPackageInstalled(root: string, pkg: string): DoctorCheck {
+  const pkgPath = path.join(root, 'package.json');
+  if (!fileExists(pkgPath)) {
+    return { name: pkg, status: 'error', message: 'No package.json found' };
+  }
+
+  const pkgJson = JSON.parse(readFile(pkgPath));
+  const deps = { ...pkgJson.dependencies, ...pkgJson.devDependencies };
+
+  if (deps[pkg]) {
+    return { name: pkg, status: 'ok', message: `Installed (${deps[pkg]})` };
+  }
+  return { name: pkg, status: 'error', message: 'Not installed' };
 }
 
 function projectUsesVoiceMode(root: string): boolean {
@@ -125,7 +236,6 @@ function projectUsesVoiceMode(root: string): boolean {
     return true;
   }
   if (process.env.NEXT_PUBLIC_GUIDEKIT_VOICE !== '0') {
-    // Example app defaults voice on unless explicitly disabled.
     const exampleProviders = path.join(root, 'apps', 'example-nextjs', 'app', 'providers.tsx');
     if (fileExists(exampleProviders)) {
       const content = readFile(exampleProviders);
@@ -138,7 +248,7 @@ function projectUsesVoiceMode(root: string): boolean {
   return false;
 }
 
-function checkVadPackage(root: string): CheckResult {
+function checkVadPackage(root: string): DoctorCheck {
   const pkgPath = path.join(root, 'package.json');
   if (!fileExists(pkgPath)) {
     return { name: '@guidekit/vad', status: 'skip', message: 'No package.json found' };
@@ -180,148 +290,7 @@ function checkVadPackage(root: string): CheckResult {
   return { name: '@guidekit/vad', status: 'ok', message: 'Installed (Silero VAD for mic pipeline)' };
 }
 
-function checkVoiceBrowserNote(): CheckResult {
-  return {
-    name: 'Voice browser support',
-    status: 'skip',
-    message:
-      'Use Chrome or Edge for Web Speech STT/TTS; Firefox needs Deepgram STT. Mic requires HTTPS or localhost.',
-  };
-}
-
-function checkPackageInstalled(root: string, pkg: string): CheckResult {
-  const pkgPath = path.join(root, 'package.json');
-  if (!fileExists(pkgPath)) {
-    return { name: pkg, status: 'error', message: 'No package.json found' };
-  }
-
-  const pkgJson = JSON.parse(readFile(pkgPath));
-  const deps = { ...pkgJson.dependencies, ...pkgJson.devDependencies };
-
-  if (deps[pkg]) {
-    return { name: pkg, status: 'ok', message: `Installed (${deps[pkg]})` };
-  }
-  return { name: pkg, status: 'error', message: 'Not installed' };
-}
-
-function checkGitignore(root: string): CheckResult {
-  const gitignorePath = path.join(root, '.gitignore');
-  if (!fileExists(gitignorePath)) {
-    return {
-      name: '.gitignore',
-      status: 'warn',
-      message: 'No .gitignore found. Ensure .env files are not committed.',
-    };
-  }
-  const content = readFile(gitignorePath);
-  if (!content.includes('.env')) {
-    return {
-      name: '.gitignore',
-      status: 'warn',
-      message: '.env is not in .gitignore. API keys could be accidentally committed.',
-    };
-  }
-  return { name: '.gitignore', status: 'ok', message: '.env files are ignored' };
-}
-
-async function checkProviderConnectivity(
-  name: string,
-  url: string,
-): Promise<CheckResult> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-
-    const response = await fetch(url, {
-      method: 'HEAD',
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-
-    if (response.ok || response.status === 401 || response.status === 403 || response.status === 405) {
-      return { name: `${name} connectivity`, status: 'ok', message: 'Reachable' };
-    }
-    return {
-      name: `${name} connectivity`,
-      status: 'warn',
-      message: `HTTP ${response.status}`,
-    };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    if (message.includes('abort')) {
-      return { name: `${name} connectivity`, status: 'error', message: 'Timeout (5s)' };
-    }
-    return { name: `${name} connectivity`, status: 'error', message };
-  }
-}
-
-function checkGuideKitRepoParity(root: string): CheckResult[] {
-  const tokenRoutePath = path.join(root, 'apps', 'example-nextjs', 'app', 'api', 'guidekit', 'token', 'route.ts');
-  const nightlyWorkflowPath = path.join(root, '.github', 'workflows', 'nightly.yml');
-  const ciWorkflowPath = path.join(root, '.github', 'workflows', 'ci.yml');
-  const playwrightConfigPath = path.join(root, 'playwright.config.ts');
-
-  if (
-    !fileExists(tokenRoutePath) ||
-    !fileExists(nightlyWorkflowPath) ||
-    !fileExists(ciWorkflowPath) ||
-    !fileExists(playwrightConfigPath)
-  ) {
-    return [];
-  }
-
-  const tokenRoute = readFile(tokenRoutePath);
-  const nightlyWorkflow = readFile(nightlyWorkflowPath);
-  const ciWorkflow = readFile(ciWorkflowPath);
-  const playwrightConfig = readFile(playwrightConfigPath);
-
-  const routeRequiresSecret = tokenRoute.includes('process.env.GUIDEKIT_SECRET');
-  const nightlySeedsSecret =
-    nightlyWorkflow.includes('GUIDEKIT_SECRET: guidekit-example-e2e-secret-32-chars');
-  const playwrightSeedsSecret =
-    playwrightConfig.includes('const E2E_GUIDEKIT_SECRET') &&
-    playwrightConfig.includes('GUIDEKIT_SECRET: E2E_GUIDEKIT_SECRET');
-  const ciRunsE2EOnPullRequests =
-    ciWorkflow.includes('pull_request:') &&
-    ciWorkflow.includes('name: E2E Tests') &&
-    !ciWorkflow.includes("if: github.event_name == 'push' && github.ref == 'refs/heads/main'");
-  const nightlyAuditBlocks =
-    nightlyWorkflow.includes('pnpm audit --prod') &&
-    !nightlyWorkflow.includes('pnpm audit --prod || true');
-
-  const parityIssues: string[] = [];
-  if (!routeRequiresSecret) parityIssues.push('token route no longer enforces GUIDEKIT_SECRET');
-  if (!nightlySeedsSecret) parityIssues.push('Nightly does not seed a deterministic test secret');
-  if (!playwrightSeedsSecret) parityIssues.push('Playwright webServer does not seed a deterministic test secret');
-
-  const results: CheckResult[] = [
-    {
-      name: 'GuideKit repo parity',
-      status: parityIssues.length === 0 ? 'ok' : 'warn',
-      message: parityIssues.length === 0
-        ? 'Example token route and automated E2E secret seeding are aligned for local and CI parity.'
-        : `Repo parity gaps: ${parityIssues.join('; ')}`,
-    },
-    {
-      name: 'Hosted E2E signal',
-      status: ciRunsE2EOnPullRequests ? 'ok' : 'warn',
-      message: ciRunsE2EOnPullRequests
-        ? 'Pull requests receive a hosted E2E signal before release-confidence fixes are merged.'
-        : 'Pull requests do not currently get a hosted E2E signal.',
-    },
-    {
-      name: 'Nightly dependency audit gate',
-      status: nightlyAuditBlocks ? 'ok' : 'warn',
-      message: nightlyAuditBlocks
-        ? 'Nightly fails when production dependency advisories are detected.'
-        : 'Nightly is not enforcing the production dependency audit exit code.',
-    },
-  ];
-
-  return results;
-}
-
-function checkPlatformPackages(root: string): CheckResult[] {
+function checkPlatformPackages(root: string): DoctorCheck[] {
   const pkgPath = path.join(root, 'package.json');
   if (!fileExists(pkgPath)) return [];
 
@@ -348,32 +317,20 @@ function checkPlatformPackages(root: string): CheckResult[] {
   }];
 }
 
-function usesSrcApp(root: string): boolean {
-  return fileExists(path.join(root, 'src', 'app'));
+function checkVoiceBrowserNote(): DoctorCheck {
+  return {
+    name: 'Voice browser support',
+    status: 'skip',
+    message:
+      'Use Chrome or Edge for Web Speech STT/TTS; Firefox needs Deepgram STT. Mic requires HTTPS or localhost.',
+  };
 }
 
-function getAppDir(root: string): string {
-  return usesSrcApp(root)
-    ? path.join(root, 'src', 'app')
-    : path.join(root, 'app');
-}
+// ---------------------------------------------------------------------------
+// Integration checks
+// ---------------------------------------------------------------------------
 
-function detectDevServerPort(root: string): number {
-  const pkgPath = path.join(root, 'package.json');
-  if (!fileExists(pkgPath)) return 3000;
-
-  const pkg = JSON.parse(readFile(pkgPath)) as { scripts?: Record<string, string> };
-  const devScript = pkg.scripts?.dev ?? pkg.scripts?.start ?? '';
-  const portMatch = devScript.match(/(?:^|\s)(?:-p|--port)\s+(\d+)/);
-  if (portMatch) return Number(portMatch[1]);
-
-  const portEnvMatch = devScript.match(/PORT=(\d+)/);
-  if (portEnvMatch) return Number(portEnvMatch[1]);
-
-  return 3000;
-}
-
-function checkProxyRouteFiles(root: string): CheckResult[] {
+function checkProxyRouteFiles(root: string): DoctorCheck[] {
   const framework = detectFramework(root);
   if (framework !== 'nextjs-app') {
     return [{
@@ -384,10 +341,10 @@ function checkProxyRouteFiles(root: string): CheckResult[] {
   }
 
   const required = [
-    { name: 'guidekit-routes helper', filePath: path.join(root, 'lib', 'guidekit-routes.ts') },
-    { name: 'token route', filePath: path.join(getAppDir(root), 'api', 'guidekit', 'token', 'route.ts') },
-    { name: 'LLM proxy route', filePath: path.join(getAppDir(root), 'api', 'guidekit', 'llm', 'route.ts') },
-    { name: 'health route', filePath: path.join(getAppDir(root), 'api', 'guidekit', 'health', 'route.ts') },
+    { name: 'guidekit-routes helper', filePath: getProxyRoutesLibPath(root) },
+    { name: 'token route', filePath: getApiRoutePath(root, 'token') },
+    { name: 'LLM proxy route', filePath: getApiRoutePath(root, 'llm') },
+    { name: 'health route', filePath: getApiRoutePath(root, 'health') },
   ];
 
   const missing = required.filter((entry) => !fileExists(entry.filePath));
@@ -403,10 +360,15 @@ function checkProxyRouteFiles(root: string): CheckResult[] {
     name: 'Proxy routes',
     status: 'warn',
     message: `Missing: ${missing.map((entry) => entry.name).join(', ')}. Run npx guidekit init to scaffold proxy mode.`,
+    fix: async () => {
+      const opResult: FileOperationResult = { createdFiles: [], skippedFiles: [], warnings: [], nextSteps: [] };
+      await scaffoldNextProxyRoutes(root, false, opResult, true);
+    },
+    fixLabel: 'Scaffold missing proxy routes',
   }];
 }
 
-function checkProviderWiring(root: string): CheckResult {
+function checkProviderWiring(root: string): DoctorCheck {
   const framework = detectFramework(root);
   if (framework !== 'nextjs-app') {
     return {
@@ -416,7 +378,7 @@ function checkProviderWiring(root: string): CheckResult {
     };
   }
 
-  const layoutPath = path.join(getAppDir(root), 'layout.tsx');
+  const layoutPath = getLayoutPath(root);
   if (!fileExists(layoutPath)) {
     return {
       name: 'Provider wiring',
@@ -444,14 +406,73 @@ function checkProviderWiring(root: string): CheckResult {
     name: 'Provider wiring',
     status: 'warn',
     message: 'layout.tsx does not import Providers. Import ./providers and wrap {children}.',
+    fix: async () => {
+      const opResult: FileOperationResult = { createdFiles: [], skippedFiles: [], warnings: [], nextSteps: [] };
+      const providerPath = getProviderPath(root, framework);
+      if (providerPath && !fileExists(providerPath)) {
+        await scaffoldProvider(root, opResult, framework, false, 'text', true);
+      }
+      await maybeWireProvidersInLayout(root, opResult, true);
+    },
+    fixLabel: 'Create provider component and wire layout.tsx',
   };
+}
+
+// ---------------------------------------------------------------------------
+// Connectivity checks
+// ---------------------------------------------------------------------------
+
+async function checkProviderConnectivity(
+  name: string,
+  url: string,
+): Promise<DoctorCheck> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+
+    const response = await fetch(url, {
+      method: 'HEAD',
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (response.ok || response.status === 401 || response.status === 403 || response.status === 405) {
+      return { name: `${name} connectivity`, status: 'ok', message: 'Reachable' };
+    }
+    return {
+      name: `${name} connectivity`,
+      status: 'warn',
+      message: `HTTP ${response.status}`,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    if (message.includes('abort')) {
+      return { name: `${name} connectivity`, status: 'error', message: 'Timeout (5s)' };
+    }
+    return { name: `${name} connectivity`, status: 'error', message };
+  }
+}
+
+function detectDevServerPort(root: string): number {
+  const pkgPath = path.join(root, 'package.json');
+  if (!fileExists(pkgPath)) return 3000;
+
+  const pkg = JSON.parse(readFile(pkgPath)) as { scripts?: Record<string, string> };
+  const devScript = pkg.scripts?.dev ?? pkg.scripts?.start ?? '';
+  const portMatch = devScript.match(/(?:^|\s)(?:-p|--port)\s+(\d+)/);
+  if (portMatch) return Number(portMatch[1]);
+
+  const portEnvMatch = devScript.match(/PORT=(\d+)/);
+  if (portEnvMatch) return Number(portEnvMatch[1]);
+
+  return 3000;
 }
 
 async function checkLocalGuidekitEndpoint(
   name: string,
   url: string,
   method: 'GET' | 'POST',
-): Promise<CheckResult> {
+): Promise<DoctorCheck> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 500);
@@ -495,7 +516,7 @@ async function checkLocalGuidekitEndpoint(
   }
 }
 
-async function checkLocalIntegration(root: string): Promise<CheckResult[]> {
+async function checkLocalIntegration(root: string): Promise<DoctorCheck[]> {
   const framework = detectFramework(root);
   if (framework !== 'nextjs-app') return [];
 
@@ -509,105 +530,229 @@ async function checkLocalIntegration(root: string): Promise<CheckResult[]> {
 }
 
 // ---------------------------------------------------------------------------
+// GuideKit repo parity checks
+// ---------------------------------------------------------------------------
+
+function checkGuideKitRepoParity(root: string): DoctorCheck[] {
+  const tokenRoutePath = path.join(root, 'apps', 'example-nextjs', 'app', 'api', 'guidekit', 'token', 'route.ts');
+  const nightlyWorkflowPath = path.join(root, '.github', 'workflows', 'nightly.yml');
+  const ciWorkflowPath = path.join(root, '.github', 'workflows', 'ci.yml');
+  const playwrightConfigPath = path.join(root, 'playwright.config.ts');
+
+  if (
+    !fileExists(tokenRoutePath) ||
+    !fileExists(nightlyWorkflowPath) ||
+    !fileExists(ciWorkflowPath) ||
+    !fileExists(playwrightConfigPath)
+  ) {
+    return [];
+  }
+
+  const tokenRoute = readFile(tokenRoutePath);
+  const nightlyWorkflow = readFile(nightlyWorkflowPath);
+  const ciWorkflow = readFile(ciWorkflowPath);
+  const playwrightConfig = readFile(playwrightConfigPath);
+
+  const routeRequiresSecret = tokenRoute.includes('process.env.GUIDEKIT_SECRET');
+  const nightlySeedsSecret =
+    nightlyWorkflow.includes('GUIDEKIT_SECRET: guidekit-example-e2e-secret-32-chars');
+  const playwrightSeedsSecret =
+    playwrightConfig.includes('const E2E_GUIDEKIT_SECRET') &&
+    playwrightConfig.includes('GUIDEKIT_SECRET: E2E_GUIDEKIT_SECRET');
+  const ciRunsE2EOnPullRequests =
+    ciWorkflow.includes('pull_request:') &&
+    ciWorkflow.includes('name: E2E Tests') &&
+    !ciWorkflow.includes("if: github.event_name == 'push' && github.ref == 'refs/heads/main'");
+  const nightlyAuditBlocks =
+    nightlyWorkflow.includes('pnpm audit --prod') &&
+    !nightlyWorkflow.includes('pnpm audit --prod || true');
+
+  const parityIssues: string[] = [];
+  if (!routeRequiresSecret) parityIssues.push('token route no longer enforces GUIDEKIT_SECRET');
+  if (!nightlySeedsSecret) parityIssues.push('Nightly does not seed a deterministic test secret');
+  if (!playwrightSeedsSecret) parityIssues.push('Playwright webServer does not seed a deterministic test secret');
+
+  const results: DoctorCheck[] = [
+    {
+      name: 'GuideKit repo parity',
+      status: parityIssues.length === 0 ? 'ok' : 'warn',
+      message: parityIssues.length === 0
+        ? 'Example token route and automated E2E secret seeding are aligned for local and CI parity.'
+        : `Repo parity gaps: ${parityIssues.join('; ')}`,
+    },
+    {
+      name: 'Hosted E2E signal',
+      status: ciRunsE2EOnPullRequests ? 'ok' : 'warn',
+      message: ciRunsE2EOnPullRequests
+        ? 'Pull requests receive a hosted E2E signal before release-confidence fixes are merged.'
+        : 'Pull requests do not currently get a hosted E2E signal.',
+    },
+    {
+      name: 'Nightly dependency audit gate',
+      status: nightlyAuditBlocks ? 'ok' : 'warn',
+      message: nightlyAuditBlocks
+        ? 'Nightly fails when production dependency advisories are detected.'
+        : 'Nightly is not enforcing the production dependency audit exit code.',
+    },
+  ];
+
+  return results;
+}
+
+// ---------------------------------------------------------------------------
+// Output helpers
+// ---------------------------------------------------------------------------
+
+function printCheck(check: DoctorCheck): void {
+  let icon: string;
+  let color: string;
+  switch (check.status) {
+    case 'ok':
+      icon = '✓';
+      color = c.green;
+      break;
+    case 'warn':
+      icon = '!';
+      color = c.yellow;
+      break;
+    case 'error':
+      icon = '✗';
+      color = c.red;
+      break;
+    case 'skip':
+      icon = '○';
+      color = c.dim;
+      break;
+  }
+  log(`  ${color}${icon}${c.reset} ${check.name}: ${c.dim}${check.message}${c.reset}`);
+}
+
+function printSection(title: string, checks: DoctorCheck[], silent: boolean): void {
+  if (silent || checks.length === 0) return;
+  log(`${c.bold}${title}${c.reset}`);
+  for (const check of checks) {
+    printCheck(check);
+  }
+  log('');
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
-export async function runDoctor(): Promise<void> {
-  heading('GuideKit Doctor — Checking your setup');
+export async function runDoctor(options: DoctorOptions = {}): Promise<DoctorResult> {
+  const root = options.cwd ?? findProjectRoot();
+  const autoFix = options.fix ?? false;
+  const silent = options.silent ?? false;
 
-  const root = findProjectRoot();
-  info(`Project root: ${c.dim}${root}${c.reset}`);
-  log('');
+  const result: DoctorResult = {
+    checks: [],
+    errors: 0,
+    warnings: 0,
+    fixesApplied: [],
+  };
 
-  const results: CheckResult[] = [];
-
-  // Static checks
-  log(`${c.bold}Environment${c.reset}`);
-  results.push(checkEnvFile(root));
-  results.push(checkGitignore(root));
-  results.push(checkGuidekitSecret());
-  results.push(checkLlmApiKey());
-  results.push(checkSttApiKey());
-  results.push(checkTtsApiKey());
-
-  log(`${c.bold}Packages${c.reset}`);
-  results.push(checkPackageInstalled(root, '@guidekit/core'));
-  results.push(checkPackageInstalled(root, '@guidekit/react'));
-  results.push(checkPackageInstalled(root, '@guidekit/server'));
-  results.push(checkVadPackage(root));
-  results.push(...checkPlatformPackages(root));
-
-  log(`${c.bold}Voice${c.reset}`);
-  results.push(checkVoiceBrowserNote());
-
-  const integrationChecks = checkProxyRouteFiles(root);
-  if (integrationChecks.length > 0) {
-    log(`${c.bold}Integration${c.reset}`);
-    results.push(...integrationChecks);
-    results.push(checkProviderWiring(root));
+  if (!silent) {
+    intro('GuideKit Doctor', 'Checking your setup');
+    info(`Project root: ${c.dim}${root}${c.reset}`);
+    log('');
   }
 
-  // Connectivity checks
-  log(`${c.bold}Connectivity${c.reset}`);
-  const connectivityResults = await Promise.all([
+  // Environment
+  const envChecks = [
+    checkEnvFile(root),
+    checkGitignore(root),
+    checkGuidekitSecret(root),
+    checkLlmApiKey(),
+    checkSttApiKey(),
+    checkTtsApiKey(),
+  ];
+  printSection('Environment', envChecks, silent);
+  result.checks.push(...envChecks);
+
+  // Packages
+  const packageChecks = [
+    checkPackageInstalled(root, '@guidekit/core'),
+    checkPackageInstalled(root, '@guidekit/react'),
+    checkPackageInstalled(root, '@guidekit/server'),
+    checkVadPackage(root),
+    ...checkPlatformPackages(root),
+  ];
+  printSection('Packages', packageChecks, silent);
+  result.checks.push(...packageChecks);
+
+  // Voice
+  const voiceChecks = [checkVoiceBrowserNote()];
+  printSection('Voice', voiceChecks, silent);
+  result.checks.push(...voiceChecks);
+
+  // Integration
+  const integrationChecks = [...checkProxyRouteFiles(root), checkProviderWiring(root)];
+  printSection('Integration', integrationChecks, silent);
+  result.checks.push(...integrationChecks);
+
+  // Connectivity
+  const connectivityChecks = await Promise.all([
     checkProviderConnectivity('Google AI', 'https://generativelanguage.googleapis.com'),
     checkProviderConnectivity('Deepgram', 'https://api.deepgram.com'),
     checkProviderConnectivity('ElevenLabs', 'https://api.elevenlabs.io'),
   ]);
-  results.push(...connectivityResults);
+  printSection('Connectivity', connectivityChecks, silent);
+  result.checks.push(...connectivityChecks);
 
+  // Local endpoints
   const localChecks = await checkLocalIntegration(root);
-  if (localChecks.length > 0) {
-    log(`${c.bold}Local endpoints${c.reset}`);
-    results.push(...localChecks);
+  printSection('Local endpoints', localChecks, silent);
+  result.checks.push(...localChecks);
+
+  // Repo parity
+  const repoChecks = checkGuideKitRepoParity(root);
+  printSection('GuideKit Repo Parity', repoChecks, silent);
+  result.checks.push(...repoChecks);
+
+  // Count
+  for (const check of result.checks) {
+    if (check.status === 'error') result.errors++;
+    if (check.status === 'warn') result.warnings++;
   }
 
-  const repoParityChecks = checkGuideKitRepoParity(root);
-  if (repoParityChecks.length > 0) {
-    log(`${c.bold}GuideKit Repo Parity${c.reset}`);
-    results.push(...repoParityChecks);
-  }
+  // Remediation
+  const fixable = result.checks.filter(
+    (check) => check.fix && (check.status === 'warn' || check.status === 'error'),
+  );
 
-  // Print results
-  log('');
-  heading('Results');
+  if (fixable.length > 0 && !silent) {
+    const shouldFix = autoFix || await confirm(
+      `${fixable.length} issue(s) can be fixed automatically. Apply fixes?`,
+      { defaultValue: false },
+    );
 
-  let errors = 0;
-  let warnings = 0;
-
-  for (const result of results) {
-    let icon: string;
-    let color: string;
-    switch (result.status) {
-      case 'ok':
-        icon = '✓';
-        color = c.green;
-        break;
-      case 'warn':
-        icon = '!';
-        color = c.yellow;
-        warnings++;
-        break;
-      case 'error':
-        icon = '✗';
-        color = c.red;
-        errors++;
-        break;
-      case 'skip':
-        icon = '○';
-        color = c.dim;
-        break;
+    if (shouldFix) {
+      for (const check of fixable) {
+        if (!check.fix) continue;
+        try {
+          await check.fix();
+          result.fixesApplied.push(check.name);
+          success(`Fixed: ${check.name}`);
+        } catch (err) {
+          error(`Failed to fix ${check.name}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+      log('');
     }
-    log(`  ${color}${icon}${c.reset} ${result.name}: ${c.dim}${result.message}${c.reset}`);
   }
 
-  log('');
-
-  if (errors > 0) {
-    error(`${errors} error(s) found. Fix these before deploying.`);
-  } else if (warnings > 0) {
-    warn(`${warnings} warning(s). Everything should work, but review the warnings above.`);
-  } else {
-    success('All checks passed! Your GuideKit setup looks good.');
+  // Summary
+  if (!silent) {
+    if (result.errors > 0) {
+      error(`${result.errors} error(s) found. Fix these before deploying.`);
+    } else if (result.warnings > 0) {
+      warn(`${result.warnings} warning(s). Everything should work, but review the warnings above.`);
+    } else {
+      success('All checks passed! Your GuideKit setup looks good.');
+    }
+    outro('Doctor complete');
   }
+
+  return result;
 }

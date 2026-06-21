@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import {
   platformDemoPlugin,
@@ -16,6 +17,8 @@ const GuideKitProvider = dynamic(
 
 /** Demo layout with cognitive engine enabled for E2E contract tests. */
 export default function DemoLayout({ children }: { children: ReactNode }) {
+  const router = useRouter();
+
   return (
     <GuideKitProvider
       tokenEndpoint="/api/guidekit/token"
@@ -32,6 +35,7 @@ export default function DemoLayout({ children }: { children: ReactNode }) {
       hallucinationGuard
       cognitive
       agent={{ name: 'GuideKit Cognitive Demo', greeting: 'Cognitive mode is enabled.' }}
+      navigation={{ router }}
       options={{
         debug: process.env.NODE_ENV === 'development',
         mode: 'text',

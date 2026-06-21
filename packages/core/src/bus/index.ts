@@ -43,7 +43,8 @@ export interface EventMap {
   };
 
   // -- Action safety --------------------------------------------------------
-  'action:confirmation-required': { selector: string; reason?: string };
+  'action:confirmation-required': { selector: string; reason?: string; risk?: import('../types/index.js').ActionRisk };
+  'site-search:error': { message: string };
 
   // -- Voice events ---------------------------------------------------------
   'voice:state-change': { from: string; to: string };

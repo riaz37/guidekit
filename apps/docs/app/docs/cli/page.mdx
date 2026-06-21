@@ -36,13 +36,28 @@ npx guidekit init --platform
 6. Creates a provider wrapper component (Next.js App Router)
 7. Optionally patches `layout.tsx` to import `Providers`
 
+**Options:**
+- `--yes` — Skip prompts and use defaults
+- `--platform` — Enable Platform Mode (RAG, plugins, intelligence)
+- `--auth-mode token|direct` — Proxy auth mode (default: `token`)
+- `--json` — Output the scaffold result as JSON (implies `--yes`)
+
+```bash
+npx guidekit init --yes --platform
+npx guidekit init --yes --auth-mode direct --json
+```
+
 ### `guidekit doctor`
 
 Validates your setup — checks environment variables, packages, proxy route files, provider wiring, local endpoints (when the dev server is running), external provider connectivity, and, when run inside the GuideKit monorepo, CI/local parity for the example app and release-confidence workflows.
 
 ```bash
 npx guidekit doctor
+npx guidekit doctor --fix
+npx guidekit doctor --json
 ```
+
+When run interactively, `doctor` will offer to apply safe fixes (create `.env.local`, generate a `GUIDEKIT_SECRET`, add `.env` to `.gitignore`, scaffold missing proxy routes, and wire the provider into `layout.tsx`). Use `--fix` to apply them without prompting, or `--json` to get machine-readable output.
 
 **Checks performed:**
 - `.env` / `.env.local` file exists
@@ -89,7 +104,12 @@ Generates a cryptographically random 256-bit signing secret for JWT token authen
 
 ```bash
 npx guidekit generate-secret
+npx guidekit generate-secret --write-env
+npx guidekit generate-secret --write-env --copy
+npx guidekit generate-secret --json
 ```
+
+When run interactively, the command can write `GUIDEKIT_SECRET` directly to `.env.local` and copy it to the clipboard. Use `--write-env` and `--copy` to do this without prompting, or `--json` to get machine-readable output.
 
 **Output:**
 ```
@@ -99,12 +119,20 @@ GuideKit — Generate Signing Secret
 
   SIIwq8fzeBsh1s5WTTMBZEiXcxU5BH51A0ScD5ORVvQ
 
-Add this to your .env file:
-
-  GUIDEKIT_SECRET=SIIwq8fzeBsh1s5WTTMBZEiXcxU5BH51A0ScD5ORVvQ
+✓ Saved GUIDEKIT_SECRET to /Users/you/myapp/.env.local
 
 Warning: Keep this secret safe. Never commit it to version control.
 ```
+
+## Interactive menu
+
+Running `npx guidekit` without a command in an interactive terminal opens a menu so you can pick a command instead of typing it:
+
+```bash
+npx guidekit
+```
+
+In CI or non-TTY environments, the same command prints the help text below.
 
 ## Help
 
